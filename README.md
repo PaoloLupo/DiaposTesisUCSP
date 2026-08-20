@@ -1,6 +1,4 @@
-# 02
-
-Proyecto `video` generado por Gaanim.
+# Diapositivas Tesis
 
 ## Editar y previsualizar
 
