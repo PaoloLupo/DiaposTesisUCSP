@@ -1,0 +1,10 @@
+exports/*
+!exports/.gitkeep
+snapshots/
+__pycache__/
+*.mp4
+*.webm
+*.webp
+*.gif
+AGENTS.md
+.venv/
