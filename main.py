@@ -1,4 +1,4 @@
-from gaanim import BLACK, ORANGE, WHITE, Anchor, Background, Direction, Scene, Transition
+from gaanim import BLACK, BLUE, GRAY, ORANGE, PURPLE, RED, WHITE, Anchor, Background, Direction, Scene, Transition
 
 
 #---------------------------------
@@ -86,7 +86,9 @@ headline = scene.text(
 title_accent = scene.line(-880, 270, 880, 270).stroke(ACCENT, 5)
 
 edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
-mapa_peru = scene.svg("peru.svg").no_fill().stroke(BLACK,3).scaled(0.8).at(400, -100)
+mapa_peru = scene.svg("peru.svg").fill(GRAY).stroke(BLACK,3).scaled(0.8).at(400, -100)
+porcentaje = scene.badge("$+50 %$ viviendas construidas\nen zonas urbanas", variant="accent", appearance="soft")
+
 
 scene.play([
     eyebrow.fade_in_from(direction=Direction.DOWN, distance=20),
@@ -96,9 +98,10 @@ scene.play([
 
 scene.play([
     edif_svg.write(1.5),
-    mapa_peru.write()
+    mapa_peru.write(),
+    porcentaje.fade_in(),
 ])
 
-scene.wait(5)
+scene.stop()
 
 scene.render()
