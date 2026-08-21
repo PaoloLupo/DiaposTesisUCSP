@@ -1,4 +1,4 @@
-from gaanim import BLACK, WHITE, Anchor, Background, Direction, Scene, Transition
+from gaanim import BLACK, ORANGE, WHITE, Anchor, Background, Direction, Scene, Transition
 
 
 #---------------------------------
@@ -76,17 +76,27 @@ scene.stop()
 _ = scene.segment("Contexto del problema", Transition.cross_fade(0.55))
 
 eyebrow = scene.text("02  /  CONTEXTO DEL PROBLEMA").fill(ACCENT).scaled(0.72).at(
-    -880, 420, Anchor.TOP_LEFT
+    -880, 450, Anchor.TOP_LEFT
 )
 
 headline = scene.text(
     "La *albañilería confinada* como sistema constructivo *masivo*\nen un país con *alta actividad sísmica*",
     role="title",
-).fill(BLACK).at(-880, 360, Anchor.TOP_LEFT)
+).fill(BLACK).at(-880, 400, Anchor.TOP_LEFT)
+title_accent = scene.line(-880, 270, 880, 270).stroke(ACCENT, 5)
+
+edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
+mapa_peru = scene.svg("peru.svg").no_fill().stroke(BLACK,3).scaled(0.8).at(400, -100)
 
 scene.play([
     eyebrow.fade_in_from(direction=Direction.DOWN, distance=20),
-    headline.write()
+    headline.write(),
+    title_accent.create()
+])
+
+scene.play([
+    edif_svg.write(1.5),
+    mapa_peru.write()
 ])
 
 scene.wait(5)
