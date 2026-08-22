@@ -1,5 +1,10 @@
 [project]
-name = "02"
+name = "diapostesis"
 version = "0.1.0"
 requires-python = ">=3.14"
-dependencies = ["gaanim"]
+dependencies = [
+    "gaanim",
+]
+
+[tool.uv.sources]
+gaanim = { path = "/home/paologl/dev/rust/gaanim/target/wheels/gaanim-0.1.0-py3-none-any.whl" }
