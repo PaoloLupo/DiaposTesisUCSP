@@ -93,7 +93,6 @@ headline = (
     .at(-880, 400, Anchor.TOP_LEFT)
 )
 title_accent = scene.line(-880, 280, 880, 280).stroke(ACCENT, 5)
-# inei_text = scene.text("Según INEI,").at(0,0)
 
 # edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
 mapa_peru_mask = (
@@ -117,17 +116,9 @@ mapa_peru = (
     )
     .z_index(-1)
 )
-# porcentaje = scene.badge(
-#     "$+50 %$ viviendas construidas\nen zonas urbanas",
-#     variant="accent",
-#     appearance="soft",
-# ).at(-100, -100)
 
 peru_group = scene.group([mapa_peru_mask, porcentaje_alb_txt, mapa_peru])
 
-# Gráfico que aparecerá a la derecha después de desplazar el mapa.
-# Los datos se ordenan de mayor a menor y se expresan como porcentaje
-# del total de viviendas particulares del Perú.
 materiales_ordenados = sorted(
     [
         ("Ladrillo\no bloque", 6_283_079),
@@ -185,17 +176,22 @@ materiales_spec = (
         y=Axis.linear(0, 70).ticks(10).label("Viviendas (%)"),
     )
 )
-materiales_chart = scene.chart(materiales_spec).scaled(0.50).at(250, -70)
-
 materiales_title = (
     scene.text(
-        "Material predominante en paredes",
+        "Material de construcción predominante en paredes",
         role="subtitle",
     )
     .fill(BLACK)
-    .scaled(0.72)
+    .scaled(0.50)
     .at(250, 130)
 )
+
+materiales_chart = scene.chart(materiales_spec).scaled(0.50).at(250, -70)
+materiales_fuente = scene.text("_Fuente: INEI 2025_",role="caption").scaled(0.5).at(530, -310).fill(GRAY)
+materiales_group = scene.group([materiales_chart.drawable(), materiales_fuente, materiales_title])
+
+autoconstruccion_txt = scene.badge("En su mayoría autoconstruidas", variant="danger").at(250, -300)
+# edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
 
 scene.play(
     [
@@ -236,10 +232,18 @@ scene.play(
     [
         materiales_chart.layer("marks").write().duration(1.1),
         materiales_chart.layer("labels").write().duration(1.5),
+        materiales_fuente.write()
     ],
     lag=1,
 )
 
 scene.stop("materiales-listo")
+
+scene.play([
+    materiales_group.move(0, 100),
+    autoconstruccion_txt.fade_in(),
+])
+
+scene.stop()
 
 scene.render()
