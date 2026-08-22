@@ -88,14 +88,28 @@ headline = (
     .at(-880, 400, Anchor.TOP_LEFT)
 )
 title_accent = scene.line(-880, 270, 880, 270).stroke(ACCENT, 5)
+# inei_text = scene.text("Según INEI,").at(0,0)
 
-edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
-mapa_peru = scene.svg("peru.svg").fill(GRAY).stroke(BLACK, 3).scaled(0.8).at(400, -100)
-porcentaje = scene.badge(
-    "$+50 %$ viviendas construidas\nen zonas urbanas",
-    variant="accent",
-    appearance="soft",
+# edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
+mapa_peru_mask = (
+    scene.svg("peru.svg").no_fill().stroke(BLACK, 3).scaled(0.8).at(0, -100)
 )
+
+porcentaje_alb = scene.parameter(0.0)
+porcentaje_alb_txt = scene.readout(porcentaje_alb, format=".0f", suffix = "%", font_size=110).at(0,-200).glow(BLACK,3).fill(BLACK)
+# TODO: eliminar el artificio de opacity(0) cuando se arregle el bug #3
+mapa_peru = scene.fill_level(
+    mapa_peru_mask,
+    ORANGE,
+    0.0,
+    direction="up",
+    keep_outline=False,
+).opacity(0).z_index(-1)
+# porcentaje = scene.badge(
+#     "$+50 %$ viviendas construidas\nen zonas urbanas",
+#     variant="accent",
+#     appearance="soft",
+# ).at(-100, -100)
 
 
 scene.play(
@@ -103,14 +117,22 @@ scene.play(
         eyebrow.fade_in_from(direction=Direction.DOWN, distance=20),
         headline.write(),
         title_accent.create(),
+        mapa_peru_mask.write(),
     ]
 )
 
+scene.stop()
+
 scene.play(
     [
-        edif_svg.write(1.5),
-        mapa_peru.write(),
-        porcentaje.fade_in(),
+        # edif_svg.write(1.5),
+        mapa_peru_mask.animate().stroke(GRAY,2),
+
+        scene.camera.frame_to(mapa_peru_mask, margin=0, duration=1.2),
+        porcentaje_alb_txt.fade_in(),
+        porcentaje_alb.animate_to(55.0),
+        # TODO: eliminar el artificio de opacity(0) cuando se arregle el bug #3
+        mapa_peru.animate().opacity(1).fill_level(0.55).duration(1.2),
     ]
 )
 
