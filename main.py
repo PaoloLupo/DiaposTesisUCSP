@@ -9,11 +9,16 @@ from gaanim import (
     RED,
     WHITE,
     Anchor,
+    Axis,
     Background,
     Brush,
+    ChartSpec,
     Direction,
+    Field,
+    Scale,
     Scene,
     Transition,
+    Value,
 )
 
 # ---------------------------------
@@ -87,7 +92,7 @@ headline = (
     .fill(BLACK)
     .at(-880, 400, Anchor.TOP_LEFT)
 )
-title_accent = scene.line(-880, 270, 880, 270).stroke(ACCENT, 5)
+title_accent = scene.line(-880, 280, 880, 280).stroke(ACCENT, 5)
 # inei_text = scene.text("Según INEI,").at(0,0)
 
 # edif_svg = scene.svg("edif_alba.svg").scaled(0.5).at(-550, -100)
@@ -96,21 +101,101 @@ mapa_peru_mask = (
 )
 
 porcentaje_alb = scene.parameter(0.0)
-porcentaje_alb_txt = scene.readout(porcentaje_alb, format=".0f", suffix = "%", font_size=110).at(0,-200).glow(BLACK,3).fill(BLACK)
-# TODO: eliminar el artificio de opacity(0) cuando se arregle el bug #3
-mapa_peru = scene.fill_level(
-    mapa_peru_mask,
-    ORANGE,
-    0.0,
-    direction="up",
-    keep_outline=False,
-).opacity(0).z_index(-1)
+porcentaje_alb_txt = (
+    scene.readout(porcentaje_alb, format=".0f", suffix="%", font_size=110)
+    .at(-15, -200)
+    .glow(BLACK, 3)
+    .fill(BLACK)
+)
+mapa_peru = (
+    scene.fill_level(
+        mapa_peru_mask,
+        ORANGE,
+        0.0,
+        direction="up",
+        keep_outline=False,
+    )
+    .z_index(-1)
+)
 # porcentaje = scene.badge(
 #     "$+50 %$ viviendas construidas\nen zonas urbanas",
 #     variant="accent",
 #     appearance="soft",
 # ).at(-100, -100)
 
+peru_group = scene.group([mapa_peru_mask, porcentaje_alb_txt, mapa_peru])
+
+# Gráfico que aparecerá a la derecha después de desplazar el mapa.
+# Los datos se ordenan de mayor a menor y se expresan como porcentaje
+# del total de viviendas particulares del Perú.
+materiales_ordenados = sorted(
+    [
+        ("Ladrillo\no bloque", 6_283_079),
+        ("Adobe", 1_914_324),
+        ("Madera", 923_006),
+        ("Tapia", 435_795),
+        ("Triplay\ncalamina", 317_806),
+        ("Quincha", 123_433),
+        ("Piedra\ncon barro", 66_852),
+        ("Piedra /\nsillar", 66_081),
+        ("Otro", 37_147),
+    ],
+    key=lambda item: item[1],
+    reverse=True,
+)
+total_viviendas = 10_167_523
+materiales = [material for material, _ in materiales_ordenados]
+colores_materiales = [
+    ORANGE,
+    "#B7791F",
+    "#8B5E3C",
+    "#A16207",
+    "#64748B",
+    "#D97706",
+    "#78716C",
+    "#94A3B8",
+    "#475569",
+]
+materiales_porcentaje = [
+    100 * viviendas / total_viviendas for _, viviendas in materiales_ordenados
+]
+
+materiales_data = {
+    "id": [str(index) for index in range(len(materiales))],
+    "material": materiales,
+    "color_material": materiales,
+    "viviendas_porcentaje": materiales_porcentaje,
+    "rotulo": [f"{porcentaje:.2f}%" for porcentaje in materiales_porcentaje],
+}
+
+materiales_spec = (
+    ChartSpec(materiales_data, key="id")
+    .mark("bar", width=0.72, label_position="outside", label_offset=18)
+    .encode(
+        x="material",
+        y="viviendas_porcentaje",
+        color=Field(
+            "color_material",
+            scale=Scale.category(materiales).colors(colores_materiales),
+        ),
+        label="rotulo",
+    )
+    .axes(
+        x=Axis.category(materiales).label("Material predominante"),
+        y=Axis.linear(0, 70).ticks(10).label("Viviendas (%)"),
+    )
+)
+materiales_chart = scene.chart(materiales_spec).scaled(0.50).at(250, -70)
+
+materiales_title = (
+    scene.text(
+        "Material predominante en paredes",
+        role="subtitle",
+    )
+    .fill(BLACK)
+    .scaled(0.72)
+    .at(250, 130)
+)
 
 scene.play(
     [
@@ -126,16 +211,35 @@ scene.stop()
 scene.play(
     [
         # edif_svg.write(1.5),
-        mapa_peru_mask.animate().stroke(GRAY,2),
-
         scene.camera.frame_to(mapa_peru_mask, margin=0, duration=1.2),
+        mapa_peru_mask.animate().stroke(GRAY, 2),
         porcentaje_alb_txt.fade_in(),
-        porcentaje_alb.animate_to(55.0),
-        # TODO: eliminar el artificio de opacity(0) cuando se arregle el bug #3
-        mapa_peru.animate().opacity(1).fill_level(0.55).duration(1.2),
+        porcentaje_alb.animate_to(61.8),
+        mapa_peru.animate().fill_level(0.55).duration(1.2),
+    ]
+)
+scene.wait(1)
+
+scene.play(
+    [
+        peru_group.move(-400, 0).duration(1.0),
     ]
 )
 
-scene.stop()
+scene.play(
+    [
+        materiales_chart.write(),
+        materiales_title.fade_in_from(Direction.DOWN, distance=20).duration(0.5),
+    ]
+)
+scene.play(
+    [
+        materiales_chart.layer("marks").write().duration(1.1),
+        materiales_chart.layer("labels").write().duration(1.5),
+    ],
+    lag=1,
+)
+
+scene.stop("materiales-listo")
 
 scene.render()
