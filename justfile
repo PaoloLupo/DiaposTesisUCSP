@@ -1,3 +1,9 @@
+[windows]
+set shell := ["powershell.exe", "-NoLogo", "-Command"]
+
+play:
+    gaanim .
+
 [linux]
 reinstall:
     uv remove gaanim
