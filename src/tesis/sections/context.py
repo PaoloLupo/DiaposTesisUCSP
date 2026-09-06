@@ -18,13 +18,11 @@ from tesis.theme import ACCENT
 
 
 def build(scene: Scene):
-    _ = scene.segment("Contexto del problema", Transition.cross_fade(0.55))
+    _ = scene.segment("Problemática", Transition.cross_fade(0.55))
 
-    eyebrow = (
-        scene.text("02  /  CONTEXTO DEL PROBLEMA")
-        .fill(ACCENT)
-        .scale_to(0.72)
-        .move_to(-7.3333, 3.75, Anchor.TOP_LEFT)
+    title = (
+        scene.text("*PROBLEMÁTICA*", role="title")
+        .move_to(0,0)
     )
 
     headline = (
@@ -122,9 +120,15 @@ def build(scene: Scene):
     ).move_to(2.0833, -2.5)
     # edif_svg = scene.media.svg("edif_alba.svg").scale_to(0.5).move_to(-4.5833, -0.8333)
 
+    scene.play([
+        title.animate.write(),
+    ])
+
+    scene.stop()
+
     scene.play(
         [
-            eyebrow.animate.fade_in_from(direction=Direction.DOWN, distance=0.1667),
+            title.animate.fade_out(),
             headline.animate.write(),
             title_accent.animate.create(),
             mapa_peru_mask.animate.write(),
