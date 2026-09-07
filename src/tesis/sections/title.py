@@ -12,8 +12,8 @@ def build(scene: Scene):
         line_spacing=1.4,
     ).move_to(0, 2.4)
     title = scene.text(
-        "*MARCO DE TRABAJO PARA LA AUTOMATIZACIÓN DEL DISEÑO DE LA DISTRIBUCIÓN DE MUROS EN PLANTA PARA EDIFICIOS DE ALBAÑILERÍA CONFINADA*",
-        role="title",
+        "*MARCO DE TRABAJO PARA LA AUTOMATIZACIÓN DE LA VERIFICACIÓN NORMATIVA DE LA DISTRIBUCIÓN DE MUROS EN PLANTA PARA EDIFICIOS DE ALBAÑILERÍA CONFINADA*",
+        size=0.6,
         text_align="center",
         line_spacing=1.35,
     )
