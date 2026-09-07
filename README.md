@@ -20,14 +20,21 @@ El tramo activo avanza por segmento de contenido y su nombre se destaca con `ACC
 el número y el título principal acompañan el cambio.
 Conserva el fondo, la tipografía y `ACCENT` del proyecto.
 
-`main.py` ya lo muestra antes de la problemática. Para las siguientes partes,
-reutiliza la misma instancia de `SectionIndex` y llama a `show` antes de construir
-el contenido del bloque:
+`main.py` usa `build` para mostrar la entrada y calcular el avance automáticamente
+a partir de la lista de segmentos de la sección:
 
 ```python
-section_index.show("objetivos", transition=Transition.cross_fade(0.4))
-# Construir aquí los segmentos de objetivos.
+section_index.build(
+    "problematica",
+    context.SEGMENTS,
+    transition=Transition.cross_fade(0.4),
+)
 ```
+
+Cada función de la lista recibe `scene` y abre exactamente un `scene.segment()`.
+El rail avanza al abrirlo; las llamadas a `scene.stop()` no cambian el progreso.
+Para añadir o quitar segmentos, edita `SEGMENTS` en el módulo de la sección.
+`show()` sigue disponible para mostrar únicamente una entrada de sección.
 
 Las claves disponibles son `problematica`, `objetivos`, `fundamentos`, `propuesta`,
 `resultados` y `conclusiones`. Cada entrada tiene su propia pausa para exponer.

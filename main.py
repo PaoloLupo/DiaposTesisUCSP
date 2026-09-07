@@ -8,8 +8,9 @@ scene = create_scene()
 
 title.build(scene)
 section_index = SectionIndex(scene)
-section_index.show("problematica", transition=Transition.cross_fade(0.4))
-context.build(scene, section_index)
-section_index.show("objetivos", transition=Transition.cross_fade(0.4))
-section_index.show("fundamentos", transition=Transition.cross_fade(0.4))
+section_index.build(
+    "problematica", context.SEGMENTS
+)
+section_index.show("objetivos")
+section_index.show("fundamentos")
 scene.render()

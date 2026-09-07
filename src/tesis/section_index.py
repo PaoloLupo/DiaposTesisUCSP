@@ -1,3 +1,6 @@
+from collections.abc import Callable, Sequence
+from typing import cast
+
 from gaanim import (
     BLACK,
     Color,
@@ -28,6 +31,26 @@ FIRST_Y = 0
 ROW_GAP = 1.5
 
 
+class _SegmentScene:
+    """Delegate to Scene, advancing just after the callback opens its segment."""
+
+    def __init__(self, scene: Scene, on_segment: Callable[[], None]):
+        self._scene = scene
+        self._on_segment = on_segment
+        self.opened = False
+
+    def __getattr__(self, name):
+        return getattr(self._scene, name)
+
+    def segment(self, *args, **kwargs):
+        if self.opened:
+            raise ValueError("Each section builder must open exactly one segment")
+        result = self._scene.segment(*args, **kwargs)
+        self.opened = True
+        self._on_segment()
+        return result
+
+
 class SectionIndex:
     """Keep the previous selection and animate it into each new section.
 
@@ -41,6 +64,34 @@ class SectionIndex:
         self._visits: int = 0
         self._rail_fills = []
         self._rail_labels = []
+
+    def build(
+        self,
+        key: str,
+        segments: Sequence[Callable[[Scene], None]],
+        *,
+        transition: Transition = Transition.cross_fade(0.4),
+    ) -> None:
+        """Show the divider and advance on entry to each listed content segment.
+
+        Each callback receives a Scene-compatible delegate and must call
+        scene.segment() exactly once. Internal stops do not change progress.
+        """
+        builders = tuple(segments)
+        if not builders or not all(callable(builder) for builder in builders):
+            raise ValueError("Provide at least one callable segment builder")
+        self.show(key, transition=transition)
+        # Rebuilding the same section also starts its content progress afresh.
+        self.scene.play(
+            self._rail_fills[self._previous].animate.fill_level(0), duration=0,
+        )
+        for ordinal, builder in enumerate(builders, start=1):
+            segment_scene = _SegmentScene(
+                self.scene, lambda step=ordinal: self.advance(step, len(builders)),
+            )
+            builder(cast(Scene, segment_scene))
+            if not segment_scene.opened:
+                raise ValueError("Each section builder must open exactly one segment")
 
     def show(self, key: str, *, transition: Transition | None = None) -> None:
         keys = [section_key for section_key, _ in SECTIONS]

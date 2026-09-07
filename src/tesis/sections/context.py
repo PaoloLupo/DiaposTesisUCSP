@@ -1,8 +1,5 @@
-"""Problemática: contexto nacional → distribución en planta → trabajo manual.
-
-Base: TesisUCSP/01_intro.typ (Problemática y Justificación) y
-TesisUCSP/05_analisismanual.typ (introducción del proceso convencional).
-Las plantas son esquemas conceptuales, no resultados de análisis estructural.
+"""
+Problemática: contexto nacional → distribución en planta → trabajo manual.
 """
 
 from math import hypot
@@ -23,7 +20,6 @@ from gaanim import (
 )
 
 from tesis.data.materiales_inei import CHART_DATA, MATERIALES, PORCENTAJES, SOURCE_LABEL
-from tesis.section_index import SectionIndex
 from tesis.theme import ACCENT
 
 INK_MUTED = "#626878"
@@ -53,9 +49,9 @@ def _text(
     )
 
 
-def _header(scene: Scene, step: str, headline: str):
-    title = _text(scene, headline, -7.2, 3.35, size=0.51)
-    rule = scene.geometry.line(-7.2, 2.6, 7.2, 2.6).stroke(ACCENT, 0.035)
+def _header(scene: Scene,  headline: str):
+    title = _text(scene, headline, 0, 3.5, size=0.5, center=True)
+    rule = scene.geometry.line(length=14).stroke(ACCENT, 0.035).next_to(title, direction=Direction.DOWN, spacing= 0.2 )
     scene.play(
         [
             title.animate.write(),
@@ -91,7 +87,7 @@ def _arrow(scene: Scene, x1: float, y1: float, x2: float, y2: float, color: Colo
     )
 
 
-def materials(scene: Scene, section_index: SectionIndex | None = None):
+def materials(scene: Scene):
     _ = scene.segment(
         "Problemática",
         Transition.cross_fade(0.55),
@@ -104,30 +100,25 @@ def materials(scene: Scene, section_index: SectionIndex | None = None):
             "indicador ilustrativo nacional, no una distribución geográfica."
         ),
     )
-    if section_index is not None:
-        section_index.advance(1, 3)
-    _header(
-        scene, "01  CONTEXTO NACIONAL", "*Un material extendido* en un país sísmico"
-    )
+    _header(scene, "*Sistema constructivo* mas usado en un país sísmico")
 
-    scene.camera.save("contexto-general")
     # SVG stroke widths are local to the asset and scale with its geometry.
     outline = (
         scene.media.svg("peru.svg")
         .no_fill()
-        .stroke(INK_MUTED, 2.0)
-        .scale_to(0.0054)
+        .stroke(INK_MUTED, 2)
+        .scale_to(0.007)
         .move_to(0, -0.2)
     )
     amount = scene.viz.parameter(0.0)
     percentage = (
-        scene.viz.readout(amount, format=".1f", suffix="%", font_size=0.8)
+        scene.viz.readout(amount, format=".0f", suffix="%", font_size=0.8)
         .fill(BLACK)
-        .move_to(-0.7, -0.95)
+        .move_to(0, -1)
     )
     fill = scene.geometry.fill_level(
         outline,
-        ORANGE,
+        ACCENT,
         0.0,
         direction="up",
         keep_outline=False,
@@ -137,16 +128,16 @@ def materials(scene: Scene, section_index: SectionIndex | None = None):
         scene,
         "Viviendas con paredes de\n*ladrillo o bloque de concreto*",
         0,
-        -2.85,
+        -3.4,
         size=0.27,
         center=True,
     )
-    scene.play(outline.animate.write(), duration=0.85)
+    scene.play([outline.animate.fade_in()])
     scene.play(
         [
+            percentage.animate.fade_in(),
             amount.animate.set(PORCENTAJES[0]),
             fill.animate.fill_level(PORCENTAJES[0] / 100),
-            percentage.animate.fade_in(),
             caption.animate.fade_in(),
         ],
         duration=1.35,
@@ -158,12 +149,11 @@ def materials(scene: Scene, section_index: SectionIndex | None = None):
         [
             map_group.animate.shift_by(-4.65, 0),
             caption.animate.shift_by(-4.65, 0),
-            scene.camera.animate.restore("contexto-general"),
         ],
         duration=0.85,
     )
     colors = [
-        ORANGE,
+        ACCENT,
         "#B7791F",
         "#8B5E3C",
         "#A16207",
@@ -200,15 +190,6 @@ def materials(scene: Scene, section_index: SectionIndex | None = None):
         color=INK_MUTED,
         center=True,
     )
-    scope = _text(
-        scene,
-        "El material de la pared no identifica el sistema estructural.",
-        0,
-        -3.65,
-        size=0.24,
-        color=INK_MUTED,
-        center=True,
-    )
     scene.play(
         [
             chart.layer("axes").animate.create(),
@@ -219,13 +200,12 @@ def materials(scene: Scene, section_index: SectionIndex | None = None):
     )
     scene.play(
         stagger(
-            chart.layer("marks").animate.grow_from_center().duration(1.0),
+            chart.layer("marks").animate.write().duration(1.0),
             chart.layer("labels").animate.fade_in().duration(0.6),
             source.animate.fade_in().duration(0.4),
             each=0.35,
         )
     )
-    scene.play(scope.animate.fade_in(), duration=0.45)
     scene.stop("materiales-listo")
 
 
@@ -287,7 +267,7 @@ def _wall_plan(scene):
     )
 
 
-def _distribution(scene, section_index: SectionIndex | None = None):
+def _distribution(scene: Scene):
     scene.segment(
         "Problemática · distribución",
         Transition.cross_fade(0.55),
@@ -300,9 +280,7 @@ def _distribution(scene, section_index: SectionIndex | None = None):
             "No confundir densidad suficiente con una verificación integral."
         ),
     )
-    if section_index is not None:
-        section_index.advance(2, 3)
-    _header(scene, "02  EXIGENCIA ESTRUCTURAL", "La *distribución de muros* importa")
+    _header(scene, "La *distribución de muros* importa")
     boundary, horizontal, vertical, x_axis, y_axis, endpoints = _wall_plan(scene)
     plan_label = _text(
         scene,
@@ -411,7 +389,7 @@ def _workflow_node(scene, x, number, title, body):
     return scene.geometry.group([outline, number_text, heading, detail])
 
 
-def _manual_workflow(scene, section_index: SectionIndex | None = None):
+def _manual_workflow(scene: Scene):
     scene.segment(
         "Problemática · proceso manual",
         Transition.cross_fade(0.55),
@@ -427,11 +405,7 @@ def _manual_workflow(scene, section_index: SectionIndex | None = None):
             "sin anticipar resultados de automatización ni sustituir al ingeniero."
         ),
     )
-    if section_index is not None:
-        section_index.advance(3, 3)
-    _header(
-        scene, "03  PROCESO CONVENCIONAL", "La verificación depende de *pasos manuales*"
-    )
+    _header(scene, "La verificación depende de *pasos manuales*")
     nodes = [
         _workflow_node(
             scene,
@@ -514,7 +488,9 @@ def _manual_workflow(scene, section_index: SectionIndex | None = None):
     scene.stop("pregunta-del-problema")
 
 
-def build(scene: Scene, section_index: SectionIndex | None = None):
-    materials(scene, section_index)
-    _distribution(scene, section_index)
-    _manual_workflow(scene, section_index)
+SEGMENTS = (materials, _distribution, _manual_workflow)
+
+
+def build(scene: Scene):
+    for segment in SEGMENTS:
+        segment(scene)
