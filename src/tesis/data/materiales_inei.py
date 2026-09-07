@@ -1,4 +1,16 @@
-"""Datos de material predominante en paredes, fuente INEI 2025."""
+"""INEI, Censos Nacionales 2025, Características de la vivienda.
+
+Hoja VIV6, cuadro 6: fila 7, Perú / Viviendas particulares, B7:K7.
+Universo: viviendas particulares con ocupantes presentes (no población).
+Se conserva el orden descendente para facilitar la comparación en pantalla.
+"""
+
+SOURCE_URL = (
+    "https://proyectos.inei.gob.pe/dir-segmentacion-ci/postcensal/prod/"
+    "adjuntos/censos-2025/descarga_datos/tabulados/00/vivienda/"
+    "Caracter%C3%ADsticas_de_la_vivienda.xlsx"
+)
+SOURCE_LABEL = "INEI · Censos Nacionales 2025 · Cuadro 6"
 
 MATERIALES_ORDENADOS = sorted(
     [
@@ -6,10 +18,10 @@ MATERIALES_ORDENADOS = sorted(
         ("Adobe", 1_914_324),
         ("Madera", 923_006),
         ("Tapia", 435_795),
-        ("Triplay\ncalamina", 317_806),
+        ("Triplay /\ncalamina /\nestera", 317_806),
         ("Quincha", 123_433),
-        ("Piedra\ncon barro", 66_852),
-        ("Piedra /\nsillar", 66_081),
+        ("Piedra\n+ barro", 66_852),
+        ("Piedra\n/ sillar", 66_081),
         ("Otro", 37_147),
     ],
     key=lambda item: item[1],
@@ -26,5 +38,5 @@ CHART_DATA = {
     "material": MATERIALES,
     "color_material": MATERIALES,
     "viviendas_porcentaje": PORCENTAJES,
-    "rotulo": [f"{porcentaje:.2f}%" for porcentaje in PORCENTAJES],
+    "rotulo": [f"{porcentaje:.1f}%" for porcentaje in PORCENTAJES],
 }
