@@ -2,8 +2,6 @@
 Problemática: contexto nacional → distribución en planta → trabajo manual.
 """
 
-from math import hypot
-
 from gaanim import (
     BLACK,
     ORANGE,
@@ -15,16 +13,29 @@ from gaanim import (
     Field,
     Scale,
     Scene,
+    Section,
+    SectionStep,
     Transition,
+    computed,
     stagger,
 )
 
 from tesis.data.materiales_inei import CHART_DATA, MATERIALES, PORCENTAJES, SOURCE_LABEL
-from tesis.theme import ACCENT
-
-INK_MUTED = "#626878"
-RULE = "#C9CDDA"
-WARM = "#B7791F"
+from tesis.theme import (
+    ACCENT,
+    ARROW_STYLE,
+    BODY,
+    CENTER_FLOW,
+    HEADING,
+    INK_MUTED,
+    LEFT_FLOW,
+    NODE_BODY,
+    NODE_CARD,
+    NODE_NUMBER,
+    NODE_TITLE,
+    RULE,
+    WARM,
+)
 
 
 def _text(
@@ -33,24 +44,24 @@ def _text(
     x: float,
     y: float,
     *,
-    size: float = 0.28,
-    color: Color = BLACK,
+    size: float | None = None,
+    color: Color | str | None = None,
     center: bool = False,
 ):
     return (
         scene.text(
             content,
+            style=BODY,
+            flow=CENTER_FLOW if center else LEFT_FLOW,
             size=size,
-            text_align="center" if center else "left",
-            line_spacing=1.18,
+            color=color,
         )
-        .fill(color)
         .move_to(x, y, Anchor.CENTER if center else Anchor.TOP_LEFT)
     )
 
 
-def _header(scene: Scene,  headline: str):
-    title = _text(scene, headline, 0, 3.5, size=0.5, center=True)
+def _header(scene: Scene, headline: str):
+    title = scene.text(headline, style=HEADING, flow=CENTER_FLOW).move_to(0, 3.5, Anchor.CENTER)
     rule = scene.geometry.line(length=14).stroke(ACCENT, 0.035).next_to(title, direction=Direction.DOWN, spacing= 0.2 )
     scene.play(
         [
@@ -61,45 +72,7 @@ def _header(scene: Scene,  headline: str):
     )
 
 
-def _arrow(scene: Scene, x1: float, y1: float, x2: float, y2: float, color: Color):
-    """Arrow dimensions in scene units, including a restrained 0.18-unit head."""
-    length = hypot(x2 - x1, y2 - y1)
-    ux, uy = (x2 - x1) / length, (y2 - y1) / length
-    head = min(0.18, length * 0.3)
-    points = [
-        (0, 0.018),
-        (length - head, 0.018),
-        (length - head, 0.075),
-        (length, 0),
-        (length - head, -0.075),
-        (length - head, -0.018),
-        (0, -0.018),
-    ]
-    return (
-        scene.geometry.polygon(
-            [
-                (x1 + along * ux - across * uy, y1 + along * uy + across * ux)
-                for along, across in points
-            ]
-        )
-        .fill(color)
-        .no_stroke()
-    )
-
-
 def materials(scene: Scene):
-    _ = scene.segment(
-        "Problemática",
-        Transition.cross_fade(0.55),
-        notes=(
-            "Base: tesis, capítulo 1, Problemática. Introducir la presencia de la "
-            "albañilería y el contexto sísmico del Perú. El gráfico actualiza la "
-            "referencia INEI 2017 de la tesis con el tabulado de viviendas INEI 2025. "
-            "El porcentaje mide material predominante en paredes, no acredita "
-            "confinamiento ni desempeño sísmico. El relleno del mapa es un "
-            "indicador ilustrativo nacional, no una distribución geográfica."
-        ),
-    )
     _header(scene, "*Sistema constructivo* mas usado en un país sísmico")
 
     # SVG stroke widths are local to the asset and scale with its geometry.
@@ -119,10 +92,9 @@ def materials(scene: Scene):
     fill = scene.geometry.fill_level(
         outline,
         ACCENT,
-        0.0,
         direction="up",
         keep_outline=False,
-    ).z_index(-1)
+    ).z_index(-1).set_fill_level(computed(lambda value: value / 100, inputs=[amount]))
     map_group = scene.geometry.group([outline, fill, percentage])
     caption = _text(
         scene,
@@ -137,7 +109,6 @@ def materials(scene: Scene):
         [
             percentage.animate.fade_in(),
             amount.animate.set(PORCENTAJES[0]),
-            fill.animate.fill_level(PORCENTAJES[0] / 100),
             caption.animate.fade_in(),
         ],
         duration=1.35,
@@ -209,7 +180,7 @@ def materials(scene: Scene):
     scene.stop("materiales-listo")
 
 
-def _wall_plan(scene):
+def _wall_plan(scene: Scene):
     """A schematic, unscaled plan with separate wall families in X and Y."""
     cx, cy = -3.9, -0.25
     boundary = (
@@ -253,8 +224,14 @@ def _wall_plan(scene):
             (round(cx + x, 4), round(cy + y + offset, 4))
             for offset in (-height / 2, height / 2)
         )
-    x_arrow = _arrow(scene, cx - 1.2, -2.45, cx + 1.2, -2.45, ORANGE)
-    y_arrow = _arrow(scene, -6.75, -1.45, -6.75, 0.95, ACCENT)
+    x_arrow = (
+        scene.geometry.arrow(cx - 1.2, -2.45, cx + 1.2, -2.45, **ARROW_STYLE)
+        .fill(ORANGE).no_stroke()
+    )
+    y_arrow = (
+        scene.geometry.arrow(-6.75, -1.45, -6.75, 0.95, **ARROW_STYLE)
+        .fill(ACCENT).no_stroke()
+    )
     x_label = _text(scene, "X", cx + 1.5, -2.45, size=0.28, color=WARM, center=True)
     y_label = _text(scene, "Y", -6.75, 1.3, size=0.28, color=ACCENT, center=True)
     return (
@@ -268,18 +245,6 @@ def _wall_plan(scene):
 
 
 def _distribution(scene: Scene):
-    scene.segment(
-        "Problemática · distribución",
-        Transition.cross_fade(0.55),
-        notes=(
-            "Base: tesis, capítulo 1, Problemática y Justificación. En el "
-            "contexto sísmico peruano, explicar la importancia de distribuir "
-            "muros portantes en ambas direcciones y conectarlos con los elementos "
-            "de confinamiento. La planta es un esquema conceptual sin escala; "
-            "no representa el caso de estudio ni demuestra cumplimiento E.070. "
-            "No confundir densidad suficiente con una verificación integral."
-        ),
-    )
     _header(scene, "La *distribución de muros* importa")
     boundary, horizontal, vertical, x_axis, y_axis, endpoints = _wall_plan(scene)
     plan_label = _text(
@@ -377,34 +342,18 @@ def _distribution(scene: Scene):
 
 
 def _workflow_node(scene, x, number, title, body):
-    outline = (
-        scene.geometry.rounded_rect(3.8, 1.75, 0.08)
-        .no_fill()
-        .stroke(RULE, 0.025)
-        .move_to(x, 0.65)
-    )
-    number_text = _text(scene, number, x, 1.85, size=0.23, color=ACCENT, center=True)
-    heading = _text(scene, f"*{title}*", x, 0.95, size=0.32, center=True)
-    detail = _text(scene, body, x, 0.3, size=0.24, color=INK_MUTED, center=True)
-    return scene.geometry.group([outline, number_text, heading, detail])
+    labels = [
+        (scene.text(number, style=NODE_NUMBER, flow=CENTER_FLOW), 1.2),
+        (scene.text(f"*{title}*", style=NODE_TITLE, flow=CENTER_FLOW), 0.3),
+        (scene.text(body, style=NODE_BODY, flow=CENTER_FLOW), -0.35),
+    ]
+    return scene.layout.card([
+        scene.layout.item(label, absolute=True, anchor=Anchor.CENTER, offset=(0, y))
+        for label, y in labels
+    ], **NODE_CARD).move_to(x, 0.65)
 
 
 def _manual_workflow(scene: Scene):
-    scene.segment(
-        "Problemática · proceso manual",
-        Transition.cross_fade(0.55),
-        notes=(
-            "Base: tesis, capítulo 1, Problemática (últimos dos párrafos) y "
-            "capítulo 5, introducción del análisis manual. Presentar el flujo "
-            "convencional estudiado: modelo y resultados en ETABS, extracción "
-            "y procesamiento mediante hojas de cálculo, verificaciones E.070. "
-            "La tesis identifica variabilidad de criterios, errores de "
-            "transcripción y verificaciones omitidas como riesgos, no como "
-            "frecuencias medidas. El retorno representa la revisión tras "
-            "modificar la distribución. Cerrar con el problema de investigación, "
-            "sin anticipar resultados de automatización ni sustituir al ingeniero."
-        ),
-    )
     _header(scene, "La verificación depende de *pasos manuales*")
     nodes = [
         _workflow_node(
@@ -425,7 +374,14 @@ def _manual_workflow(scene: Scene):
             "Revisar requisitos\nde la distribución",
         ),
     ]
-    arrows = [_arrow(scene, x, 0.65, x + 1.05, 0.65, ORANGE) for x in (-3.05, 1.95)]
+    arrows = [
+        scene.geometry.connector(
+            left.port("salida"), right.port("entrada"),
+            **ARROW_STYLE,
+        )
+        .fill(ORANGE).no_stroke()
+        for left, right in zip(nodes, nodes[1:])
+    ]
     transfer = [
         _text(scene, "trasladar", x, 1.13, size=0.18, color=WARM, center=True)
         for x in (-2.5, 2.5)
@@ -456,13 +412,17 @@ def _manual_workflow(scene: Scene):
         stagger(*[risk.animate.fade_in().duration(0.45) for risk in risks], each=0.2)
     )
     return_path = (
-        scene.geometry.polyline(
-            [(5, -1.45), (5, -2.0), (-7.1, -2.0), (-7.1, 0.65), (-6.98, 0.65)]
+        scene.geometry.connector(
+            nodes[2].port("retorno_inicio"), nodes[0].port("retorno_fin"),
+            via=[
+                nodes[2].port("retorno_bajada"),
+                nodes[0].port("retorno_inferior"),
+                nodes[0].port("retorno_giro"),
+            ],
+            head_length=0.057, head_width=0.15, body_width=0.035,
         )
-        .no_fill()
-        .stroke(ACCENT, 0.035)
+        .fill(ACCENT).no_stroke()
     )
-    arrow_tip = _arrow(scene, -7.1, 0.65, -6.91, 0.65, ACCENT)
     repeat = _text(
         scene,
         "Modificar la distribución → repetir la revisión",
@@ -472,8 +432,10 @@ def _manual_workflow(scene: Scene):
         color=ACCENT,
         center=True,
     )
-    scene.play([return_path.animate.create(), repeat.animate.fade_in()], duration=0.8)
-    scene.play(arrow_tip.animate.create(), duration=0.35)
+    scene.play([
+        return_path.animate.create().duration(1.15),
+        repeat.animate.fade_in().duration(0.8),
+    ])
     scene.stop("iteracion-y-riesgos")
 
     question = _text(
@@ -488,9 +450,47 @@ def _manual_workflow(scene: Scene):
     scene.stop("pregunta-del-problema")
 
 
-SEGMENTS = (materials, _distribution, _manual_workflow)
-
-
-def build(scene: Scene):
-    for segment in SEGMENTS:
-        segment(scene)
+SECTION = Section("problematica", [
+    SectionStep(
+        name="Problemática",
+        build=materials,
+        transition=Transition.cross_fade(0.55),
+        notes=(
+            "Base: tesis, capítulo 1, Problemática. Introducir la presencia de la "
+            "albañilería y el contexto sísmico del Perú. El gráfico actualiza la "
+            "referencia INEI 2017 de la tesis con el tabulado de viviendas INEI 2025. "
+            "El porcentaje mide material predominante en paredes, no acredita "
+            "confinamiento ni desempeño sísmico. El relleno del mapa es un "
+            "indicador ilustrativo nacional, no una distribución geográfica."
+        ),
+    ),
+    SectionStep(
+        name="Problemática · distribución",
+        build=_distribution,
+        transition=Transition.cross_fade(0.55),
+        notes=(
+            "Base: tesis, capítulo 1, Problemática y Justificación. En el "
+            "contexto sísmico peruano, explicar la importancia de distribuir "
+            "muros portantes en ambas direcciones y conectarlos con los elementos "
+            "de confinamiento. La planta es un esquema conceptual sin escala; "
+            "no representa el caso de estudio ni demuestra cumplimiento E.070. "
+            "No confundir densidad suficiente con una verificación integral."
+        ),
+    ),
+    SectionStep(
+        name="Problemática · proceso manual",
+        build=_manual_workflow,
+        transition=Transition.cross_fade(0.55),
+        notes=(
+            "Base: tesis, capítulo 1, Problemática (últimos dos párrafos) y "
+            "capítulo 5, introducción del análisis manual. Presentar el flujo "
+            "convencional estudiado: modelo y resultados en ETABS, extracción "
+            "y procesamiento mediante hojas de cálculo, verificaciones E.070. "
+            "La tesis identifica variabilidad de criterios, errores de "
+            "transcripción y verificaciones omitidas como riesgos, no como "
+            "frecuencias medidas. El retorno representa la revisión tras "
+            "modificar la distribución. Cerrar con el problema de investigación, "
+            "sin anticipar resultados de automatización ni sustituir al ingeniero."
+        ),
+    ),
+])
