@@ -17,5 +17,5 @@ def create_scene() -> Scene:
     # TODO: load_project deberia aceptar tambien Path y no str
     scene.assets.load_project(str(PROJECT_MANIFEST))
     scene.canvas.set_theme("paper")
-    # scene.canvas.set_fonts(font="Century Gothic")
+    # scene.canvas.set_fonts(font="Arial")
     return scene

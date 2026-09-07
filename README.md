@@ -13,8 +13,11 @@ Los recursos van en `assets/`; las salidas generadas van en `exports/`.
 ## Entradas de sección
 
 El índice animado resume la exposición en seis bloques: Problemática, Objetivos,
-Fundamentos, Propuesta, Resultados y Conclusiones. La sección activa se transforma
-en un rótulo oscuro; el número, el indicador y la barra de avance acompañan el cambio.
+Fundamentos, Propuesta, Resultados y Conclusiones. Un rail global persistente ocupa
+el borde inferior, con el nombre de cada sección justo encima y el contenido más arriba.
+Una franja gris suave y una línea superior separan la navegación del contenido.
+El tramo activo avanza por segmento de contenido y su nombre se destaca con `ACCENT`;
+el número y el título principal acompañan el cambio.
 Conserva el fondo, la tipografía y `ACCENT` del proyecto.
 
 `main.py` ya lo muestra antes de la problemática. Para las siguientes partes,
