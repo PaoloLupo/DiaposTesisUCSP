@@ -1,5 +1,16 @@
 # Diapositivas Tesis
 
+## Base teórica
+
+El submódulo [`TesisUCSP`](https://github.com/PaoloLupo/TesisUCSP) contiene la tesis
+que sirve como base teórica para preparar las diapositivas.
+
+Después de clonar este proyecto, descarga la revisión de la tesis registrada con:
+
+```powershell
+git submodule update --init --recursive
+```
+
 ## Editar y previsualizar
 
 Edita `main.py` y ejecuta:

@@ -1,4 +1,8 @@
 {
+  "include": ["src", "main.py"],
+  "venvPath": ".",
+  "venv": ".venv",
+ "pythonVersion": "3.14",
   "executionEnvironments": [
     {
       "root": ".",

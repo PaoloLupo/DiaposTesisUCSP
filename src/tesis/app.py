@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from gaanim import Background, Scene
+from gaanim import Scene
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_MANIFEST = PROJECT_ROOT / "gaanim.toml"

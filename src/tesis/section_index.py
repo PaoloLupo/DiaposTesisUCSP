@@ -2,9 +2,11 @@ from gaanim import (
     BLACK,
     Color,
     Direction,
+    Drawable,
     Scene,
     Section,
     SectionProgress,
+    Text,
     TextAnchor,
     Transition,
     parallel,
@@ -41,19 +43,23 @@ class SectionIndex:
         self.scene: Scene = scene
         self._previous: int | None = None
         self._visits: int = 0
-        self._rail_fills = []
-        self._rail_labels = []
+        self._rail_fills: list[Drawable] = []
+        self._rail_labels: list[Text] = []
 
     def build(
         self,
         section: Section,
         *,
-        transition: Transition = Transition.cross_fade(0.4),
+        transition: Transition | None = None,
     ) -> None:
         """Show the divider, then let Section open and build its content steps."""
+        if transition is None:
+            transition = Transition.cross_fade(0.4)
         self.show(section.key, transition=transition)
+        active = self._previous
+        assert active is not None, "show() must select an active section"
         self.scene.play(
-            self._rail_fills[self._previous].animate.fill_level(0), duration=0,
+            self._rail_fills[active].animate.fill_level(0), duration=0,
         )
         section.build(self.scene, on_enter=self.advance)
 

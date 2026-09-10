@@ -10,7 +10,7 @@ SOURCE_URL = (
     "adjuntos/censos-2025/descarga_datos/tabulados/00/vivienda/"
     "Caracter%C3%ADsticas_de_la_vivienda.xlsx"
 )
-SOURCE_LABEL = "INEI · Censos Nacionales 2025 · Cuadro 6"
+SOURCE_LABEL = "INEI · Censos Nacionales 2025"
 
 MATERIALES_ORDENADOS = sorted(
     [
@@ -18,10 +18,10 @@ MATERIALES_ORDENADOS = sorted(
         ("Adobe", 1_914_324),
         ("Madera", 923_006),
         ("Tapia", 435_795),
-        ("Triplay /\ncalamina /\nestera", 317_806),
+        ("Triplay\ncalamina\nestera", 317_806),
         ("Quincha", 123_433),
-        ("Piedra\n+ barro", 66_852),
-        ("Piedra\n/ sillar", 66_081),
+        ("Piedra\nbarro", 66_852),
+        ("Piedra\nsillar", 66_081),
         ("Otro", 37_147),
     ],
     key=lambda item: item[1],

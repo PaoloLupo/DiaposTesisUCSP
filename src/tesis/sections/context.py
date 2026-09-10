@@ -2,6 +2,9 @@
 Problemática: contexto nacional → distribución en planta → trabajo manual.
 """
 
+import itertools
+from collections.abc import Callable
+
 from gaanim import (
     BLACK,
     ORANGE,
@@ -10,6 +13,7 @@ from gaanim import (
     ChartSpec,
     Color,
     Direction,
+    Drawable,
     Field,
     Scale,
     Scene,
@@ -17,6 +21,7 @@ from gaanim import (
     SectionStep,
     Transition,
     computed,
+    sequence,
     stagger,
 )
 
@@ -72,8 +77,8 @@ def _header(scene: Scene, headline: str):
     )
 
 
-def materials(scene: Scene):
-    _header(scene, "*Sistema constructivo* mas usado en un país sísmico")
+def materials_inei(scene: Scene):
+    _header(scene, "*Albañilería* presente como material\nen un país con alta actividad sísmica")
 
     # SVG stroke widths are local to the asset and scale with its geometry.
     outline = (
@@ -84,6 +89,7 @@ def materials(scene: Scene):
         .move_to(0, -0.2)
     )
     amount = scene.viz.parameter(0.0)
+    fraction: Callable[[float], float] = lambda value: value / 100
     percentage = (
         scene.viz.readout(amount, format=".0f", suffix="%", font_size=0.8)
         .fill(BLACK)
@@ -94,7 +100,7 @@ def materials(scene: Scene):
         ACCENT,
         direction="up",
         keep_outline=False,
-    ).z_index(-1).set_fill_level(computed(lambda value: value / 100, inputs=[amount]))
+    ).z_index(-1).set_fill_level(computed(fraction, inputs=[amount]))
     map_group = scene.geometry.group([outline, fill, percentage])
     caption = _text(
         scene,
@@ -180,168 +186,16 @@ def materials(scene: Scene):
     scene.stop("materiales-listo")
 
 
-def _wall_plan(scene: Scene):
-    """A schematic, unscaled plan with separate wall families in X and Y."""
-    cx, cy = -3.9, -0.25
-    boundary = (
-        scene.geometry.rect(4.7, 3.35).no_fill().stroke(RULE, 0.025).move_to(cx, cy)
-    )
-    horizontal = []
-    vertical = []
-    endpoints = set()
-    for x, y, width in [
-        (-1.55, 1.55, 1.4),
-        (1.25, 1.55, 2.0),
-        (-1.35, -1.55, 1.8),
-        (1.575, -1.55, 1.35),
-        (-1.25, 0.0, 2.0),
-        (1.575, 0.0, 1.35),
-    ]:
-        horizontal.append(
-            scene.geometry.rect(width, 0.13)
-            .fill(ORANGE)
-            .no_stroke()
-            .move_to(cx + x, cy + y)
-        )
-        endpoints.update(
-            (round(cx + x + offset, 4), round(cy + y, 4))
-            for offset in (-width / 2, width / 2)
-        )
-    for x, y, height in [
-        (-2.25, 0.775, 1.55),
-        (-2.25, -1.075, 0.95),
-        (2.25, 0.0, 3.1),
-        (0.25, 0.9, 1.3),
-        (0.25, -1.05, 1.0),
-    ]:
-        vertical.append(
-            scene.geometry.rect(0.13, height)
-            .fill(ACCENT)
-            .no_stroke()
-            .move_to(cx + x, cy + y)
-        )
-        endpoints.update(
-            (round(cx + x, 4), round(cy + y + offset, 4))
-            for offset in (-height / 2, height / 2)
-        )
-    x_arrow = (
-        scene.geometry.arrow(cx - 1.2, -2.45, cx + 1.2, -2.45, **ARROW_STYLE)
-        .fill(ORANGE).no_stroke()
-    )
-    y_arrow = (
-        scene.geometry.arrow(-6.75, -1.45, -6.75, 0.95, **ARROW_STYLE)
-        .fill(ACCENT).no_stroke()
-    )
-    x_label = _text(scene, "X", cx + 1.5, -2.45, size=0.28, color=WARM, center=True)
-    y_label = _text(scene, "Y", -6.75, 1.3, size=0.28, color=ACCENT, center=True)
-    return (
-        boundary,
-        horizontal,
-        vertical,
-        [x_arrow, x_label],
-        [y_arrow, y_label],
-        sorted(endpoints),
-    )
-
-
 def _distribution(scene: Scene):
-    _header(scene, "La *distribución de muros* importa")
-    boundary, horizontal, vertical, x_axis, y_axis, endpoints = _wall_plan(scene)
-    plan_label = _text(
-        scene,
-        "DISTRIBUCIÓN EN PLANTA",
-        -3.9,
-        1.85,
-        size=0.20,
-        color=INK_MUTED,
-        center=True,
-    )
-    caveat = _text(
-        scene,
-        "Esquema conceptual · sin escala",
-        -3.9,
-        -3.1,
-        size=0.18,
-        color=INK_MUTED,
-        center=True,
-    )
-    first = _text(scene, "01", 0.35, 1.6, size=0.25, color=WARM)
-    first_title = _text(scene, "*Muros en ambas direcciones*", 1.05, 1.65, size=0.33)
-    first_body = _text(
-        scene,
-        "La densidad de muros se revisa\nen X y en Y.",
-        1.05,
-        1.0,
-        size=0.28,
-        color=INK_MUTED,
-    )
-    takeaway = _text(
-        scene,
-        "Cada cambio de distribución exige volver a verificar.",
-        0,
-        -3.6,
-        size=0.30,
-        color=ACCENT,
-        center=True,
-    )
-    scene.play(
-        [
-            boundary.animate.create(),
-            plan_label.animate.fade_in(),
-            caveat.animate.fade_in(),
-        ],
-        duration=0.55,
-    )
-    scene.play(
-        stagger(
-            *[wall.animate.grow_from_center().duration(0.55) for wall in horizontal],
-            each=0.07,
-        )
-    )
-    scene.play(
-        [item.animate.fade_in() for item in [*x_axis, first, first_title, first_body]],
-        duration=0.6,
-    )
-    scene.play(
-        stagger(
-            *[wall.animate.grow_from_center().duration(0.55) for wall in vertical],
-            each=0.07,
-        )
-    )
-    scene.play([item.animate.fade_in() for item in y_axis], duration=0.4)
-    scene.stop("muros-en-dos-direcciones")
-
-    # Confinement markers on the conceptual plan; no force simulation.
-    columns = []
-    for x, y in endpoints:
-        columns.append(
-            scene.geometry.rect(0.18, 0.18).fill(BLACK).no_stroke().move_to(x, y)
-        )
-    scene.play(
-        stagger(
-            *[col.animate.grow_from_center().duration(0.4) for col in columns],
-            each=0.045,
-        )
-    )
-    second = _text(scene, "02", 0.35, -0.35, size=0.25, color=ACCENT)
-    second_title = _text(scene, "*Conexión y confinamiento*", 1.05, -0.3, size=0.33)
-    second_body = _text(
-        scene,
-        "Muros y elementos de confinamiento\ndeben trabajar en conjunto.",
-        1.05,
-        -0.95,
-        size=0.28,
-        color=INK_MUTED,
-    )
-    scene.play(
-        [item.animate.fade_in() for item in [second, second_title, second_body]],
-        duration=0.6,
-    )
-    scene.play(takeaway.animate.write(), duration=0.9)
+    _header(scene, "La *distribución de muros en planta* es importante")
+    # casa = scene.media.svg("edif_alba.svg").scale_by(0.005).move_to(-3.5,0)
+    lottie = scene.media.lottie("placas_subduccion.lottie")
+    lottie.scale_by(0.8).move_to(-2.5,0)
+    scene.play(sequence(lottie.animate.fade_in(), lottie))
     scene.stop("distribucion-y-confinamiento")
 
 
-def _workflow_node(scene, x, number, title, body):
+def _workflow_node(scene: Scene, x: float, number: str, title: str, body: str):
     labels = [
         (scene.text(number, style=NODE_NUMBER, flow=CENTER_FLOW), 1.2),
         (scene.text(f"*{title}*", style=NODE_TITLE, flow=CENTER_FLOW), 0.3),
@@ -380,7 +234,7 @@ def _manual_workflow(scene: Scene):
             **ARROW_STYLE,
         )
         .fill(ORANGE).no_stroke()
-        for left, right in zip(nodes, nodes[1:])
+        for left, right in itertools.pairwise(nodes)
     ]
     transfer = [
         _text(scene, "trasladar", x, 1.13, size=0.18, color=WARM, center=True)
@@ -453,7 +307,7 @@ def _manual_workflow(scene: Scene):
 SECTION = Section("problematica", [
     SectionStep(
         name="Problemática",
-        build=materials,
+        build=materials_inei,
         transition=Transition.cross_fade(0.55),
         notes=(
             "Base: tesis, capítulo 1, Problemática. Introducir la presencia de la "

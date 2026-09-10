@@ -6,5 +6,13 @@ dependencies = [
     "gaanim",
 ]
 
+[tool.pyright]
+include = ["src", "main.py"]
+extraPaths = ["src"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+pythonVersion = "3.14"
+
 [tool.uv.sources]
 gaanim = { path = "../../rust/gaanim/target/wheels/gaanim-0.2.0-py3-none-any.whl" }
