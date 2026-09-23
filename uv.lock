@@ -18,7 +18,7 @@ name = "gaanim"
 version = "0.2.0"
 source = { path = "../../rust/gaanim/target/wheels/gaanim-0.2.0-py3-none-any.whl" }
 wheels = [
-    { filename = "gaanim-0.2.0-py3-none-any.whl", hash = "sha256:0ab21db4833c5a2415f87a08ada7141f1f6d2897713e44f1c946ff89c43b7bd1" },
+    { filename = "gaanim-0.2.0-py3-none-any.whl", hash = "sha256:48629c74cdb1214d9e3d61af0037e878356f84f97495b4e267a173f501bce627" },
 ]
 
 [package.metadata]

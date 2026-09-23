@@ -1,113 +1,134 @@
-# Diapositivas Tesis
+# Diapositivas de tesis
 
-## Base teórica
+Sustentación animada en Gaanim de la tesis *Marco de trabajo para la automatización del
+diseño de la distribución de muros en planta para edificios de albañilería confinada*
+(UCSP). Pensada para **30 minutos**: 8 bloques, 31 diapositivas de contenido, 8 divisores
+de agenda y una portada (40 segmentos, 72 pausas).
 
-El submódulo [`TesisUCSP`](https://github.com/PaoloLupo/TesisUCSP) contiene la tesis
-que sirve como base teórica para preparar las diapositivas.
+## Ejecutar
 
-Después de clonar este proyecto, descarga la revisión de la tesis registrada con:
+```powershell
+gaanim .
+gaanim --present .
+gaanim check . --strict
+```
+
+En presentación: espacio o flecha derecha para avanzar, izquierda para volver, `O` para buscar
+una escena y `P` para la vista del expositor con las notas. Cada nota empieza con el tiempo
+sugerido y cita la tabla o figura de la tesis que respalda la diapositiva.
+
+Para ensayar solo algunos bloques:
+
+```powershell
+$env:TESIS_BLOCKS = "resultados,conclusiones"; gaanim .
+```
+
+Las claves son `problematica`, `objetivos`, `fundamentos`, `manual`, `marco`, `alba`,
+`resultados` y `conclusiones`. La portada siempre se incluye.
+
+## Recorrido de 30 minutos
+
+Los tiempos incluyen la explicación oral; las pausas (`scene.stop`) esperan al expositor.
+
+| Bloque | Diapositivas | Tiempo | Acumulado |
+| --- | --- | ---: | ---: |
+| Portada | Título y planta del caso dibujándose | 0:45 | 0:45 |
+| 01 Problemática | Material de las viviendas (INEI 2025) · muro confinado y sismo · traslado manual y pregunta | 3:00 | 3:45 |
+| 02 Objetivos y método | Objetivo general e hipótesis · objetivos específicos · metodología | 2:00 | 5:45 |
+| 03 Fundamentos | Densidad con la planta real · tres verificaciones de resistencia · deriva | 4:00 | 9:45 |
+| 04 Proceso manual | Caso de estudio · áreas vs barras · criterios de modelamiento · ciclo manual | 3:30 | 13:15 |
+| 05 Marco de trabajo | Qué se automatiza · flujo general · módulo de densidad · trazabilidad | 3:45 | 17:00 |
+| 06 Alba | Arquitectura · API de ETABS · interfaz · reporte | 3:00 | 20:00 |
+| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia · fisuración | 6:00 | 26:00 |
+| 08 Conclusiones | Objetivos · hallazgos · alcance y futuro · cierre | 2:45 | 28:45 |
+| Divisores | 8 × ~6 s | 0:50 | ≈ 29:35 |
+
+Si hace falta recortar, las diapositivas que menos afectan el argumento son
+*Proceso manual · criterios de modelamiento*, *Alba · API de ETABS* y *Resultados · cortante*:
+basta quitarlas de la lista de `SectionStep` de su bloque.
+
+## Sistema visual
+
+- **Papel y ladrillo:** fondo cálido `#F6F3EC`, tinta `#1D2129` y terracota `#B8532F`.
+- **Colores con significado fijo:** terracota = albañilería, dirección X y modelo MCT;
+  azul acero = dirección Y y MSTA; gris concreto = concreto y MSTO; verde y rojo solo para
+  *cumple* / *no cumple*.
+- **Tipografía incrustada** en `assets/fonts` (todas con licencia OFL): Aleo para títulos y
+  cifras, Lato para el texto, Cascadia Mono para etiquetas técnicas; las ecuaciones usan la
+  matemática de Typst. La presentación no depende de las fuentes instaladas en el equipo.
+- **Títulos-afirmación:** cada título dice la conclusión de la diapositiva; el kicker indica el
+  bloque y la línea inferior, la fuente en la tesis.
+- **Un mismo edificio en toda la exposición:** la planta de San Bartolomé (2006) se dibuja como
+  geometría (`tesis.building`) con los muros y etiquetas Pier del modelo de ETABS. Se reutiliza
+  en la portada, la densidad, el caso de estudio, la resistencia global, el mapa de fisuración
+  y el cierre.
+
+## Dónde editar
+
+| Cambio | Archivo |
+| --- | --- |
+| Orden de los bloques | `main.py` |
+| Colores, tipografías y tema | `src/tesis/theme.py` |
+| Encabezado, fuentes, chips de estado, cotas | `src/tesis/kit.py` |
+| Símbolos de diagramas de flujo | `src/tesis/diagram.py` |
+| Dibujo de la planta del caso | `src/tesis/building.py` |
+| Muros, longitudes y densidad del caso | `src/tesis/data/planta.py` |
+| Cifras transcritas de la tesis | `src/tesis/data/thesis.py` |
+| Datos INEI 2025 | `src/tesis/data/materiales_inei.py` |
+| Divisores y riel de avance | `src/tesis/section_index.py` |
+| Contenido de cada bloque | `src/tesis/sections/<bloque>.py` |
+
+Cada bloque termina con su `SECTION`: una lista de `SectionStep(name, build, notes)`. Para
+añadir una diapositiva, escribe su función y agrega el paso. `tesis.kit.t()` escapa los `_`
+fuera de `$...$`, así que los subíndices se escriben como matemática: `"$V_e$ (tonf)"`.
+
+## Datos y fuentes
+
+El submódulo [TesisUCSP](https://github.com/PaoloLupo/TesisUCSP) contiene la tesis; las
+cifras corresponden al commit `d1d0b73`, que revierte el título a «…automatización del diseño
+de la distribución de muros…» (la portada usa ese título).
 
 ```powershell
 git submodule update --init --recursive
+python -m unittest discover -s tests -v
 ```
 
-## Editar y previsualizar
+Las pruebas leen las tablas Typst reales y verifican pesos por nivel, fuerzas en altura,
+derivas, cortantes y resistencias (cap. 8), fisuración por muro y esfuerzo axial (cap. 5), y
+que la densidad calculada desde la planta coincide con `tb:densidad_ejm` (4.80 % y 3.74 %).
 
-Edita `main.py` y ejecuta:
+Matices que conviene respetar al exponer (también están en las notas):
+
+- La comparación es descriptiva: MCT, MSTA y MSTO difieren en norma, idealización, programa y
+  procesamiento; no mide una tasa de error ni un ahorro de tiempo de Alba.
+- MCT vs MSTA aísla la idealización (misma norma); MSTA vs MSTO aísla la norma.
+- El dato INEI 2025 es el material de las paredes exteriores; no acredita confinamiento.
+- La deriva animada y el ciclo manual son esquemas; sus valores del caso se citan aparte.
+
+## Revisión por capturas
+
+`gaanim --diff` puede capturar la presentación sin ventana. `tesis.review` registra el instante
+de cada pausa y pide una imagen justo antes de cada una:
 
 ```powershell
-.\run.ps1
+cd ..
+gaanim --diff --example DiaposTesisUCSP --capture-only --no-gui --tests-root DiaposTesisUCSP/snapshots
 ```
 
-Los recursos van en `assets/`; las salidas generadas van en `exports/`.
-
-El proyecto usa `Section`, `SectionStep`, rellenos reactivos y conectores del checkout
-local de Gaanim indicado por `GAANIM_ROOT`. `run.ps1` utiliza su runtime de
-desarrollo y prepara las rutas de sus DLL; el ejecutable global instalado
-todavía no incorpora estas APIs. Los argumentos se resuelven desde este proyecto.
-La wheel de autoría y su hash están fijados en `uv.lock`; instala los tipos con
-`uv sync`.
-
-## Entradas de sección
-
-El índice animado resume la exposición en seis bloques: Problemática, Objetivos,
-Fundamentos, Propuesta, Resultados y Conclusiones. Un rail global persistente ocupa
-el borde inferior, con el nombre de cada sección justo encima y el contenido más arriba.
-Una franja gris suave y una línea superior separan la navegación del contenido.
-El tramo activo avanza por segmento de contenido y su nombre se destaca con `ACCENT`;
-el número y el título principal acompañan el cambio.
-Conserva el fondo, la tipografía y `ACCENT` del proyecto.
-
-`main.py` usa `build` para mostrar la entrada y calcular el avance automáticamente
-a partir de la sección declarada en el módulo de contenido:
-
-```python
-section_index.build(
-    context.SECTION,
-    transition=Transition.cross_fade(0.4),
-)
-```
-
-`context.SECTION` es un `Section` de Gaanim. Cada `SectionStep` declara su nombre,
-builder, transición y notas. Gaanim abre el segmento y entrega la escena original
-al builder, que crea contenido sin llamar a `scene.segment()`.
-El rail utiliza `SectionProgress.fraction` al entrar en cada paso;
-las llamadas a `scene.stop()` no cambian el progreso.
-Para añadir o quitar segmentos, edita los pasos de `SECTION`.
-Reutiliza esa instancia al repetir la sección para obtener nombres únicos.
-`show()` sigue disponible para mostrar únicamente una entrada de sección.
-
-Las claves disponibles son `problematica`, `objetivos`, `fundamentos`, `propuesta`,
-`resultados` y `conclusiones`. Cada entrada tiene su propia pausa para exponer.
-También admite saltos, regresos y repetir una sección.
-
-Para ver una demo de los seis cambios:
-
-```powershell
-.\run.ps1 examples/section_index.py
-```
-
-## Problemática
-
-`src/tesis/sections/context.py` desarrolla tres momentos con pausas para exponer:
-
-1. Contexto nacional: mapa, contador y materiales predominantes en paredes.
-2. Distribución en planta: muros en X/Y y elementos de confinamiento.
-3. Proceso convencional: ETABS, hojas de cálculo, verificación e iteración manual.
-
-Las tarjetas usan `layout.card`; `NODE_CARD` en `src/tesis/theme.py` centraliza
-el contorno, las dimensiones y los puertos con nombre. El helper de contenido
-solo define los textos y su disposición editorial.
-Las flechas del flujo usan `geometry.connector` entre puertos de las tarjetas.
-El retorno es un único conector con puntos intermedios relativos a esas anclas;
-al mover una tarjeta se actualizan sus conexiones. `ARROW_STYLE` centraliza
-las dimensiones, y cada conector admite `animate.create()`.
-
-Se basa en `01_intro.typ` (Problemática y Justificación) y la introducción de
-`05_analisismanual.typ` de la tesis. Cada segmento incluye notas del expositor.
-La planta es conceptual, sin escala, y no representa una comprobación estructural.
-
-Los estilos y flujos de texto están centralizados en `src/tesis/theme.py`.
-Las tarjetas del proceso usan `scene.layout.stack` con posiciones relativas a
-su caja. El contador y el relleno del mapa comparten un único parámetro:
-`computed(..., inputs=[amount])` convierte el porcentaje a una fracción para
-`fill_level`, por lo que solo se anima `amount`.
-
-El gráfico actualiza la referencia INEI 2017 de la tesis con los
-[tabulados oficiales de vivienda del Censo 2025](https://proyectos.inei.gob.pe/dir-segmentacion-ci/postcensal/prod/adjuntos/censos-2025/descarga_datos/tabulados/00/vivienda/Caracter%C3%ADsticas_de_la_vivienda.xlsx),
-hoja **VIV6**, cuadro 6, rango **B7:K7**. Los datos y su fuente se conservan en
-`src/tesis/data/materiales_inei.py`. El 61,8 % corresponde al material de las
-paredes exteriores; no mide la proporción de albañilería confinada. El relleno
-del mapa ilustra el indicador nacional y no una distribución por región.
+Las imágenes y `stops.json` (pausa, instante, segmento) quedan en
+`snapshots/DiaposTesisUCSP/current/`. Con `TESIS_ONLY="12,30"` se capturan solo esas pausas.
+El comando se lanza desde la carpeta superior porque `--example .` no se acepta (ver
+`GAANIM_NOTAS.md`).
 
 ## Exportar
 
 ```powershell
-.\run.ps1 export . --output exports/video.mp4 --quality production
+gaanim export . --output exports/tesis.mp4 --quality production
 ```
 
-## Validar
+La exportación ignora las pausas y genera una secuencia continua de ~3.5 minutos de animación.
 
-```powershell
-.\run.ps1 check .
-```
+## Notas para Gaanim
+
+`GAANIM_NOTAS.md` recoge los bugs y mejoras de Gaanim encontrados durante el rediseño, con
+pasos para reproducirlos y el rodeo aplicado aquí.
