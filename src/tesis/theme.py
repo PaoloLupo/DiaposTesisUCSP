@@ -44,7 +44,7 @@ DIRECTION_COLORS = {"X": BRICK, "Y": STEEL}
 # Tipografía
 DISPLAY = "Aleo"
 SANS = "Lato"
-MONO = "Cascadia Mono"
+MONO = "IBM Plex Mono"
 
 TITLE = TextStyle(font=DISPLAY, size=0.50, weight=700, color=INK)
 KICKER = TextStyle(font=SANS, size=0.17, weight=900, color=BRICK, letter_spacing=0.035)

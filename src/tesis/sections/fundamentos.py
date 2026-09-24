@@ -383,7 +383,7 @@ def _mini_wall(
 
 
 def strength_checks(scene: Scene) -> None:
-    header(scene, KICKER, "Tres preguntas de resistencia, por muro y por piso")
+    header(scene, KICKER, "Tres verificaciones de resistencia, por muro y por piso")
     w, gap = 4.6, 0.25
     axial = AXIAL_STRESS_FLOOR1["MCT"] / 10  # tonf/m² → kgf/cm²
     limit = min(AXIAL_LIMITS)

@@ -15,4 +15,4 @@ typeCheckingMode = "strict"
 pythonVersion = "3.14"
 
 [tool.uv.sources]
-gaanim = { path = "../../rust/gaanim/target/wheels/gaanim-0.2.0-py3-none-any.whl" }
+gaanim = { path = "C:/Tools/gaanim/gaanim-0.2.2-py3-none-any.whl" }

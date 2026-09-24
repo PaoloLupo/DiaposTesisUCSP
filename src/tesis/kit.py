@@ -74,7 +74,7 @@ def header(
     items: list[Drawable] = [kick, head]
     anims = [
         kick.animate.fade_in_from(Direction.RIGHT, 0.12).duration(0.45),
-        head.animate.fade_in_from(Direction.UP, 0.10).duration(0.6),
+        head.animate.write().duration(1),
     ]
     if rule:
         line = scene.geometry.line(length= RIGHT_EDGE- LEFT_EDGE).stroke(
@@ -270,7 +270,7 @@ def dimension(
     size: float = 0.15,
     width: float = 0.01,
 ) -> Drawable:
-    """Cota de plano en Cascadia Mono, a ``offset`` del segmento por el lado ``side``.
+    """Cota de plano en IBM Plex Mono, a ``offset`` del segmento por el lado ``side``.
 
     Como en los planos, el rótulo de una cota vertical se lee girado.
     """

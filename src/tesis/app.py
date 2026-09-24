@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from gaanim import Scene
+from gaanim import Scene, PostProcess
 
 from tesis.theme import PAPER, build_theme
 

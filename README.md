@@ -56,7 +56,7 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
   azul acero = dirección Y y MSTA; gris concreto = concreto y MSTO; verde y rojo solo para
   *cumple* / *no cumple*.
 - **Tipografía incrustada** en `assets/fonts` (todas con licencia OFL): Aleo para títulos y
-  cifras, Lato para el texto, Cascadia Mono para etiquetas técnicas; las ecuaciones usan la
+  cifras, Lato para el texto, IBM Plex Mono para etiquetas técnicas; las ecuaciones usan la
   matemática de Typst. La presentación no depende de las fuentes instaladas en el equipo.
 - **Títulos-afirmación:** cada título dice la conclusión de la diapositiva; el kicker indica el
   bloque y la línea inferior, la fuente en la tesis.

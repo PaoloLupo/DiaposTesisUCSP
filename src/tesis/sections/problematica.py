@@ -54,7 +54,7 @@ MATERIAL_LABELS = {
 
 
 def materials(scene: Scene) -> None:
-    header(scene, KICKER, "El ladrillo es el material de seis de cada diez viviendas")
+    header(scene, KICKER, "El ladrillo es el material usado en seis de cada diez viviendas")
 
     outline = (
         scene.media.svg("peru.svg")
@@ -112,7 +112,7 @@ def materials(scene: Scene) -> None:
     title = label(
         scene,
         "Material predominante en paredes exteriores · % de viviendas",
-        -1.6,
+        -1.0,
         2.62,
         color=MUTED,
         size=0.14,
@@ -456,7 +456,7 @@ def _callout(
 
 
 def manual_transfer(scene: Scene) -> None:
-    header(scene, KICKER, "ETABS no verifica la norma E.070: los datos se trasladan a mano")
+    header(scene, KICKER, "ETABS no verifica la norma E.070 se hace un proceso manual")
 
     # Ventana de resultados del modelo: valores reales de V_e, piso 1, MCT (tb:agriet_xy).
     piers = ["X1", "X3", "X4", "X5", "X6"]
@@ -577,7 +577,7 @@ def manual_transfer(scene: Scene) -> None:
             1.72,
             color=BRICK_DEEP,
             background=BRICK_SOFT,
-            size=0.17,
+            size=0.19,
             font=MONO,
         )
         for name, x in steps
@@ -706,7 +706,7 @@ def manual_transfer(scene: Scene) -> None:
     )
     q_text = t(
         scene,
-        "¿Cómo sistematizar la verificación E.070 a partir del modelo de ETABS?",
+        "¿Cómo sistematizar la verificación de la norma E.070 a partir de un modelo de ETABS?",
         0,
         -2.55,
         font=DISPLAY,
