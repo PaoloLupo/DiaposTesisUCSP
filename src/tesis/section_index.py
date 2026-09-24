@@ -12,8 +12,8 @@ from gaanim import (
     Anchor,
     Direction,
     Drawable,
-    Playable,
     NavigationEntry,
+    Playable,
     ProgressRail,
     Scene,
     Section,
@@ -189,9 +189,9 @@ class SectionIndex:
             previous if previous is not None else active,
             pitch=AGENDA_GAP,
             item=_agenda_row,
-            marker=lambda scene: scene.geometry.rounded_rect(0.07, 0.42, 0.035)
-            .fill(BRICK)
-            .no_stroke(),
+            marker=lambda scene: (
+                scene.geometry.rounded_rect(0.07, 0.42, 0.035).fill(BRICK).no_stroke()
+            ),
         )
         agenda.root.shift_by(AGENDA_X, AGENDA_TOP)
 

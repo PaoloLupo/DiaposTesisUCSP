@@ -48,7 +48,9 @@ def case_study(scene: Scene) -> None:
     ox, oy = plan.origin
     s = plan.scale
     dims = [
-        dimension(scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", side="below", offset=0.45),
+        dimension(
+            scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", side="below", offset=0.45
+        ),
         dimension(
             scene,
             (ox + WIDTH * s, oy),
