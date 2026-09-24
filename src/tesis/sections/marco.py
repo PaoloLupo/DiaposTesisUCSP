@@ -178,7 +178,7 @@ def scope(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 6, Procesos clave para la automatización y Evaluación de cumplimiento",
+        "Tesis · §6.1 Procesos clave para la automatización, p. 98; §6.1.3 Evaluación de cumplimiento, p. 100",
     )
     scene.stop("reparto")
 
@@ -378,7 +378,7 @@ def general_flow(scene: Scene) -> None:
     scene.play(token.animate.fade_out().duration(0.2))
     source(
         scene,
-        "Tesis · cap. 6, fig:flujo_marco y Evaluación de cumplimiento y retroalimentación al usuario",
+        "Tesis · Figura 42, p. 103; §6.1.3 Evaluación de cumplimiento y retroalimentación al usuario, p. 100",
     )
     scene.stop("flujo-general")
 
@@ -561,7 +561,7 @@ def density_module(scene: Scene) -> None:
     scene.play(token.animate.fade_out().duration(0.2))
     source(
         scene,
-        "Tesis · cap. 6, fig:flujo_densidad (E.070 art. 19.2) · valores: cap. 5, tb:densidad_ejm",
+        "Tesis · Figura 43, p. 105 (E.070, art. 19.2) · valores: Tabla 22, p. 57",
     )
     scene.stop("modulo-recorrido")
 
@@ -764,7 +764,7 @@ def traceability(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 6, Especificación de entradas y salidas · registro: cap. 8, tb:cortss_comp y tb:resco_comp",
+        "Tesis · §6.3 Especificación de entradas y salidas, p. 111 · registro: Tablas 53 y 54, pp. 133–134",
     )
     scene.stop("trazabilidad")
 
@@ -789,7 +789,7 @@ SECTION = Section(
             build=general_flow,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. fig:flujo_marco. Antes de verificar se valida: una etiqueta, combinación o "
+                "1 min. Figura 42 (p. 103). Antes de verificar se valida: una etiqueta, combinación o "
                 "parámetro faltante detiene el módulo con un diagnóstico, y eso no es un "
                 "incumplimiento normativo. Luego se procesa por muro, piso y dirección, se ejecutan "
                 "los módulos y se consolidan resultados. Si el ingeniero modifica el modelo, se vuelve "
@@ -801,7 +801,7 @@ SECTION = Section(
             build=density_module,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1.25 min. fig:flujo_densidad como ejemplo de módulo: entradas, validación, "
+                "1.25 min. Figura 43 (p. 105) como ejemplo de módulo: entradas, validación, "
                 "clasificación, aporte efectivo (concreto con Ec/Em), suma, comparación y salida. "
                 "A la derecha, los valores del caso en cada paso. Los otros módulos (axial, "
                 "fisuración y corte, derivas) siguen la misma estructura con sus diagramas del cap. 6."

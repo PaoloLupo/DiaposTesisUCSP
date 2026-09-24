@@ -196,7 +196,7 @@ def architecture(scene: Scene) -> None:
         "Cada diagrama de flujo del capítulo 6 es una rutina del módulo 5",
         y=-2.95,
     )
-    source(scene, "Tesis · cap. 7, arqui_software y tbl:tecnologias")
+    source(scene, "Tesis · Figura 50, p. 118 y Tabla 46, p. 115")
     scene.stop("arquitectura-flujo")
 
 
@@ -332,7 +332,7 @@ def api(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 7, tabla_funciones_api · métodos tal como se listan en la tesis",
+        "Tesis · Tabla 47, p. 120 · métodos tal como se listan en la tesis",
     )
     scene.stop("api-etabs")
 
@@ -450,7 +450,7 @@ def interface(scene: Scene) -> None:
             scene.stop(f"interfaz-zona-{i + 1}")
     source(
         scene,
-        "Tesis · cap. 7, fig:alba_ui · captura de Alba v0.1.0 con el modelo del caso (ModeloBartolomes.EDB)",
+        "Tesis · Figura 51, p. 121 · captura de Alba v0.1.0 con el modelo del caso (ModeloBartolomes.EDB)",
     )
     scene.stop("interfaz")
 
@@ -617,7 +617,7 @@ def report(scene: Scene) -> None:
         ]
     )
     source(
-        scene, "Tesis · cap. 7, fig:frag_typst, fig:cod_typst y tbl:estructura_reporte"
+        scene, "Tesis · Figuras 48 y 49, pp. 116–117; Tabla 48, p. 124"
     )
     scene.stop("reporte-estructura")
 
@@ -642,7 +642,7 @@ SECTION = Section(
             build=api,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. tabla_funciones_api: métodos consultados para niveles, materiales, muros, "
+                "45 s. Tabla 47 (p. 120): métodos consultados para niveles, materiales, muros, "
                 "elementos de área y frame, conectividad, tablas de resultados y control del análisis. "
                 "Esto reemplaza la exportación manual de tablas. Antes de leer se comprueba que exista "
                 "una instancia abierta y un modelo analizado; si no, la consola advierte."
@@ -653,7 +653,7 @@ SECTION = Section(
             build=interface,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. Captura real (fig:alba_ui) con el modelo del caso: 136.51 m², 4 pisos, zona 4. "
+                "45 s. Captura real (Figura 51 (p. 121)) con el modelo del caso: 136.51 m², 4 pisos, zona 4. "
                 "Barra de herramientas; panel de flujo con estado de conexión y etapas (proyecto, muros, "
                 "verificaciones, capturas, reporte); panel de trabajo; consola de diagnósticos. No es una "
                 "demostración en vivo."
@@ -666,7 +666,7 @@ SECTION = Section(
             notes=(
                 "45 s. Python procesa y exporta un JSON; la plantilla Typst compone el PDF con fórmulas, "
                 "tablas, referencias normativas y capturas. El fragmento corresponde a la densidad "
-                "mínima (0.032) del caso. Secciones según tbl:estructura_reporte."
+                "mínima (0.032) del caso. Secciones según Tabla 48 (p. 124)."
             ),
         ),
     ],

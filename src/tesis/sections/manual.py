@@ -127,7 +127,7 @@ def case_study(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 5, tb:info_gen, tb:carac_mat y fig:piers_planta · planta de San Bartolomé (2006), "
+        "Tesis · Tablas 20 y 21, pp. 52–53; Figura 34, p. 66 · planta de San Bartolomé (2006), "
         "etiquetas Pier del modelo en ETABS (′ = simétrico _2)",
     )
     scene.stop("caso-x2")
@@ -339,7 +339,7 @@ def idealizations(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 4, Modelamientos recomendados; cap. 5, modelo_ct y m_porticos_planos · esquemas conceptuales",
+        "Tesis · §4.5, p. 49; §5.3.1 y §5.3.2, pp. 58 y 67 · esquemas conceptuales",
     )
     scene.stop("idealizaciones")
 
@@ -414,7 +414,7 @@ def criteria(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 4: tb:P_sc, tb:D_sc, tb:D_i, tb:disc_p; cap. 5: fig:piers_planta · capturas de ETABS de la tesis",
+        "Tesis · Tablas 8, 14, 16 y 19, pp. 35, 42, 44 y 49; Figura 34, p. 66 · capturas de ETABS de la tesis",
     )
     scene.stop("criterios-modelamiento")
 
@@ -581,7 +581,7 @@ def manual_cycle(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 5, fig:flujo_manual y Extracción de datos y creación de hoja de cálculo",
+        "Tesis · Figura 41, p. 80; §5.5.1 Extracción de datos y creación de hoja de cálculo, p. 81",
     )
     scene.stop("ciclo-repeticion")
 
@@ -631,7 +631,7 @@ SECTION = Section(
             build=manual_cycle,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. fig:flujo_manual: modelo → exportar y filtrar tablas → copiar a hojas → "
+                "45 s. Figura 41 (p. 80): modelo → exportar y filtrar tablas → copiar a hojas → "
                 "verificar. Si algo no cumple, se busca el origen, se modifica el modelo y se repite "
                 "todo. Ocho verificaciones en la hoja de cálculo. El contador de iteraciones es "
                 "ilustrativo: la tesis no registró cuántas iteraciones tomó el caso."

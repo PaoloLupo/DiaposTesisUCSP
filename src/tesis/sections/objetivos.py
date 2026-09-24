@@ -165,7 +165,7 @@ def purpose(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 1, Objetivo general, Hipótesis y Variables de la investigación",
+        "Tesis · §1.3.1 Objetivo general, §1.4 Hipótesis y §1.5 Variables de la investigación, pp. 3–4",
     )
     scene.stop("hipotesis")
 
@@ -262,7 +262,7 @@ def specific(scene: Scene) -> None:
             flow_label.animate.fade_in().duration(0.5),
         ]
     )
-    source(scene, "Tesis · cap. 1, Objetivos específicos")
+    source(scene, "Tesis · §1.3.2 Objetivos específicos, p. 4")
     scene.stop("objetivos-especificos")
 
 
@@ -383,7 +383,7 @@ def method(scene: Scene) -> None:
         y=-2.95,
     )
     source(
-        scene, "Tesis · cap. 1, Metodología de la investigación; población y muestra"
+        scene, "Tesis · §1.6 Metodología de la investigación y §1.6.3 Población y muestra, p. 5"
     )
     scene.stop("metodologia")
 

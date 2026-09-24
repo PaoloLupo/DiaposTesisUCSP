@@ -24,7 +24,7 @@ from gaanim import (
     stagger,
 )
 
-from tesis.kit import LEFT_EDGE, t
+from tesis.kit import LEFT_EDGE, RIGHT_EDGE, t
 from tesis.theme import (
     BRICK,
     DISPLAY,
@@ -94,6 +94,19 @@ AGENDA_X = 1.9
 AGENDA_TOP = 2.35
 AGENDA_GAP = 0.66
 RAIL_Y = -4.46
+# Cabecera corrida: el título de la tesis centrado en el borde superior, sobre el
+# kicker, entre dos filetes que llegan a los márgenes.
+RUNNING_HEAD = (
+    "Marco de trabajo para la automatización del diseño de la distribución "
+    "de muros en planta para edificios de albañilería confinada"
+)
+RUNNING_HEAD_Y = 4.24
+RUNNING_HEAD_HALF = 4.6  # semiancho aproximado del texto con este estilo
+RUNNING_HEAD_STYLE = TextStyle(
+    font=SANS, size=0.1, weight=700, color=INK_SOFT, letter_spacing=0.015
+)
+# Escenas que ya muestran el título completo (como la portada) no llevan cabecera.
+NO_RUNNING_HEAD = {"Cierre"}
 
 
 def _agenda_row(scene: Scene, entry: NavigationEntry, state: str) -> Drawable:
@@ -131,6 +144,8 @@ class SectionIndex:
         self.scene = scene
         self._previous: int | None = None
         self._rail: ProgressRail | None = None
+        self._head: Drawable | None = None
+        self._head_visible = False
 
     def build(self, section: Section, *, transition: Transition | None = None) -> None:
         if section.key not in KEYS:
@@ -158,6 +173,7 @@ class SectionIndex:
         _, title, question, _ = SECTIONS[active]
         _ = scene.camera.reset()
         rail = self._rail or self._build_rail()
+        self._set_running_head(False)
 
         # El numeral rueda desde el bloque anterior hasta el actual.
         numeral = scene.viz.rolling_number(
@@ -238,8 +254,43 @@ class SectionIndex:
         """Al entrar a cada escena el tramo activo del riel avanza (el divisor no cuenta)."""
         if progress.index == 1 or self._rail is None:
             return
+        self._set_running_head(progress.step.name not in NO_RUNNING_HEAD)
         active = KEYS.index(progress.key)
         share = (progress.index - 1) / (progress.total - 1)
         scene.play(
             self._rail.animate.to((active + share) / len(SECTIONS)), duration=0.35
         )
+
+    def _set_running_head(self, visible: bool) -> None:
+        """Muestra el título de la tesis en las escenas y lo oculta en los divisores."""
+        if visible == self._head_visible:
+            return
+        scene = self.scene
+        if self._head is None:
+            y, gap = RUNNING_HEAD_Y, RUNNING_HEAD_HALF + 0.25
+            text = t(
+                scene,
+                RUNNING_HEAD.upper(),
+                0,
+                y,
+                style=RUNNING_HEAD_STYLE,
+                anchor=Anchor.CENTER,
+            )
+            # Escudo pequeño y en gris al inicio del filete izquierdo: sello discreto.
+            logo = (
+                scene.media.svg("logoucsp.svg")
+                .scale_to(0.00033)
+                .fill(MUTED)
+                .move_to(LEFT_EDGE + 0.09, y)
+            )
+            rules = [
+                scene.geometry.line(LEFT_EDGE + 0.3, y, -gap, y).stroke(RULE, 0.012),
+                scene.geometry.line(gap, y, RIGHT_EDGE, y).stroke(RULE, 0.012),
+            ]
+            head = scene.geometry.group([logo, rules[0], text, rules[1]])
+            head.hud().z_index(100)
+            scene.persist(head)
+            self._head = head
+        anim = self._head.animate.fade_in() if visible else self._head.animate.fade_out()
+        scene.play(anim, duration=0.3)
+        self._head_visible = visible

@@ -73,7 +73,7 @@ def materials(scene: Scene) -> None:
         mode="continuous",
         color=INK,
     ).move_to(-4.55, -0.35, Anchor.CENTER)
-    level = computed(lambda value: value / 100, inputs=[counter.parameter])
+    level = computed(lambda value: value / 100 - 0.1, inputs=[counter.parameter])
     fill = (
         scene.geometry.fill_level(
             outline, BRICK_SOFT, direction="up", keep_outline=False
@@ -224,14 +224,33 @@ def _brick_wall(scene: Scene, cx: float, cy: float, width: float, height: float)
             toothed = (r // 2) % 2 == 0
             xi = x_in - sign * tooth if toothed else x_in
             pts += [(xi, y1), (xi, y0)]
-        return scene.geometry.polygon(pts).fill(CONCRETE_SOFT).stroke(CONCRETE, 0.012)
+        return pts
 
-    columns = [column(left, left - col_w), column(right, right + col_w)]
+    # Las siluetas de concreto sirven de máscara para el vaciado y quedan ocultas;
+    # el contorno visible es una copia aparte (el encofrado).
+    column_pts = [column(left, left - col_w), column(right, right + col_w)]
+    columns = [
+        scene.geometry.polygon(pts).fill(CONCRETE_SOFT).no_stroke().opacity(0)
+        for pts in column_pts
+    ]
+    forms = [
+        scene.geometry.polygon(pts).no_fill().stroke(CONCRETE, 0.014).z_index(4)
+        for pts in column_pts
+    ]
+    beam_y = top_bricks + beam_h / 2
     beam = (
         scene.geometry.rect(width, beam_h)
         .fill(CONCRETE_SOFT)
-        .stroke(CONCRETE, 0.012)
-        .move_to(cx, top_bricks + beam_h / 2)
+        .no_stroke()
+        .opacity(0)
+        .move_to(cx, beam_y)
+    )
+    forms.append(
+        scene.geometry.rect(width, beam_h)
+        .no_fill()
+        .stroke(CONCRETE, 0.014)
+        .z_index(4)
+        .move_to(cx, beam_y)
     )
     ground = scene.geometry.line(
         cx - width / 2 - 0.4, bottom, cx + width / 2 + 0.4, bottom
@@ -242,13 +261,20 @@ def _brick_wall(scene: Scene, cx: float, cy: float, width: float, height: float)
             cx - width / 2 - 0.3 + 0.22 * i for i in range(int((width + 0.8) / 0.22))
         ]
     ]
-    return rows, columns, beam, scene.geometry.group([ground, *hatch]), top_bricks
+    return (
+        rows,
+        columns,
+        beam,
+        forms,
+        scene.geometry.group([ground, *hatch]),
+        top_bricks,
+    )
 
 
 def seismic(scene: Scene) -> None:
     header(scene, KICKER, "En un país sísmico, el muro confinado trabaja como unidad")
 
-    plates = scene.media.lottie("placas_subduccion.lottie")
+    plates = scene.media.lottie("placas_subduccion_paleta.lottie")
     plates.scale_by(0.43).move_to(-5.0, 0.4)
     plate_caption = t(
         scene,
@@ -264,15 +290,41 @@ def seismic(scene: Scene) -> None:
     scene.stop("contexto-sismico")
 
     cx, cy, w, h = 1.15, -0.2, 3.7, 3.2
-    rows, columns, beam, ground, top_bricks = _brick_wall(scene, cx, cy, w, h)
-    scene.play(ground.animate.create().duration(0.5))
+    rows, columns, beam, forms, ground, top_bricks = _brick_wall(scene, cx, cy, w, h)
+    col_forms, beam_form = forms[:2], forms[2]
+
+    # Fases constructivas en el orden de obra: asentado del muro, vaciado de
+    # columnas y, al final, la viga solera.
+    phases = [
+        t(
+            scene,
+            text,
+            cx,
+            cy + h / 2 + 0.55,
+            font=MONO,
+            size=0.16,
+            color=MUTED,
+            anchor=Anchor.BOTTOM,
+        )
+        for text in (
+            "Fase 1 · asentado del muro",
+            "Fase 2 · encofrado y vaciado de columnas",
+            "Fase 3 · encofrado y vaciado de la viga solera",
+        )
+    ]
+    scene.play(
+        [
+            ground.animate.create().duration(0.5),
+            phases[0].animate.fade_in().duration(0.3),
+        ]
+    )
     scene.play(
         stagger(
             *[
                 r.animate.fade_in_from(Direction.DOWN, 0.05).duration(0.25)
                 for r in rows
             ],
-            each=0.045,
+            each=0.12,
         )
     )
     wall_note = _callout(
@@ -283,17 +335,34 @@ def seismic(scene: Scene) -> None:
         (3.75, -0.75),
     )
     scene.play(wall_note)
+
     fills = [
         scene.geometry.fill_level(
-            c, CONCRETE_SOFT, 0, direction="up", keep_outline=True
+            c, CONCRETE_SOFT, 0, direction="up", keep_outline=False
         )
         for c in columns
     ]
-    scene.play([f.animate.fill_level(1).duration(0.9) for f in fills])
-    beam_fill = scene.geometry.fill_level(
-        beam, CONCRETE_SOFT, 0, direction="right", keep_outline=True
+    scene.play(
+        [
+            phases[0].animate.fade_out().duration(0.25),
+            phases[1].animate.fade_in().duration(0.3),
+            *[f.animate.create().duration(0.5) for f in col_forms],
+        ]
     )
-    scene.play(beam_fill.animate.fill_level(1).duration(0.6))
+    scene.play([f.animate.fill_level(1).duration(1.2) for f in fills])
+
+    beam_fill = scene.geometry.fill_level(
+        beam, CONCRETE_SOFT, 0, direction="right", keep_outline=False
+    )
+    scene.play(
+        [
+            phases[1].animate.fade_out().duration(0.25),
+            phases[2].animate.fade_in().duration(0.3),
+            beam_form.animate.create().duration(0.4),
+        ]
+    )
+    scene.play(beam_fill.animate.fill_level(1).duration(0.8))
+    scene.play(phases[2].animate.fade_out().duration(0.3))
     col_note = _callout(
         scene,
         "Columnas y viga solera",
@@ -337,7 +406,7 @@ def seismic(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 1, Problemática; cap. 2, Albañilería confinada (Gonzales, 1992; Tavera, 2014; San Bartolomé, 2018)",
+        "Tesis · §1.1 Problemática, p. 1; §3.1 Albañilería confinada, p. 21 (Gonzales, 1992; Tavera, 2014; San Bartolomé, 2018)",
     )
     scene.stop("muro-confinado")
 
@@ -352,8 +421,12 @@ def _callout(
     align_right: bool = False,
 ):
     ax, ay = anchor
-    dot = scene.geometry.circle(0.05).fill(INK).no_stroke().move_to(*target)
-    lead = scene.geometry.line(target, (ax, ay - 0.16)).stroke(INK_SOFT, 0.01)
+    dot = (
+        scene.geometry.circle(0.05).fill(INK).no_stroke().move_to(*target).z_index(6)
+    )
+    lead = (
+        scene.geometry.line(target, (ax, ay - 0.16)).stroke(INK_SOFT, 0.01).z_index(6)
+    )
     head = t(
         scene,
         title,
@@ -383,11 +456,13 @@ def _callout(
 
 
 def manual_transfer(scene: Scene) -> None:
-    header(scene, KICKER, "ETABS no verifica la E.070: los datos se trasladan a mano")
+    header(scene, KICKER, "ETABS no verifica la norma E.070: los datos se trasladan a mano")
 
     # Ventana de resultados del modelo: valores reales de V_e, piso 1, MCT (tb:agriet_xy).
     piers = ["X1", "X3", "X4", "X5", "X6"]
-    etabs = _window(scene, -5.15, 0.85, 3.9, 2.75, "ETABS · Pier Forces")
+    etabs = _window(
+        scene, -5.15, 0.85, 3.9, 2.75, "ETABS · Pier Forces", icon=ETABS_ICON
+    )
     head = ["Story", "Pier", "Ve (tonf)"]
     xs = [-6.8, -5.6, -4.3]
     table: list[Drawable] = [
@@ -441,7 +516,14 @@ def manual_transfer(scene: Scene) -> None:
         ]
         records.append(cells)
     sheet = _window(
-        scene, 4.4, 0.85, 4.6, 2.75, "Hoja de cálculo · E.070", tint=PASS_TINT
+        scene,
+        4.4,
+        0.85,
+        4.6,
+        2.75,
+        "Excel · Verificación E.070",
+        icon=EXCEL_ICON,
+        tint=PASS_TINT,
     )
     letters = [
         t(
@@ -641,47 +723,90 @@ def manual_transfer(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 1, Problemática y Justificación. Valores: $V_e$ del piso 1, MCT (tb:agriet_xy).",
+        "Tesis · §1.1 Problemática y §1.2 Justificación, pp. 1–2. Valores: $V_e$ del piso 1, MCT (Tabla 35, p. 86).",
     )
     scene.stop("pregunta-de-investigacion")
 
 
 PASS_TINT = STEEL_SOFT
+ETABS_ICON = ("E", "#2B6CB0")
+EXCEL_ICON = ("X", "#107C41")
 
 
 def _window(
-    scene: Scene, cx: float, cy: float, w: float, h: float, title: str, *, tint=CARD
+    scene: Scene,
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
+    title: str,
+    *,
+    icon: tuple[str, str],
+    tint=CARD,
 ) -> Drawable:
+    # Decoración de Windows (ETABS solo corre en Windows): esquinas casi rectas,
+    # título a la izquierda y botones minimizar/maximizar/cerrar a la derecha.
     frame = (
-        scene.geometry.rounded_rect(w, h, 0.1)
+        scene.geometry.rounded_rect(w, h, 0.04)
         .fill(CARD)
         .stroke(RULE, 0.014)
         .move_to(cx, cy)
     )
+    bar_y = cy + h / 2 - 0.17
     bar = (
-        scene.geometry.rounded_rect(w, 0.34, 0.1)
+        scene.geometry.rounded_rect(w, 0.34, 0.04)
         .fill(tint)
         .no_stroke()
-        .move_to(cx, cy + h / 2 - 0.17)
+        .move_to(cx, bar_y)
     )
-    dots = [
-        scene.geometry.circle(0.045)
-        .fill(c)
+    g = 0.055  # semilado del glifo
+    close_x = cx + w / 2 - 0.22
+    max_x = close_x - 0.42
+    min_x = max_x - 0.42
+    controls = [
+        scene.geometry.line(min_x - g, bar_y, min_x + g, bar_y).stroke(INK_SOFT, 0.012),
+        scene.geometry.rect(2 * g, 2 * g)
+        .no_fill()
+        .stroke(INK_SOFT, 0.012)
+        .move_to(max_x, bar_y),
+        scene.geometry.line(
+            close_x - g, bar_y - g, close_x + g, bar_y + g
+        ).stroke(INK_SOFT, 0.012),
+        scene.geometry.line(
+            close_x - g, bar_y + g, close_x + g, bar_y - g
+        ).stroke(INK_SOFT, 0.012),
+    ]
+    # Ícono de la aplicación, representativo (no el logotipo oficial).
+    letter, color = icon
+    icon_x = cx - w / 2 + 0.22
+    badge = [
+        scene.geometry.rounded_rect(0.22, 0.22, 0.04)
+        .fill(color)
         .no_stroke()
-        .move_to(cx - w / 2 + 0.2 + i * 0.15, cy + h / 2 - 0.17)
-        for i, c in enumerate([BRICK, "#D9B25B", "#9DB08A"])
+        .move_to(icon_x, bar_y),
+        t(
+            scene,
+            letter,
+            icon_x,
+            bar_y,
+            font="Lato",
+            size=0.15,
+            weight=900,
+            color="#FFFFFF",
+            anchor=Anchor.CENTER,
+        ),
     ]
     name = t(
         scene,
         title,
-        cx - w / 2 + 0.6,
-        cy + h / 2 - 0.17,
+        icon_x + 0.22,
+        bar_y,
         font=MONO,
         size=0.14,
         color=INK_SOFT,
         anchor=Anchor.LEFT,
     )
-    return scene.geometry.group([frame, bar, *dots, name])
+    return scene.geometry.group([frame, bar, *controls, *badge, name])
 
 
 SECTION = Section(
@@ -718,7 +843,7 @@ SECTION = Section(
             notes=(
                 "1.25 min. Los programas comerciales (ETABS, SAP2000) no implementan la E.070; el "
                 "ingeniero exporta tablas, filtra, copia a hojas de cálculo y verifica. Las cifras "
-                "son V_e reales del piso 1 del modelo MCT (tb:agriet_xy), usadas solo para ilustrar "
+                "son V_e reales del piso 1 del modelo MCT (Tabla 35 (p. 86)), usadas solo para ilustrar "
                 "el traslado. Riesgos citados en la tesis: errores de selección, transcripción, "
                 "ordenamiento y verificaciones omitidas; no se midió su frecuencia. Cerrar con la "
                 "pregunta de investigación."

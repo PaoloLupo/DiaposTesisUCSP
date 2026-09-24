@@ -186,7 +186,7 @@ def models(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 8, Diferencias encontradas entre los modelos analizados · la propuesta E.070 (2019) "
+        "Tesis · §8.1 Diferencias encontradas entre los modelos analizados, p. 126 · la propuesta E.070 (2019) "
         "se adoptó como caso de análisis",
     )
     scene.stop("modelos-logica")
@@ -358,7 +358,7 @@ def weight_forces(scene: Scene) -> None:
     scene.play(callout.animate.fade_in().duration(0.4))
     source(
         scene,
-        "Tesis · cap. 8, tb:pesos_comp y tb:peso_comp · diferencias con la base de las notas de cada tabla",
+        "Tesis · Tablas 50 y 51, pp. 129–130 · diferencias con la base de las notas de cada tabla",
     )
     scene.stop("fuerzas-altura")
 
@@ -545,7 +545,7 @@ def drifts(scene: Scene) -> None:
     ]
     scene.play(stagger(*[n.animate.fade_in().duration(0.4) for n in notes], each=0.15))
     source(
-        scene, "Tesis · cap. 8, tb:dist_comp · detalle 0–0.2 %, misma escala en X e Y"
+        scene, "Tesis · Tabla 52, p. 131 · detalle 0–0.2 %, misma escala en X e Y"
     )
     scene.stop("derivas-detalle")
 
@@ -586,7 +586,7 @@ def shear(scene: Scene) -> None:
         ),
     ]
     scene.play(stagger(*[n.animate.fade_in().duration(0.4) for n in notes], each=0.15))
-    source(scene, "Tesis · cap. 8, tb:cortss_comp · $V_E$ de cada entrepiso")
+    source(scene, "Tesis · Tabla 53, p. 133 · $V_E$ de cada entrepiso")
     scene.stop("cortante")
 
 
@@ -663,7 +663,7 @@ def resistance(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 8, tb:cortss_comp y tb:resco_comp; cap. 5, tb:cort_glob_pp (MSTA: «No cumple · replantear»)",
+        "Tesis · Tablas 53 y 54, pp. 133–134; Tabla 38, p. 89 (MSTA: «No cumple · replantear»)",
     )
     scene.stop("resistencia-diagnostico")
 
@@ -810,7 +810,7 @@ def cracking(scene: Scene) -> None:
     scene.play([x.animate.fade_in().duration(0.3) for x in legend])
     source(
         scene,
-        "Tesis · cap. 5, tb:agriet_xy (MCT) y tb:agriet_xy_pp (MSTA), sismo moderado, piso 1 · mismo edificio y misma norma",
+        "Tesis · Tablas 35 (MCT) y 36 (MSTA), pp. 86–87, sismo moderado, piso 1 · mismo edificio y misma norma",
     )
     scene.stop("fisuracion-comparacion")
 
@@ -856,9 +856,9 @@ SECTION = Section(
             build=weight_forces,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. tb:pesos_comp: 451.84 / 456.57 / 432.11 tonf. MSTA pesa 1.04 % más que MCT "
+                "1 min. Tabla 50 (p. 129): 451.84 / 456.57 / 432.11 tonf. MSTA pesa 1.04 % más que MCT "
                 "(áreas tributarias vs volumen modelado); MSTO pesa 5.66 % menos que MSTA por columnas "
-                "de 0.20 m. tb:peso_comp: Fi difiere a lo más 2.14 % entre MCT y MSTA, pero MSTO es "
+                "de 0.20 m. Tabla 51 (p. 130): Fi difiere a lo más 2.14 % entre MCT y MSTA, pero MSTO es "
                 "hasta 23.3 % menor que MSTA en el piso 4 por el cambio de Z y de la E.030."
             ),
         ),
@@ -879,7 +879,7 @@ SECTION = Section(
             build=shear,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. tb:cortss_comp. En Y, MCT es hasta 11.25 % menor que MSTA: el modelo de áreas "
+                "45 s. Tabla 53 (p. 133). En Y, MCT es hasta 11.25 % menor que MSTA: el modelo de áreas "
                 "considera el aporte de muros ortogonales. En X ambos casi coinciden porque los "
                 "confinamientos de intersecciones T/L se asignaron al Pier de la dirección X (limitación "
                 "de ETABS: un elemento no pertenece a dos Pier). MSTO es hasta 30.9 % menor en X por la "
@@ -902,8 +902,8 @@ SECTION = Section(
             build=cracking,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1.25 min. Control de fisuración con sismo moderado en el piso 1 (tb:agriet_xy y "
-                "tb:agriet_xy_pp). MCT: los 24 muros de albañilería cumplen. MSTA: 7 de 24 no cumplen "
+                "1.25 min. Control de fisuración con sismo moderado en el piso 1 (Tabla 35 (p. 86) y "
+                "Tabla 36 (p. 87)). MCT: los 24 muros de albañilería cumplen. MSTA: 7 de 24 no cumplen "
                 "(X1, X5, X7, sus simétricos X1′ y X5′, e Y1′, Y2′). Es el mismo edificio y la misma "
                 "norma: cambia la idealización. X2 es de concreto y no se evalúa con este criterio."
             ),

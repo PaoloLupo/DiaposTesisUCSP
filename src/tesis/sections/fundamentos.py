@@ -16,11 +16,19 @@ from gaanim import (
     SectionStep,
     Transition,
     computed,
+    parallel,
     part,
     stagger,
 )
 
-from tesis.building import FLOOR_AREA, WALLS, density, draw_plan, wall_area_sum
+from tesis.building import (
+    FLOOR_AREA,
+    STAIR,
+    WALLS,
+    density,
+    draw_plan,
+    wall_area_sum,
+)
 from tesis.data.thesis import (
     AXIAL_LIMITS,
     AXIAL_STRESS_FLOOR1,
@@ -67,18 +75,112 @@ def density_check(scene: Scene) -> None:
         color=MUTED,
         anchor=Anchor.TOP,
     )
+    # Presentación gradual de la planta: primero el contorno y los ejes, luego
+    # los muros por dirección, cada grupo con su entrada en la leyenda.
+    stair_note = t(
+        scene,
+        "escalera",
+        *plan.to_scene((STAIR[0] + STAIR[2]) / 2, (STAIR[1] + STAIR[3]) / 2),
+        font=MONO,
+        size=0.12,
+        color=MUTED,
+        anchor=Anchor.CENTER,
+    )
+    gx, gy, arm = LEFT_EDGE + 0.2, -2.55, 0.45
+    axes = [
+        scene.geometry.arrow(
+            gx, gy, gx + arm, gy, head_length=0.1, head_width=0.1, body_width=0.018
+        )
+        .fill(BRICK)
+        .no_stroke(),
+        scene.geometry.arrow(
+            gx, gy, gx, gy + arm, head_length=0.1, head_width=0.1, body_width=0.018
+        )
+        .fill(STEEL)
+        .no_stroke(),
+    ]
+    axis_labels = [
+        t(
+            scene,
+            "X",
+            gx + arm + 0.08,
+            gy,
+            font=MONO,
+            size=0.14,
+            color=BRICK,
+            anchor=Anchor.LEFT,
+        ),
+        t(
+            scene,
+            "Y",
+            gx,
+            gy + arm + 0.08,
+            font=MONO,
+            size=0.14,
+            color=STEEL,
+            anchor=Anchor.BOTTOM,
+        ),
+    ]
     scene.play(
         stagger(
             plan.slab.animate.fade_in().duration(0.5),
-            plan.void.animate.fade_in().duration(0.3),
-            stagger(
-                *[w.animate.grow_from_center().duration(0.35) for w in plan.all_walls],
-                each=0.02,
+            parallel(
+                plan.void.animate.fade_in().duration(0.3),
+                stair_note.animate.fade_in().duration(0.3),
             ),
             area_note.animate.fade_in().duration(0.3),
-            each=0.2,
+            parallel(
+                *[a.animate.grow_arrow().duration(0.4) for a in axes],
+                *[a.animate.fade_in().duration(0.4) for a in axis_labels],
+            ),
+            each=0.25,
         )
     )
+
+    legend_y = 2.3
+
+    def legend(x: float, color: str, text: str) -> list[Drawable]:
+        swatch = (
+            scene.geometry.rect(0.3, 0.09)
+            .fill(color)
+            .no_stroke()
+            .move_to(x + 0.15, legend_y)
+        )
+        name = t(
+            scene,
+            text,
+            x + 0.4,
+            legend_y,
+            size=0.16,
+            color=INK_SOFT,
+            anchor=Anchor.LEFT,
+        )
+        return [swatch, name]
+
+    masonry_x = [
+        d
+        for name, d in plan.walls.items()
+        if name.startswith("X") and name.split("_")[0] != "X2"
+    ]
+    groups = [
+        (legend(LEFT_EDGE + 0.2, BRICK, "Muros en X"), masonry_x),
+        (legend(LEFT_EDGE + 2.3, STEEL, "Muros en Y"), plan.by_direction("Y")),
+        (legend(LEFT_EDGE + 4.4, CONCRETE, "Concreto (X2)"), plan.instances("X2")),
+    ]
+    for items, walls in groups:
+        scene.play(
+            parallel(
+                *[i.animate.fade_in().duration(0.3) for i in items],
+                stagger(
+                    *[w.animate.grow_from_center().duration(0.35) for w in walls],
+                    each=0.05,
+                ),
+            )
+        )
+    scene.play(stair_note.animate.fade_out().duration(0.3))
+    scene.stop("densidad-planta")
+    scene.wait(0.05)  # que la pausa no capture el primer trazo de la fórmula
+
     x0 = 1.15
     formula = scene.text.equation(
         part("d", "D"),
@@ -123,7 +225,7 @@ def density_check(scene: Scene) -> None:
         counter.move_to(x0 + 1.55, y - 0.28, Anchor.LEFT)
         track_left, track_w = x0 + 2.95, 2.9
         track = (
-            scene.geometry.rounded_rect(track_w, 0.16, 0.08)
+            scene.geometry.rounded_rect(track_w, 0.16, 0.02)
             .fill(FAINT)
             .no_stroke()
             .move_to(track_left + track_w / 2, y - 0.28)
@@ -132,7 +234,7 @@ def density_check(scene: Scene) -> None:
             lambda v: min(v / FLOOR_AREA / 0.06, 1.0), inputs=[counter.parameter]
         )
         bar = scene.geometry.fill_level(
-            track, color, direction="right", keep_outline=False
+            track, color, direction="left", keep_outline=False
         ).set_fill_level(ratio)
         threshold_x = track_left + track_w * DENSITY_MIN / 0.06
         tick = scene.geometry.line(threshold_x, y - 0.1, threshold_x, y - 0.46).stroke(
@@ -224,7 +326,7 @@ def density_check(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 5, tb:densidad_ejm (E.070, art. 19.2b) · Z = 0.45, U = 1, S = 1, N = 4 · "
+        "Tesis · Tabla 22, p. 57 (E.070, art. 19.2b) · Z = 0.45, U = 1, S = 1, N = 4 · "
         "planta de San Bartolomé (2006)",
     )
     scene.stop("densidad-conclusion")
@@ -233,7 +335,7 @@ def density_check(scene: Scene) -> None:
 def _mini_wall(
     scene: Scene, cx: float, cy: float, w: float, h: float
 ) -> list[Drawable]:
-    """Muro confinado simplificado: hiladas como líneas, columnas y solera."""
+    """Muro confinado simplificado: ladrillos en soga, columnas y solera."""
     col, beam = 0.22, 0.2
     panel_ = (
         scene.geometry.rect(w - 2 * col, h - beam)
@@ -241,12 +343,26 @@ def _mini_wall(
         .no_stroke()
         .move_to(cx, cy - beam / 2)
     )
-    courses = [
-        scene.geometry.line(cx - w / 2 + col, y, cx + w / 2 - col, y).stroke(
-            BRICK, 0.008
-        )
-        for y in [cy - h / 2 + 0.13 * k for k in range(1, int((h - beam) / 0.13))]
-    ]
+    # Una hilada por grupo; cada hilada se desplaza medio ladrillo (aparejo de soga).
+    brick_w, brick_h, joint = 0.3, 0.1, 0.025
+    left, right = cx - w / 2 + col, cx + w / 2 - col
+    bottom = cy - h / 2
+    courses: list[Drawable] = []
+    for r in range(int((h - beam) / (brick_h + joint))):
+        y = bottom + joint + brick_h / 2 + r * (brick_h + joint)
+        x = left - (brick_w / 2 if r % 2 else 0)
+        bricks: list[Drawable] = []
+        while x < right - 0.02:
+            a, b = max(x, left), min(x + brick_w, right)
+            if b - a > 0.05:
+                bricks.append(
+                    scene.geometry.rect(b - a - joint, brick_h)
+                    .fill("#C57457")  # BRICK aclarado sobre la tarjeta
+                    .no_stroke()
+                    .move_to((a + b) / 2, y)
+                )
+            x += brick_w
+        courses.append(scene.geometry.group(bricks))
     cols = [
         scene.geometry.rect(col, h)
         .fill(CONCRETE_SOFT)
@@ -279,8 +395,8 @@ def strength_checks(scene: Scene) -> None:
             "color": INK_SOFT,
             "question": "¿La compresión en el muro\nes admisible?",
             "eq": [
-                "sigma_m = frac(P_m, L t)",
-                "sigma_m <= 0.2 f'_m [1 - (frac(h, 35 t))^2] <= 0.15 f'_m",
+                "sigma_m = P_m slash (L t)",
+                "sigma_m <= 0.2 f'_m [1 - (h slash 35 t)^2] <= 0.15 f'_m",
             ],
             "case": f"{AXIAL_WALL} · piso 1 · MCT",
             "value": f"{axial:.2f} ≤ {limit:.2f} kgf/cm²",
@@ -312,14 +428,14 @@ def strength_checks(scene: Scene) -> None:
         drawing: list[Drawable] = []
         loads: list[Drawable] = []
         if i < 2:
-            drawing = _mini_wall(scene, cx, 1.35, 2.6, 1.6)
+            drawing = _mini_wall(scene, cx, 1.1, 2.6, 1.5)
             if i == 0:
                 arrow = (
                     scene.geometry.arrow(
                         cx,
-                        2.35,
+                        2.3,
                         cx,
-                        2.2,
+                        1.88,
                         head_length=0.14,
                         head_width=0.2,
                         body_width=0.04,
@@ -330,9 +446,9 @@ def strength_checks(scene: Scene) -> None:
                 loads = [
                     scene.geometry.arrow(
                         cx + dx,
-                        2.32,
+                        2.2,
                         cx + dx,
-                        2.18,
+                        1.88,
                         head_length=0.1,
                         head_width=0.12,
                         body_width=0.025,
@@ -344,10 +460,10 @@ def strength_checks(scene: Scene) -> None:
                 p_lab = t(
                     scene,
                     "$P_m$",
-                    cx + 1.25,
-                    2.3,
+                    cx + 1.1,
+                    2.1,
                     font=MONO,
-                    size=0.16,
+                    size=0.24,
                     color=INK,
                     anchor=Anchor.LEFT,
                 )
@@ -355,10 +471,10 @@ def strength_checks(scene: Scene) -> None:
             else:
                 arrow = (
                     scene.geometry.arrow(
-                        cx - 2.05,
-                        2.05,
-                        cx - 1.35,
-                        2.05,
+                        cx - 2.1,
+                        1.75,
+                        cx - 1.32,
+                        1.75,
                         head_length=0.16,
                         head_width=0.16,
                         body_width=0.035,
@@ -368,10 +484,10 @@ def strength_checks(scene: Scene) -> None:
                 )
                 cracks = [
                     scene.geometry.dashed_line(
-                        cx - 0.9, 0.7, cx + 0.9, 1.95, dash_length=0.08, gap_length=0.05
+                        cx - 0.95, 0.45, cx + 0.95, 1.6, dash_length=0.08, gap_length=0.05
                     ).stroke(STEEL, 0.02),
                     scene.geometry.dashed_line(
-                        cx + 0.9, 0.7, cx - 0.9, 1.95, dash_length=0.08, gap_length=0.05
+                        cx + 0.95, 0.45, cx - 0.95, 1.6, dash_length=0.08, gap_length=0.05
                     )
                     .stroke(STEEL, 0.02)
                     .opacity(0.35),
@@ -379,10 +495,10 @@ def strength_checks(scene: Scene) -> None:
                 v_lab = t(
                     scene,
                     "$V_e$",
-                    cx - 2.05,
-                    2.2,
+                    cx - 2.1,
+                    1.88,
                     font=MONO,
-                    size=0.16,
+                    size=0.24,
                     color=STEEL,
                     anchor=Anchor.BOTTOM_LEFT,
                 )
@@ -419,7 +535,7 @@ def strength_checks(scene: Scene) -> None:
                     cx - 2.15,
                     1.5,
                     font=MONO,
-                    size=0.16,
+                    size=0.24,
                     color=BRICK,
                     anchor=Anchor.BOTTOM_LEFT,
                 ),
@@ -480,8 +596,8 @@ def strength_checks(scene: Scene) -> None:
         scene.stop(f"verificacion-{i + 1}")
     source(
         scene,
-        "Tesis · cap. 6, fig:flujo_axial y fig:flujo_corte (E.070, arts. 19.1b, 26.2 y 26.3) · "
-        "valores: tb:esf_ax_comp, tb:agriet_xy, tb:cort_glob",
+        "Tesis · Figuras 44 y 45, pp. 107 y 109 (E.070, arts. 19.1b, 26.2 y 26.3) · "
+        "valores: Tablas 31, 35 y 37, pp. 82, 86 y 88",
     )
     scene.stop("verificaciones-fuente")
 
@@ -702,8 +818,8 @@ def drift(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 6, fig:flujo_derivas; cap. 5, E.030 Tabla N.° 11 · esquema con desplazamientos "
-        "exagerados; valor del caso: tb:dist_comp",
+        "Tesis · Figura 46, p. 110; E.030, Tabla N.° 11 · esquema con desplazamientos "
+        "exagerados; valor del caso: Tabla 52, p. 131",
     )
     scene.stop("deriva-lectura")
 
@@ -720,7 +836,7 @@ SECTION = Section(
                 "(Z = 0.45, U = S = 1, N = 4). En X se suman L·t de cada muro (X2 es de concreto y "
                 "usa t_eq = t·Ec/Em = 0.794 m): Σ = 6.56 m², D_X = 4.80 %. En Y: Σ = 5.11 m², "
                 f"D_Y = 3.74 %. A_p = {FLOOR_AREA} m². Ambas cumplen; Y está más ajustada. "
-                "Fuente: tb:densidad_ejm. Cumplir densidad no acredita las demás verificaciones."
+                "Fuente: Tabla 22 (p. 57). Cumplir densidad no acredita las demás verificaciones."
             ),
         ),
         SectionStep(
@@ -745,7 +861,7 @@ SECTION = Section(
                 "sube el desplazamiento superior; la cota terracota es Δu, se amplifica con c y se "
                 "divide entre h. El dibujo está exagerado y no es una solución FEM. Límite E.030 "
                 "para albañilería: 0.005. En el caso MCT la máxima es 0.00133 (Y, piso 3), 27 % "
-                "del límite (tb:dist_comp)."
+                "del límite (Tabla 52 (p. 131))."
             ),
         ),
     ],

@@ -130,7 +130,7 @@ def objectives(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 9, Conclusiones · se sostiene para el caso estudiado (muestra no probabilística)",
+        "Tesis · Conclusiones, p. 135 · se sostiene para el caso estudiado (muestra no probabilística)",
     )
     scene.stop("objetivos-cumplidos")
 
@@ -228,7 +228,7 @@ def findings(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · cap. 8, tb:pesos_comp, tb:peso_comp, tb:dist_comp; cap. 5, tb:agriet_xy_pp; cap. 9, Conclusiones",
+        "Tesis · Tablas 50, 51 y 52, pp. 129–131; Tabla 36, p. 87; Conclusiones, p. 135",
     )
     scene.stop("hallazgos")
 
@@ -305,7 +305,7 @@ def outlook(scene: Scene) -> None:
         scene.stop(f"alcance-{'limites' if color is STEEL else 'futuro'}")
     source(
         scene,
-        "Tesis · cap. 7, tbl:limitaciones_impl; cap. 8, Cortante; cap. 9, Recomendaciones",
+        "Tesis · Tabla 49, p. 125; §8.2.4, p. 132; Recomendaciones, p. 137",
     )
     scene.stop("alcance-fuente")
 
@@ -379,7 +379,7 @@ SECTION = Section(
             build=objectives,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. Retomar cada objetivo específico con su conclusión del cap. 9. La hipótesis se "
+                "1 min. Retomar cada objetivo específico con su conclusión (Conclusiones, p. 135). La hipótesis se "
                 "sostiene para el caso: el marco integra de forma reproducible extracción, "
                 "procesamiento, verificación y documentación. No se afirma una reducción medida de "
                 "tiempo o de errores: no se midió."
@@ -401,8 +401,8 @@ SECTION = Section(
             build=outlook,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. Limitaciones de la implementación (tbl:limitaciones_impl) y del estudio (un "
-                "caso). Recomendaciones del cap. 9: diseño de confinamientos, intersecciones T/L, "
+                "45 s. Limitaciones de la implementación (Tabla 49, p. 125) y del estudio (un "
+                "caso). Recomendaciones (p. 137): diseño de confinamientos, intersecciones T/L, "
                 "análisis no lineal, CNN para irregularidades, mantenimiento del código libre y uso "
                 "educativo."
             ),

@@ -66,7 +66,7 @@ def t(
 
 
 def header(
-    scene: Scene, kicker: str, title: str, *, rule: bool = True
+    scene: Scene, kicker: str, title: str, *, rule: bool = False
 ) -> list[Drawable]:
     """Kicker en versalitas terracota y título-afirmación en Aleo."""
     kick = t(scene, kicker.upper(), LEFT_EDGE, 3.98, style=KICKER)
@@ -77,9 +77,9 @@ def header(
         head.animate.fade_in_from(Direction.UP, 0.10).duration(0.6),
     ]
     if rule:
-        line = scene.geometry.line(LEFT_EDGE, 2.78, RIGHT_EDGE, 2.78).stroke(
+        line = scene.geometry.line(length= RIGHT_EDGE- LEFT_EDGE).stroke(
             RULE, 0.012
-        )
+        ).next_to(head, Direction.DOWN)
         items.append(line)
         anims.append(line.animate.create().duration(0.6))
     scene.play(stagger(*anims, each=0.12))
