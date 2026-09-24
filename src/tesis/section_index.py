@@ -3,18 +3,24 @@
 Cada bloque abre con una diapositiva que muestra su número, su pregunta guía y
 la agenda completa; el marcador terracota se desplaza desde el bloque anterior.
 El riel inferior es HUD: persiste entre segmentos y avanza con cada escena.
+
+El divisor es el primer paso de la sección, así que ``gaanim . --sections
+resultados`` o ``--from resultados`` también lo incluyen.
 """
 
 from gaanim import (
     Anchor,
     Direction,
     Drawable,
+    Playable,
+    NavigationEntry,
+    ProgressRail,
     Scene,
     Section,
     SectionProgress,
-    Text,
+    SectionStep,
+    TextStyle,
     Transition,
-    parallel,
     stagger,
 )
 
@@ -31,36 +37,91 @@ from tesis.theme import (
     SANS,
 )
 
+# Clave, título de la agenda, pregunta guía y rótulo del riel.
 SECTIONS = (
     (
         "problematica",
         "Problemática",
         "¿Por qué importa verificar la distribución de muros?",
+        "Problemática",
     ),
-    ("objetivos", "Objetivos y método", "¿Qué se propuso y cómo se evaluó?"),
-    ("fundamentos", "Fundamentos", "¿Qué exige la norma a una distribución de muros?"),
-    ("manual", "Proceso manual", "¿Cómo se verifica hoy un edificio de albañilería?"),
-    ("marco", "Marco de trabajo", "¿Qué se automatiza y con qué lógica?"),
-    ("alba", "Implementación: Alba", "¿Cómo se conecta el marco con ETABS?"),
-    ("resultados", "Resultados", "¿Qué muestran los tres modelos del caso?"),
-    ("conclusiones", "Conclusiones", "¿Qué aporta el trabajo y qué queda abierto?"),
+    (
+        "objetivos",
+        "Objetivos y método",
+        "¿Qué se propuso y cómo se evaluó?",
+        "Objetivos",
+    ),
+    (
+        "fundamentos",
+        "Fundamentos",
+        "¿Qué exige la norma a una distribución de muros?",
+        "Fundamentos",
+    ),
+    (
+        "manual",
+        "Proceso manual",
+        "¿Cómo se verifica hoy un edificio de albañilería?",
+        "Proceso manual",
+    ),
+    (
+        "marco",
+        "Marco de trabajo",
+        "¿Qué se automatiza y con qué lógica?",
+        "Marco de trabajo",
+    ),
+    (
+        "alba",
+        "Implementación: Alba",
+        "¿Cómo se conecta el marco con ETABS?",
+        "Alba",
+    ),
+    (
+        "resultados",
+        "Resultados",
+        "¿Qué muestran los tres modelos del caso?",
+        "Resultados",
+    ),
+    (
+        "conclusiones",
+        "Conclusiones",
+        "¿Qué aporta el trabajo y qué queda abierto?",
+        "Conclusiones",
+    ),
 )
-RAIL_LABELS = (
-    "Problemática",
-    "Objetivos",
-    "Fundamentos",
-    "Proceso manual",
-    "Marco de trabajo",
-    "Alba",
-    "Resultados",
-    "Conclusiones",
-)
+KEYS = tuple(key for key, _, _, _ in SECTIONS)
 
 AGENDA_X = 1.9
 AGENDA_TOP = 2.35
 AGENDA_GAP = 0.66
 RAIL_Y = -4.46
-CAPTION_Y = -4.27
+
+
+def _agenda_row(scene: Scene, entry: NavigationEntry, state: str) -> Drawable:
+    """Número en mono y nombre; el bloque actual en terracota y negrita."""
+    current = state == "current"
+    color = BRICK if current else (INK_SOFT if state == "done" else MUTED)
+    number = t(
+        scene,
+        f"{entry.index + 1:02d}",
+        0,
+        0,
+        font=MONO,
+        size=0.2,
+        color=color,
+        anchor=Anchor.LEFT,
+    )
+    name = t(
+        scene,
+        entry.title,
+        0.65,
+        0,
+        font=SANS,
+        size=0.3,
+        weight=900 if current else 400,
+        color=INK if current else color,
+        anchor=Anchor.LEFT,
+    )
+    return scene.geometry.group([number, name])
 
 
 class SectionIndex:
@@ -69,73 +130,44 @@ class SectionIndex:
     def __init__(self, scene: Scene):
         self.scene = scene
         self._previous: int | None = None
-        self._visits = 0
-        self._fills: list[Drawable] = []
-        self._captions: list[Text] = []
+        self._rail: ProgressRail | None = None
 
     def build(self, section: Section, *, transition: Transition | None = None) -> None:
-        self.show(section.key, transition=transition or Transition.cross_fade(0.45))
-        active = self._previous
-        assert active is not None
-        self.scene.play(self._fills[active].animate.fill_level(0), duration=0)
-        section.build(self.scene, on_enter=self.advance)
-
-    def show(self, key: str, *, transition: Transition | None = None) -> None:
-        keys = [k for k, _, _ in SECTIONS]
-        if key not in keys:
-            raise ValueError(f"Bloque desconocido {key!r}; opciones: {', '.join(keys)}")
-        active = keys.index(key)
-        previous = self._previous
-        scene = self.scene
-        self._visits += 1
-        _, title, question = SECTIONS[active]
-        _ = scene.segment(
-            f"Índice · {title}",
-            transition,
+        if section.key not in KEYS:
+            raise ValueError(
+                f"Bloque desconocido {section.key!r}; opciones: {', '.join(KEYS)}"
+            )
+        active = KEYS.index(section.key)
+        _, title, question, _ = SECTIONS[active]
+        divider = SectionStep(
+            name="Índice",
+            build=lambda scene: self._divider(scene, active),
+            transition=transition or Transition.cross_fade(0.45),
             notes=(
                 f"Bloque {active + 1} de {len(SECTIONS)}: {title}. "
                 f"Pregunta guía: {question} Transición breve, 5-10 s."
             ),
         )
+        Section(section.key, [divider, *section.steps], title=title).build(
+            self.scene, on_enter=self._advance
+        )
+        self._previous = active
+
+    def _divider(self, scene: Scene, active: int) -> None:
+        previous = self._previous
+        _, title, question, _ = SECTIONS[active]
         _ = scene.camera.reset()
+        rail = self._rail or self._build_rail()
 
-        if not self._fills:
-            self._build_rail()
-
-        # Odómetro manual: el numeral anterior sale hacia arriba y el nuevo entra desde abajo.
-        window = (
-            scene.geometry.rect(3.4, 1.55)
-            .no_fill()
-            .no_stroke()
-            .move_to(LEFT_EDGE + 1.7, 2.02)
-        )
-        roll = 1.6
-        numeral_new = t(
-            scene,
-            f"{active + 1:02d}",
-            LEFT_EDGE,
-            1.3 - (roll if previous is not None else 0),
-            font=DISPLAY,
-            size=1.55,
+        # El numeral rueda desde el bloque anterior hasta el actual.
+        numeral = scene.viz.rolling_number(
+            (previous if previous is not None else active) + 1,
+            min_digits=2,
+            font_family=DISPLAY,
             weight=700,
+            font_size=1.55,
             color=BRICK,
-            anchor=Anchor.BOTTOM_LEFT,
-        )
-        numeral_new.clip(window)
-        numeral_old = None
-        if previous is not None:
-            numeral_old = t(
-                scene,
-                f"{previous + 1:02d}",
-                LEFT_EDGE,
-                1.3,
-                font=DISPLAY,
-                size=1.55,
-                weight=700,
-                color=BRICK,
-                anchor=Anchor.BOTTOM_LEFT,
-            )
-            numeral_old.clip(window)
+        ).move_to(LEFT_EDGE, 1.3, Anchor.BOTTOM_LEFT)
         heading = t(
             scene,
             title,
@@ -152,128 +184,62 @@ class SectionIndex:
         ).stroke(BRICK, 0.035)
         divider = scene.geometry.line(1.35, 2.7, 1.35, -3.0).stroke(RULE, 0.012)
 
-        rows: list[Drawable] = []
-        for i, (_, name, _) in enumerate(SECTIONS):
-            y = AGENDA_TOP - i * AGENDA_GAP
-            done = i < active
-            color = BRICK if i == active else (INK_SOFT if done else MUTED)
-            rows.append(
-                t(
-                    scene,
-                    f"{i + 1:02d}",
-                    AGENDA_X,
-                    y,
-                    font=MONO,
-                    size=0.2,
-                    color=color,
-                    anchor=Anchor.LEFT,
-                )
-            )
-            rows.append(
-                t(
-                    scene,
-                    name,
-                    AGENDA_X + 0.65,
-                    y,
-                    font=SANS,
-                    size=0.3,
-                    weight=900 if i == active else 400,
-                    color=INK if i == active else color,
-                    anchor=Anchor.LEFT,
-                )
-            )
-        start = previous if previous is not None else active
-        marker = (
-            scene.geometry.rounded_rect(0.07, 0.42, 0.035)
+        agenda = scene.sections.agenda(
+            [(key, name) for key, name, _, _ in SECTIONS],
+            previous if previous is not None else active,
+            pitch=AGENDA_GAP,
+            item=_agenda_row,
+            marker=lambda scene: scene.geometry.rounded_rect(0.07, 0.42, 0.035)
             .fill(BRICK)
-            .no_stroke()
-            .move_to(AGENDA_X - 0.3, AGENDA_TOP - start * AGENDA_GAP)
+            .no_stroke(),
         )
+        agenda.root.shift_by(AGENDA_X, AGENDA_TOP)
 
-        numerals = [n for n in (numeral_old, numeral_new) if n is not None]
         scene.play(
             stagger(
-                parallel(*[n.animate.fade_in().duration(0.4) for n in numerals]),
+                numeral.visual.animate.fade_in().duration(0.4),
                 heading.animate.fade_in_from(Direction.UP, 0.12).duration(0.6),
                 prompt.animate.fade_in().duration(0.5),
                 prompt_rule.animate.create().duration(0.5),
                 divider.animate.create().duration(0.5),
-                stagger(*[r.animate.fade_in().duration(0.3) for r in rows], each=0.02),
-                marker.animate.fade_in().duration(0.3),
+                agenda.root.animate.fade_in().duration(0.4),
                 each=0.08,
             )
         )
-        animations = [
-            marker.animate.move_to(
-                AGENDA_X - 0.3, AGENDA_TOP - active * AGENDA_GAP
-            ).duration(0.7),
+        animations: list[Playable] = [
+            agenda.animate.focus(active),
+            rail.animate.enter(active),
         ]
-        animations += [
-            fill.animate.fill_level(1 if i < active else 0).duration(0.7)
-            for i, fill in enumerate(self._fills)
-        ]
-        animations += [
-            caption.animate.fill(BRICK if i == active else MUTED).duration(0.5)
-            for i, caption in enumerate(self._captions)
-        ]
-        if numeral_old is not None:
-            animations += [
-                numeral_old.animate.shift_by(0, roll).duration(0.7),
-                numeral_new.animate.shift_by(0, roll).duration(0.7).delay(0.02),
-            ]
-        scene.play(animations)
-        scene.stop(f"entrada-{key}")
-        self._previous = active
+        if previous is not None:
+            animations.append(numeral.count_to(active + 1, duration=0.7))
+        scene.play(animations, duration=0.7)
+        scene.stop(f"entrada-{KEYS[active]}")
 
-    def _build_rail(self) -> None:
+    def _build_rail(self) -> ProgressRail:
         scene = self.scene
-        n = len(SECTIONS)
-        gap = 0.08
-        width = (16 - 2 * 0.7 - gap * (n - 1)) / n
-        visuals: list[Drawable] = []
-        for i, name in enumerate(RAIL_LABELS):
-            x = -8 + 0.7 + width / 2 + i * (width + gap)
-            rail = (
-                scene.geometry.rect(width, 0.04)
-                .fill(FAINT)
-                .no_stroke()
-                .move_to(x, RAIL_Y)
-                .hud()
-                .z_index(100)
-            )
-            fill = (
-                scene.geometry.fill_level(
-                    rail, BRICK, 0, direction="left", keep_outline=False
-                )
-                .hud()
-                .z_index(101)
-            )
-            caption = (
-                t(
-                    scene,
-                    name.upper(),
-                    x - width / 2,
-                    CAPTION_Y,
-                    font=SANS,
-                    size=0.115,
-                    weight=900,
-                    color=MUTED,
-                    anchor=Anchor.LEFT,
-                )
-                .hud()
-                .z_index(101)
-            )
-            self._fills.append(fill)
-            self._captions.append(caption)
-            visuals += [rail, fill, caption]
-        scene.persist(*visuals)
-        scene.play([v.animate.fade_in() for v in visuals], duration=0.35)
+        rail = scene.sections.progress_rail(
+            [(key, label.upper()) for key, _, _, label in SECTIONS],
+            length=16 - 2 * 0.7,
+            thickness=0.04,
+            segmented=True,
+            track=lambda scene, w, h: scene.geometry.rect(w, h).fill(FAINT).no_stroke(),
+            fill_color=BRICK,
+            captions=True,
+            caption_style=TextStyle(font=SANS, size=0.115, weight=900),
+            caption_colors={"done": MUTED, "current": BRICK, "upcoming": MUTED},
+        )
+        rail.root.shift_by(0, RAIL_Y).hud().z_index(100)
+        scene.persist(rail.root)
+        scene.play(rail.root.animate.fade_in(), duration=0.35)
+        self._rail = rail
+        return rail
 
-    def advance(self, scene: Scene, progress: SectionProgress) -> None:
-        """Al entrar a cada escena el tramo activo del riel avanza."""
-        if self._previous is None:
-            raise ValueError("show() debe llamarse antes de advance()")
+    def _advance(self, scene: Scene, progress: SectionProgress) -> None:
+        """Al entrar a cada escena el tramo activo del riel avanza (el divisor no cuenta)."""
+        if progress.index == 1 or self._rail is None:
+            return
+        active = KEYS.index(progress.key)
+        share = (progress.index - 1) / (progress.total - 1)
         scene.play(
-            self._fills[self._previous].animate.fill_level(progress.fraction),
-            duration=0.35,
+            self._rail.animate.to((active + share) / len(SECTIONS)), duration=0.35
         )

@@ -165,8 +165,8 @@ def scope(scene: Scene) -> None:
     )
     scene.play(
         [
-            to_alba.animate.create().duration(0.4),
-            to_eng.animate.create().duration(0.4),
+            to_alba.animate.grow_arrow().duration(0.4),
+            to_eng.animate.grow_arrow().duration(0.4),
             lab1.animate.fade_in().duration(0.3),
             lab2.animate.fade_in().duration(0.3),
         ]
@@ -538,7 +538,7 @@ def density_module(scene: Scene) -> None:
     scene.play(stagger(*[n.animate.fade_in().duration(0.25) for n in nodes], each=0.06))
     scene.play(
         [
-            *[a.animate.create().duration(0.3) for a in arrows],
+            *[a.animate.grow_arrow().duration(0.3) for a in arrows],
             side_error.animate.fade_in().duration(0.3),
             side_fail.animate.fade_in().duration(0.3),
         ]
@@ -688,11 +688,11 @@ def traceability(scene: Scene) -> None:
     scene.play(stagger(*[x.animate.fade_in().duration(0.25) for x in items], each=0.03))
     scene.play(
         stagger(
-            arrows[0].animate.create().duration(0.3),
-            arrows[1].animate.create().duration(0.3),
+            arrows[0].animate.grow_arrow().duration(0.3),
+            arrows[1].animate.grow_arrow().duration(0.3),
             core.animate.grow_from_center().duration(0.4),
             core_t.animate.fade_in().duration(0.3),
-            arrows[2].animate.create().duration(0.3),
+            arrows[2].animate.grow_arrow().duration(0.3),
             each=0.12,
         )
     )

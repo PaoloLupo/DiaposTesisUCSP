@@ -7,6 +7,7 @@ calculan con la misma base que las notas de las tablas del capítulo 8.
 from gaanim import (
     Anchor,
     Axis,
+    Color,
     CoordinateSpace,
     Direction,
     Drawable,
@@ -370,16 +371,22 @@ def _profile_panel(
     scene: Scene,
     cx: float,
     x_max: float,
-    step: float,
+    step: float | None,
     precision: int,
     series: dict[str, tuple[float, ...]],
     *,
     width: float = 5.6,
     height: float = PANEL_H,
 ) -> tuple[CoordinateSpace, list[Drawable]]:
-    """Perfil por piso: eje vertical 1-4 y un trazo con marcadores por modelo."""
+    """Perfil por piso: eje vertical 1-4 y un trazo con marcadores por modelo.
+
+    ``step=None`` deja las marcas automáticas, que se recalculan con ``view_to``.
+    """
+    x_axis = Axis.linear(0, x_max)
+    if step is not None:
+        x_axis = x_axis.ticks(step)
     plane = scene.viz.cartesian_2d(
-        Axis.linear(0, x_max).ticks(step).numbers("fixed", precision=precision),
+        x_axis.numbers("fixed", precision=precision),
         Axis.linear(0.5, 4.5).ticks(1).numbers("fixed", precision=0),
         width=width,
         height=height,
@@ -447,7 +454,7 @@ def _legend(scene: Scene, y: float) -> list[Drawable]:
 def _draw_panels(
     scene: Scene,
     x_max: float,
-    step: float,
+    step: float | None,
     precision: int,
     data: dict[str, dict[str, tuple[float, ...]]],
     axis_label: str,
@@ -490,8 +497,8 @@ def drifts(scene: Scene) -> None:
     series = {
         d: {m: tuple(v * 100 for v in DRIFTS[d][m]) for m in MODELS} for d in ("X", "Y")
     }
-    planes, groups = _draw_panels(
-        scene, 0.55, 0.1, 2, series, "distorsión (%)", limit=DRIFT_LIMIT * 100
+    planes, _ = _draw_panels(
+        scene, 0.55, None, 2, series, "distorsión (%)", limit=DRIFT_LIMIT * 100
     )
     limit_note = t(
         scene,
@@ -506,15 +513,13 @@ def drifts(scene: Scene) -> None:
     scene.play(limit_note.animate.fade_in().duration(0.3))
     scene.stop("derivas-limite")
 
-    # Detalle 0–0.2 %: nuevos ejes con la misma escala en X e Y (sin deformar marcadores).
+    # Detalle 0–0.2 %: la misma escala en X e Y; el límite queda fuera de la ventana.
     scene.play(
         [
-            *[p.animate.fade_out().duration(0.5) for p in planes],
-            *[v.animate.fade_out().duration(0.5) for g in groups for v in g],
+            *[p.animate.view_to((0, 0.2), (0.5, 4.5)).duration(1.2) for p in planes],
             limit_note.animate.fade_out().duration(0.4),
         ]
     )
-    _draw_panels(scene, 0.2, 0.05, 2, series, "distorsión (%)", titles=False)
     d_msta = relative(DRIFTS["X"]["MCT"][3], DRIFTS["X"]["MSTA"][3])
     d_msto = relative(DRIFTS["X"]["MCT"][3], DRIFTS["X"]["MSTO"][3])
     notes = [
@@ -751,7 +756,7 @@ def cracking(scene: Scene) -> None:
                         x,
                         y,
                         size=0.13,
-                        color="#FFFFFF",
+                        color=Color.from_hex("#FFFFFF"),
                         background=FAIL,
                         anchor=anchor,
                     )

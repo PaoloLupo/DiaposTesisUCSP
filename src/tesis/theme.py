@@ -10,7 +10,7 @@ Los colores tienen significado estable en toda la exposición:
 
 from pathlib import Path
 
-from gaanim import Color, TextFlow, TextStyle, Theme
+from gaanim import Color, TextStyle, Theme
 
 FONTS_DIR = Path(__file__).resolve().parents[2] / "assets" / "fonts"
 
@@ -53,17 +53,10 @@ SMALL = TextStyle(font=SANS, size=0.23, color=INK_SOFT)
 CAPTION = TextStyle(font=SANS, size=0.17, color=MUTED)
 TAG = TextStyle(font=MONO, size=0.19, color=INK_SOFT)
 
-LEFT = TextFlow(align="left", line_spacing=1.22, wrap=False)
-CENTER = TextFlow(align="center", line_spacing=1.22, wrap=False)
-RIGHT = TextFlow(align="right", line_spacing=1.22, wrap=False)
-
 
 def build_theme() -> Theme:
-    # rolling_number usa la primera cara registrada de la familia: Lato Bold va primero.
-    paths = sorted(
-        FONTS_DIR.glob("*.ttf"), key=lambda path: (path.stem != "Lato-Bold", path.stem)
-    )
-    files = {path.stem: str(path) for path in paths}
+    # font_dir registra cada cara por la familia y el peso que declara su archivo;
+    # text_markup=False deja `*` y `_` literales (`tb:dist_comp`) en todo texto.
     return Theme(
         "paper",
         name="tesis-ladrillo",
@@ -79,5 +72,6 @@ def build_theme() -> Theme:
             "rule": RULE,
         },
         fonts={"text": SANS, "code": MONO},
-        font_files=files,
+        font_dir=FONTS_DIR,
+        text_markup=False,
     )

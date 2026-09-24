@@ -67,8 +67,10 @@ def materials(scene: Scene) -> None:
         0,
         decimals=1,
         suffix=" %",
+        font_family=DISPLAY,
+        weight=700,
         font_size=0.72,
-        mode="odometer",
+        mode="continuous",
         color=INK,
     ).move_to(-4.55, -0.35, Anchor.CENTER)
     level = computed(lambda value: value / 100, inputs=[counter.parameter])
@@ -98,7 +100,7 @@ def materials(scene: Scene) -> None:
     )
     scene.play(
         counter.count_to(
-            100 * MATERIALES_ORDENADOS[0][1] / TOTAL_VIVIENDAS, duration=1.6
+            100 * MATERIALES_ORDENADOS[0][1] / TOTAL_VIVIENDAS, duration=1.6, snap=True
         )
     )
     scene.stop("material-predominante")
@@ -325,7 +327,7 @@ def seismic(scene: Scene) -> None:
     )
     scene.play(
         [
-            force.animate.create().duration(0.5),
+            force.animate.grow_arrow().duration(0.5),
             force_label.animate.fade_in().duration(0.4),
         ]
     )
@@ -507,7 +509,7 @@ def manual_transfer(scene: Scene) -> None:
     )
     scene.play(
         stagger(
-            arrow.animate.create().duration(0.4),
+            arrow.animate.grow_arrow().duration(0.4),
             *[p.animate.fade_in().duration(0.25) for p in step_labels],
             each=0.12,
         )
@@ -589,10 +591,12 @@ def manual_transfer(scene: Scene) -> None:
     scene.stop("traslado-manual")
 
     loop = (
-        scene.geometry.connector(
-            (4.4, -0.55),
-            (-5.15, -0.6),
-            via=[(4.4, -1.2), (-5.15, -1.2)],
+        scene.geometry.curved_arrow(
+            4.4,
+            -0.6,
+            -5.15,
+            -0.6,
+            -0.3,
             head_length=0.16,
             head_width=0.16,
             body_width=0.028,
@@ -611,7 +615,7 @@ def manual_transfer(scene: Scene) -> None:
     )
     scene.play(
         [
-            loop.animate.create().duration(0.9),
+            loop.animate.grow_arrow().duration(0.9),
             loop_label.animate.fade_in().duration(0.5),
         ]
     )

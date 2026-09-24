@@ -258,7 +258,7 @@ def specific(scene: Scene) -> None:
     )
     scene.play(
         [
-            flow.animate.create().duration(0.8),
+            flow.animate.grow_arrow().duration(0.8),
             flow_label.animate.fade_in().duration(0.5),
         ]
     )

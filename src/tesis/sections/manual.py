@@ -48,13 +48,13 @@ def case_study(scene: Scene) -> None:
     ox, oy = plan.origin
     s = plan.scale
     dims = [
-        dimension(scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", offset=-0.45),
+        dimension(scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", side="below", offset=0.45),
         dimension(
             scene,
             (ox + WIDTH * s, oy),
             (ox + WIDTH * s, oy + DEPTH * s),
             "8.00 m",
-            offset=0.35,
+            side="right",
         ),
     ]
     scene.play(
@@ -473,7 +473,9 @@ def manual_cycle(scene: Scene) -> None:
     center_label = t(
         scene, "iteración", cx, cy + 0.35, size=0.18, color=MUTED, anchor=Anchor.CENTER
     )
-    counter = scene.viz.rolling_number(1, font_size=0.75, color=BRICK, mode="odometer")
+    counter = scene.viz.rolling_number(
+        1, font_family=DISPLAY, weight=700, font_size=0.75, color=BRICK
+    )
     counter.move_to(cx, cy - 0.25, Anchor.CENTER)
     scene.play(
         stagger(
@@ -563,7 +565,7 @@ def manual_cycle(scene: Scene) -> None:
     )
     scene.play(
         stagger(
-            exit_arrow.animate.create().duration(0.5),
+            exit_arrow.animate.grow_arrow().duration(0.5),
             exit_label.animate.fade_in().duration(0.3),
             memory.animate.fade_in().duration(0.3),
             memory_t.animate.fade_in().duration(0.3),

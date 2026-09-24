@@ -39,6 +39,7 @@ from tesis.theme import (
     CARD,
     CONCRETE,
     CONCRETE_SOFT,
+    DISPLAY,
     FAINT,
     INK,
     INK_SOFT,
@@ -110,7 +111,14 @@ def density_check(scene: Scene) -> None:
             x0, y - 0.28, Anchor.LEFT
         )
         counter = scene.viz.rolling_number(
-            0, decimals=2, suffix=" m²", font_size=0.3, mode="odometer", color=INK
+            0,
+            decimals=2,
+            suffix=" m²",
+            font_family=DISPLAY,
+            weight=700,
+            font_size=0.3,
+            mode="odometer",
+            color=INK,
         )
         counter.move_to(x0 + 1.55, y - 0.28, Anchor.LEFT)
         track_left, track_w = x0 + 2.95, 2.9
@@ -302,6 +310,7 @@ def strength_checks(scene: Scene) -> None:
         cx = x0 + w / 2
         frame = panel(scene, x0, 2.4, w, 5.7, fill=CARD, anchor=Anchor.TOP_LEFT)
         drawing: list[Drawable] = []
+        loads: list[Drawable] = []
         if i < 2:
             drawing = _mini_wall(scene, cx, 1.35, 2.6, 1.6)
             if i == 0:
@@ -443,7 +452,15 @@ def strength_checks(scene: Scene) -> None:
                     *[d.animate.fade_in().duration(0.3) for d in drawing], each=0.01
                 ),
                 stagger(
-                    *[e.animate.fade_in().duration(0.35) for e in extras], each=0.08
+                    *[
+                        (
+                            e.animate.grow_arrow()
+                            if any(e is a for a in (arrow, *loads))
+                            else e.animate.fade_in()
+                        ).duration(0.35)
+                        for e in extras
+                    ],
+                    each=0.08,
                 ),
                 tag.animate.fade_in().duration(0.3),
                 question.animate.fade_in_from(Direction.UP, 0.06).duration(0.4),

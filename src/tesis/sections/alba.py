@@ -138,7 +138,7 @@ def architecture(scene: Scene) -> None:
     )
     scene.play(
         [
-            *[a.animate.create().duration(0.3) for a in arrows],
+            *[a.animate.grow_arrow().duration(0.3) for a in arrows],
             *[b.animate.fade_in().duration(0.4) for b in brackets],
         ]
     )

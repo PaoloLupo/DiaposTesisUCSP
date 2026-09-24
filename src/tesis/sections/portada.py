@@ -83,12 +83,13 @@ def build(scene: Scene) -> None:
     ox, oy = plan.origin
     s = plan.scale
     dims = [
-        dimension(scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", offset=-0.4),
+        dimension(scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", side="below", offset=0.4),
         dimension(
             scene,
             (ox + WIDTH * s, oy),
             (ox + WIDTH * s, oy + DEPTH * s),
             "8.00 m",
+            side="right",
             offset=0.4,
         ),
     ]

@@ -20,11 +20,13 @@ sugerido y cita la tabla o figura de la tesis que respalda la diapositiva.
 Para ensayar solo algunos bloques:
 
 ```powershell
-$env:TESIS_BLOCKS = "resultados,conclusiones"; gaanim .
+gaanim . --sections resultados,conclusiones
+gaanim . --from resultados
 ```
 
 Las claves son `problematica`, `objetivos`, `fundamentos`, `manual`, `marco`, `alba`,
-`resultados` y `conclusiones`. La portada siempre se incluye.
+`resultados` y `conclusiones`; cada bloque incluye su divisor. El guion se ejecuta completo,
+así que el estado del riel y la agenda es el mismo que en la exposición entera.
 
 ## Recorrido de 30 minutos
 
@@ -79,8 +81,9 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
 | Contenido de cada bloque | `src/tesis/sections/<bloque>.py` |
 
 Cada bloque termina con su `SECTION`: una lista de `SectionStep(name, build, notes)`. Para
-añadir una diapositiva, escribe su función y agrega el paso. `tesis.kit.t()` escapa los `_`
-fuera de `$...$`, así que los subíndices se escriben como matemática: `"$V_e$ (tonf)"`.
+añadir una diapositiva, escribe su función y agrega el paso. El tema usa `text_markup=False`:
+`*` y `_` son literales (`tb:dist_comp`) y los subíndices se escriben como matemática:
+`"$V_e$ (tonf)"`.
 
 ## Datos y fuentes
 
@@ -107,18 +110,26 @@ Matices que conviene respetar al exponer (también están en las notas):
 
 ## Revisión por capturas
 
-`gaanim --diff` puede capturar la presentación sin ventana. `tesis.review` registra el instante
-de cada pausa y pide una imagen justo antes de cada una:
+`gaanim --diff --capture-stops` captura sin ventana el estado de cada pausa, sin código de
+revisión en el guion:
 
 ```powershell
-cd ..
-gaanim --diff --example DiaposTesisUCSP --capture-only --no-gui --tests-root DiaposTesisUCSP/snapshots
+gaanim --diff --example . --capture-stops --no-gui --tests-root snapshots
+gaanim --diff --example . --capture-stops --stops 12,30 --no-gui --tests-root snapshots
+gaanim --diff --example . --capture-stops --sections resultados --no-gui --tests-root snapshots
 ```
 
-Las imágenes y `stops.json` (pausa, instante, segmento) quedan en
-`snapshots/DiaposTesisUCSP/current/`. Con `TESIS_ONLY="12,30"` se capturan solo esas pausas.
-El comando se lanza desde la carpeta superior porque `--example .` no se acepta (ver
-`GAANIM_NOTAS.md`).
+Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) quedan en
+`snapshots/DiaposTesisUCSP/current/`. Las pausas se numeran desde 1.
+
+## Actualizar Gaanim
+
+El proyecto usa el wheel local de `../../rust/gaanim/target/wheels`. Tras reconstruirlo
+(`just wheel` en Gaanim) conserva la versión 0.2.0, así que hay que forzar la reinstalación:
+
+```powershell
+just reinstall
+```
 
 ## Exportar
 
@@ -130,5 +141,5 @@ La exportación ignora las pausas y genera una secuencia continua de ~3.5 minuto
 
 ## Notas para Gaanim
 
-`GAANIM_NOTAS.md` recoge los bugs y mejoras de Gaanim encontrados durante el rediseño, con
-pasos para reproducirlos y el rodeo aplicado aquí.
+`GAANIM_NOTAS.md` recoge el estado de los bugs y mejoras de Gaanim encontrados durante el
+rediseño: qué ya se resolvió, qué sigue abierto, cómo reproducirlo y el rodeo aplicado aquí.

@@ -4,7 +4,11 @@ set shell := ["powershell.exe", "-NoLogo", "-Command"]
 play:
     gaanim .
 
-[linux]
+# Reinstala el wheel local de Gaanim aunque conserve el mismo número de versión.
 reinstall:
-    uv remove gaanim
-    uv add "../../rust/gaanim/target/wheels/gaanim-0.2.0-py3-none-any.whl"
+    uv lock --upgrade-package gaanim
+    uv sync --reinstall-package gaanim
+
+# Una imagen por pausa en snapshots/DiaposTesisUCSP/current (p. ej. just capture --stops 12,30).
+capture *args:
+    gaanim --diff --example . --capture-stops --no-gui --tests-root snapshots {{args}}

@@ -5,6 +5,8 @@ y = 2.75, contenido entre y = 2.5 e y = -3.5, fuente en y = -3.8 y el riel de
 avance debajo de y = -4.1.
 """
 
+from typing import Literal
+
 from gaanim import (
     Anchor,
     Color,
@@ -12,7 +14,6 @@ from gaanim import (
     Drawable,
     Scene,
     Text,
-    TextFlow,
     TextStyle,
     stagger,
 )
@@ -22,19 +23,16 @@ from tesis.theme import (
     BRICK,
     CAPTION,
     CARD,
-    CENTER,
     DISPLAY,
     FAIL,
     FAIL_SOFT,
     INK,
     INK_SOFT,
     KICKER,
-    LEFT,
     MONO,
     MUTED,
     PASS,
     PASS_SOFT,
-    RIGHT,
     RULE,
     SANS,
     TITLE,
@@ -42,14 +40,6 @@ from tesis.theme import (
 
 LEFT_EDGE = -7.3
 RIGHT_EDGE = 7.3
-
-
-def plain(content: str) -> str:
-    """Escapa `_` fuera de `$...$`: la marca `_x_` de Gaanim es cursiva, no subíndice."""
-    pieces = content.split("$")
-    for i in range(0, len(pieces), 2):
-        pieces[i] = pieces[i].replace("\\_", "_").replace("_", "\\_")
-    return "$".join(pieces)
 
 
 def t(
@@ -64,24 +54,14 @@ def t(
     weight: int | None = None,
     font: str | None = None,
     anchor: Anchor = Anchor.TOP_LEFT,
-    flow: TextFlow | None = None,
 ) -> Text:
-    """Texto posicionado por una esquina o su centro; alineación según el ancla."""
-    if flow is None:
-        if anchor in (Anchor.TOP, Anchor.CENTER, Anchor.BOTTOM):
-            flow = CENTER
-        elif anchor in (Anchor.TOP_RIGHT, Anchor.RIGHT, Anchor.BOTTOM_RIGHT):
-            flow = RIGHT
-        else:
-            flow = LEFT
+    """Texto posicionado por una esquina o su centro; las líneas se alinean según el ancla.
+
+    ``*`` y ``_`` son literales (``Theme(text_markup=False)``); los subíndices se
+    escriben como matemática: ``"$V_e$"``.
+    """
     return scene.text(
-        plain(content),
-        style=style,
-        flow=flow,
-        size=size,
-        color=color,
-        weight=weight,
-        font=font,
+        content, style=style, size=size, color=color, weight=weight, font=font
     ).move_to(x, y, anchor)
 
 
@@ -147,9 +127,9 @@ def pill(
     x: float,
     y: float,
     *,
-    color: Color | str = INK_SOFT,
-    background: Color | str = CARD,
-    border: Color | str | None = None,
+    color: Color = INK_SOFT,
+    background: Color = CARD,
+    border: Color | None = None,
     size: float = 0.19,
     font: str = MONO,
     weight: int | None = None,
@@ -157,19 +137,16 @@ def pill(
     anchor: Anchor = Anchor.CENTER,
 ) -> Drawable:
     """Etiqueta compacta con fondo redondeado; se ubica por su centro o una esquina."""
-    content = plain(content)
-    width, height = scene.text.measure(content, size=size, font=font)
-    w = width + 2 * pad[0]
-    h = max(height, size * 0.9) + 2 * pad[1]
-    cx, cy = _anchor_center(x, y, w, h, anchor)
-    box = scene.geometry.rounded_rect(w, h, h / 2).fill(background)
-    box = box.stroke(border, 0.012) if border is not None else box.no_stroke()
-    box.move_to(cx, cy)
-    label = scene.text(
-        content, size=size, font=font, color=color, weight=weight, flow=CENTER
-    )
-    label.move_to(cx, cy, Anchor.CENTER)
-    return scene.geometry.group([box, label])
+    return scene.slides.badge(
+        content,
+        padding=pad,
+        font_size=size,
+        font=font,
+        weight=weight,
+        color=color,
+        background=background,
+        border=border if border is not None else background,
+    ).move_to(x, y, anchor)
 
 
 def status(
@@ -208,10 +185,9 @@ def panel(
     radius: float = 0.12,
     anchor: Anchor = Anchor.CENTER,
 ) -> Drawable:
-    cx, cy = _anchor_center(x, y, w, h, anchor)
     box = scene.geometry.rounded_rect(w, h, radius).fill(fill)
     box = box.stroke(border, 0.014) if border is not None else box.no_stroke()
-    return box.move_to(cx, cy)
+    return box.move_to(x, y, anchor)
 
 
 def numeral(
@@ -288,90 +264,25 @@ def dimension(
     end: tuple[float, float],
     text: str,
     *,
+    side: Literal["left", "right", "above", "below"],
     offset: float = 0.35,
-    color: Color | str = MUTED,
+    color: Color = MUTED,
     size: float = 0.15,
     width: float = 0.01,
 ) -> Drawable:
-    """Cota de plano: línea desplazada, marcas a 45° y rótulo centrado."""
-    (x0, y0), (x1, y1) = start, end
-    horizontal = abs(y1 - y0) < abs(x1 - x0)
-    if horizontal:
-        a, b = (x0, y0 + offset), (x1, y1 + offset)
-        ext = [
-            (
-                (x0, y0 + 0.04 * (1 if offset > 0 else -1)),
-                (x0, a[1] + 0.06 * (1 if offset > 0 else -1)),
-            ),
-            (
-                (x1, y1 + 0.04 * (1 if offset > 0 else -1)),
-                (x1, b[1] + 0.06 * (1 if offset > 0 else -1)),
-            ),
-        ]
-    else:
-        a, b = (x0 + offset, y0), (x1 + offset, y1)
-        ext = [
-            (
-                (x0 + 0.04 * (1 if offset > 0 else -1), y0),
-                (a[0] + 0.06 * (1 if offset > 0 else -1), y0),
-            ),
-            (
-                (x1 + 0.04 * (1 if offset > 0 else -1), y1),
-                (b[0] + 0.06 * (1 if offset > 0 else -1), y1),
-            ),
-        ]
-    parts: list[Drawable] = [scene.geometry.line(a, b).stroke(color, width)]
-    parts += [scene.geometry.line(p, q).stroke(color, width) for p, q in ext]
-    for px, py in (a, b):
-        parts.append(
-            scene.geometry.line((px - 0.06, py - 0.06), (px + 0.06, py + 0.06)).stroke(
-                color, width * 1.8
-            )
-        )
-    mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
-    if horizontal:
-        tag = t(
-            scene,
-            text,
-            mx,
-            my + (0.06 if offset > 0 else -0.06),
-            font=MONO,
-            size=size,
-            color=color,
-            anchor=Anchor.BOTTOM if offset > 0 else Anchor.TOP,
-        )
-    else:
-        tag = t(
-            scene,
-            text,
-            mx + (0.08 if offset > 0 else -0.08),
-            my,
-            font=MONO,
-            size=size,
-            color=color,
-            anchor=Anchor.LEFT if offset > 0 else Anchor.RIGHT,
-        )
-    parts.append(tag)
-    return scene.geometry.group(parts)
+    """Cota de plano en Cascadia Mono, a ``offset`` del segmento por el lado ``side``.
 
-
-def _anchor_center(
-    x: float, y: float, w: float, h: float, anchor: Anchor
-) -> tuple[float, float]:
-    dx = {
-        Anchor.LEFT: 1,
-        Anchor.TOP_LEFT: 1,
-        Anchor.BOTTOM_LEFT: 1,
-        Anchor.RIGHT: -1,
-        Anchor.TOP_RIGHT: -1,
-        Anchor.BOTTOM_RIGHT: -1,
-    }.get(anchor, 0)
-    dy = {
-        Anchor.TOP: -1,
-        Anchor.TOP_LEFT: -1,
-        Anchor.TOP_RIGHT: -1,
-        Anchor.BOTTOM: 1,
-        Anchor.BOTTOM_LEFT: 1,
-        Anchor.BOTTOM_RIGHT: 1,
-    }.get(anchor, 0)
-    return x + dx * w / 2, y + dy * h / 2
+    Como en los planos, el rótulo de una cota vertical se lee girado.
+    """
+    return scene.mechanics.dimension_between(
+        start,
+        end,
+        offset,
+        side=side,
+        label=text,
+        label_orientation="aligned" if side in ("left", "right") else "upright",
+        font=MONO,
+        font_size=size,
+        color=color,
+        line_width=width,
+    )
