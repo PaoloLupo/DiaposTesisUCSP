@@ -634,7 +634,7 @@ def drift(scene: Scene) -> None:
     labels = [
         t(
             scene,
-            "piso i",
+            "Piso $i$",
             -6.4,
             top_y + 0.1,
             size=0.2,
@@ -643,7 +643,7 @@ def drift(scene: Scene) -> None:
         ),
         t(
             scene,
-            "piso i − 1",
+            "Piso $i − 1$",
             -6.4,
             mid_y + 0.1,
             size=0.2,
@@ -735,8 +735,8 @@ def drift(scene: Scene) -> None:
     scene.play(upper.animate.set(0.95).duration(1.4))
     du = t(
         scene,
-        "Δu",
-        -1.2,
+        "$Δ u$",
+        -1.3,
         top_y + 0.55,
         font=MONO,
         size=0.2,
