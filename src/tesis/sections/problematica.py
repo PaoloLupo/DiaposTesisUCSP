@@ -1,14 +1,19 @@
 """Bloque 1 · Problemática: material, sistema sísmico y traslado manual de datos."""
 
+import math
+
 from gaanim import (
     Anchor,
     Direction,
     Drawable,
+    Easing,
+    EasingCurve,
     Scene,
     Section,
     SectionStep,
     Transition,
     computed,
+    parallel,
     sequence,
     stagger,
 )
@@ -27,6 +32,7 @@ from tesis.theme import (
     CARD,
     CONCRETE,
     CONCRETE_SOFT,
+    FAIL,
     DISPLAY,
     FAINT,
     INK,
@@ -271,25 +277,343 @@ def _brick_wall(scene: Scene, cx: float, cy: float, width: float, height: float)
     )
 
 
-def seismic(scene: Scene) -> None:
-    header(scene, KICKER, "En un país sísmico, el muro confinado trabaja como unidad")
+# peru.svg (mapsvg) cubre lon -81.390559 a -68.672457 y lat -0.036136 a -18.388935
+# en proyección Mercator sobre un lienzo de 542.767 × 792; el contorno llena el lienzo.
+MAP_CX, MAP_CY, MAP_S = -3.35, 0.05, 0.0061
+_LON0, _LON1, _LAT0, _LAT1 = -81.390559, -68.672457, -0.036136, -18.388935
+_SVG_W, _SVG_H = 542.767, 792.0
 
-    plates = scene.media.lottie("placas_subduccion_paleta.lottie")
-    plates.scale_by(0.43).move_to(-5.0, 0.4)
-    plate_caption = t(
+
+def _merc(lat: float) -> float:
+    return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+
+
+def _geo(lon: float, lat: float) -> tuple[float, float]:
+    """Longitud y latitud a coordenadas de escena sobre el mapa del Perú."""
+    px = (lon - _LON0) * _SVG_W / (_LON1 - _LON0)
+    py = (_merc(_LAT0) - _merc(lat)) * _SVG_H / (_merc(_LAT0) - _merc(_LAT1))
+    return MAP_CX + (px - _SVG_W / 2) * MAP_S, MAP_CY - (py - _SVG_H / 2) * MAP_S
+
+
+# Traza aproximada de la fosa Perú-Chile (borde entre placas), de norte a sur.
+TRENCH = [
+    (-81.2, 1.0),
+    (-81.5, -1.5),
+    (-81.8, -3.5),
+    (-82.0, -5.0),
+    (-81.6, -7.0),
+    (-80.6, -8.8),
+    (-79.3, -10.7),
+    (-78.2, -12.3),
+    (-76.9, -14.0),
+    (-75.6, -15.6),
+    (-73.4, -17.1),
+    (-71.6, -18.4),
+    (-71.2, -19.0),
+]
+
+# Epicentros aproximados (USGS) de grandes sismos frente a la costa.
+QUAKES = [
+    ("1970 · Áncash · Mw 7.9", -78.84, -9.25),
+    ("1940 · Lima · Mw 8.2", -77.80, -11.20),
+    ("2007 · Pisco · Mw 8.0", -76.60, -13.39),
+    ("2001 · Arequipa · Mw 8.4", -73.64, -16.26),
+]
+
+
+def _trench_teeth(
+    scene: Scene, points: list[tuple[float, float]], step: float
+) -> list[Drawable]:
+    """Triángulos de subducción sobre la placa que cabalga, a intervalos regulares."""
+    teeth: list[Drawable] = []
+    carry = step / 2
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        seg = math.hypot(x1 - x0, y1 - y0)
+        ux, uy = (x1 - x0) / seg, (y1 - y0) / seg
+        nx, ny = (-uy, ux) if -uy > 0 else (uy, -ux)  # normal hacia el este
+        d = carry
+        while d < seg:
+            bx, by = x0 + ux * d, y0 + uy * d
+            half, tall = 0.055, 0.1
+            teeth.append(
+                scene.geometry.polygon(
+                    [
+                        (bx - ux * half, by - uy * half),
+                        (bx + ux * half, by + uy * half),
+                        (bx + nx * tall, by + ny * tall),
+                    ]
+                )
+                .fill(INK)
+                .no_stroke()
+            )
+            d += step
+        carry = d - seg
+    return teeth
+
+
+def plates(scene: Scene) -> None:
+    header(scene, KICKER, "El Perú está sobre el choque de dos placas tectónicas")
+
+    peru = (
+        scene.media.svg("peru.svg")
+        .fill(CARD)
+        .stroke(MUTED, 0.8)
+        .scale_to(MAP_S)
+        .move_to(MAP_CX, MAP_CY)
+    )
+    scene.play(peru.animate.create().duration(1.0))
+
+    # Dos placas: el Perú entero está sobre la Sudamericana; la fosa marca el contacto.
+    trench = [_geo(lon, lat) for lon, lat in TRENCH]
+    left, right = -7.3, -0.1
+    top, bottom = trench[0][1], trench[-1][1]
+    nazca = (
+        scene.geometry.polygon([(left, top), *trench, (left, bottom)])
+        .fill(STEEL_SOFT)
+        .no_stroke()
+        .z_index(-2)
+    )
+    southam = (
+        scene.geometry.polygon([*trench, (right, bottom), (right, top)])
+        .fill(PAPER_DEEP)
+        .no_stroke()
+        .z_index(-2)
+    )
+    nazca_label = t(
         scene,
-        "Subducción de la placa de Nazca\nbajo la placa Sudamericana",
-        -5.0,
-        -1.55,
+        "PLACA\nDE NAZCA",
+        -7.0,
+        1.9,
+        font=MONO,
+        size=0.2,
+        weight=700,
+        color=STEEL,
+    )
+    southam_label = t(
+        scene,
+        "PLACA\nSUDAMERICANA",
+        -1.75,
+        1.9,
+        font=MONO,
+        size=0.2,
+        weight=700,
+        color=INK_SOFT,
+    )
+    line = scene.geometry.polyline(trench).no_fill().stroke(INK, 0.025)
+    teeth = _trench_teeth(scene, trench, 0.28)
+    tx, ty = _geo(-82.1, -4.3)
+    trench_label = t(
+        scene,
+        "Fosa\nPerú-Chile",
+        tx - 0.15,
+        ty,
+        size=0.17,
+        color=INK,
+        weight=700,
+        anchor=Anchor.RIGHT,
+    )
+    scene.play(
+        stagger(
+            parallel(
+                nazca.animate.fade_in().duration(0.5),
+                nazca_label.animate.fade_in_from(Direction.RIGHT, 0.1).duration(0.5),
+            ),
+            parallel(
+                southam.animate.fade_in().duration(0.5),
+                southam_label.animate.fade_in_from(Direction.LEFT, 0.1).duration(0.5),
+            ),
+            each=0.35,
+        )
+    )
+    scene.play(
+        [
+            line.animate.create().duration(0.9),
+            stagger(
+                *[p.animate.grow_from_center().duration(0.2) for p in teeth],
+                each=0.9 / len(teeth),
+            ),
+            trench_label.animate.fade_in().duration(0.5),
+        ]
+    )
+
+    # La placa de Nazca converge hacia el este-noreste, contra el continente.
+    pushes: list[Drawable] = []
+    for lat in (-9.5, -15.0):
+        x1, y1 = _geo(-83.3, lat)
+        pushes.append(
+            scene.geometry.arrow(
+                x1 - 1.0,
+                y1 - 0.2,
+                x1,
+                y1,
+                head_length=0.2,
+                head_width=0.22,
+                body_width=0.07,
+            )
+            .fill(STEEL)
+            .no_stroke()
+        )
+    ax, ay = _geo(-83.3, -15.0)
+    rate = t(
+        scene,
+        "≈ 7–8 cm/año",
+        ax,
+        ay - 0.3,
+        font=MONO,
+        size=0.16,
+        color=STEEL,
+        anchor=Anchor.TOP_RIGHT,
+    )
+    scene.play(
+        [
+            *[a.animate.grow_arrow().duration(0.6) for a in pushes],
+            rate.animate.fade_in().duration(0.5),
+        ]
+    )
+    scene.stop("dos-placas")
+
+    block = scene.media.lottie("placas_subduccion_paleta.lottie")
+    block.scale_by(0.52).move_to(4.1, 0.45)
+    block_title = t(
+        scene,
+        "CORTE A–A′",
+        1.0,
+        2.4,
+        font=MONO,
+        size=0.17,
+        weight=700,
+        color=BRICK_DEEP,
+    )
+    block_labels = [
+        t(
+            scene,
+            "NAZCA",
+            1.85,
+            1.62,
+            font=MONO,
+            size=0.16,
+            weight=700,
+            color=STEEL,
+            anchor=Anchor.CENTER,
+        ),
+        t(
+            scene,
+            "SUDAMERICANA",
+            6.45,
+            2.0,
+            font=MONO,
+            size=0.16,
+            weight=700,
+            color=INK_SOFT,
+            anchor=Anchor.CENTER,
+        ),
+    ]
+    explain = t(
+        scene,
+        "La placa de Nazca se hunde (subduce) bajo la Sudamericana.\n"
+        "El contacto se traba, acumula energía y la libera en sismos.",
+        4.1,
+        -1.75,
         size=0.2,
         color=INK_SOFT,
         anchor=Anchor.TOP,
     )
-    scene.play(sequence(plates.animate.fade_in().duration(0.5), plates))
-    scene.play(plate_caption.animate.fade_in().duration(0.4))
-    scene.stop("contexto-sismico")
+    scene.play(
+        [
+            block_title.animate.fade_in().duration(0.4),
+            sequence(block.animate.fade_in().duration(0.5), block),
+            *[b.animate.fade_in().duration(0.4).delay(0.5) for b in block_labels],
+            explain.animate.fade_in().duration(0.6).delay(0.8),
+        ]
+    )
+    scene.stop("subduccion")
 
-    cx, cy, w, h = 1.15, -0.2, 3.7, 3.2
+    # Grandes sismos del último siglo: todos frente a la costa, sobre el contacto.
+    marks = []
+    for text, lon, lat in QUAKES:
+        x, y = _geo(lon, lat)
+        dot = (
+            scene.geometry.circle(0.07)
+            .fill(FAIL)
+            .no_stroke()
+            .move_to(x, y)
+            .z_index(5)
+        )
+        ring = (
+            scene.geometry.circle(0.07)
+            .no_fill()
+            .stroke(FAIL, 0.02)
+            .move_to(x, y)
+            .z_index(5)
+            .opacity(0)
+        )
+        tag = pill(
+            scene,
+            text,
+            x + 0.2,
+            y,
+            color=INK,
+            background=CARD,
+            border=RULE,
+            size=0.15,
+            anchor=Anchor.LEFT,
+        ).z_index(6)
+        marks.append(
+            stagger(
+                parallel(
+                    dot.animate.grow_from_center().duration(0.25),
+                    sequence(
+                        ring.animate.fade_in().duration(0.05),
+                        parallel(
+                            ring.animate.scale_to(6).duration(0.8),
+                            ring.animate.fade_out().duration(0.8),
+                        ),
+                    ),
+                ),
+                tag.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.35),
+                each=0.15,
+            )
+        )
+    # La cámara recorre la costa de norte a sur y sacude la escena en cada evento;
+    # el encuadre no sale del panel del mapa y al final vuelve a la vista completa.
+    zoom = 3.0
+    half_w, half_h = 8 / zoom, 4.5 / zoom
+    tour = []
+    for mark, (_, lon, lat) in zip(marks, QUAKES, strict=True):
+        x, y = _geo(lon, lat)
+        view = (min(x + 1.1, right - half_w), max(y, bottom + half_h))
+        tour.append(
+            sequence(
+                scene.camera.animate.to(scene.camera.state_2d(view, zoom))
+                .duration(0.8)
+                .easing(Easing.ease_in_out(EasingCurve.CUBIC)),
+                parallel(
+                    mark, scene.camera.animate.shake(0.012, 11.0).duration(0.7)
+                ),
+                gap=-0.1,
+            )
+        )
+    scene.play(sequence(*tour, gap=0.25))
+    scene.play(
+        scene.camera.animate.reset()
+        .duration(1.1)
+        .easing(Easing.ease_in_out(EasingCurve.CUBIC))
+    )
+    takeaway(
+        scene, "Toda la costa está frente al borde de placas: el sismo es una certeza"
+    )
+    source(
+        scene,
+        "Tesis · §1.1 Problemática, p. 1 (Tavera, 2014). Fosa y epicentros aproximados "
+        "(USGS); mapa esquemático.",
+    )
+    scene.stop("pais-sismico")
+
+
+def seismic(scene: Scene) -> None:
+    header(scene, KICKER, "Frente al sismo, el muro confinado trabaja como unidad")
+
+    cx, cy, w, h = -0.8, -0.2, 3.7, 3.2
     rows, columns, beam, forms, ground, top_bricks = _brick_wall(scene, cx, cy, w, h)
     col_forms, beam_form = forms[:2], forms[2]
 
@@ -332,7 +656,7 @@ def seismic(scene: Scene) -> None:
         "Muro de ladrillo",
         "se asienta primero,\ncon los extremos dentados",
         (cx + 0.7, cy - 0.5),
-        (3.75, -0.75),
+        (cx + w / 2 + 0.85, -0.75),
     )
     scene.play(wall_note)
 
@@ -368,7 +692,7 @@ def seismic(scene: Scene) -> None:
         "Columnas y viga solera",
         "se vacían después y\nconfinan el muro",
         (cx + w / 2 - 0.18, top_bricks - 0.6),
-        (3.75, 1.2),
+        (cx + w / 2 + 0.85, 1.2),
     )
     scene.play(col_note)
     force = (
@@ -825,12 +1149,26 @@ SECTION = Section(
             ),
         ),
         SectionStep(
+            name="Problemática · país sísmico",
+            build=plates,
+            transition=Transition.cross_fade(0.45),
+            notes=(
+                "50 s. (1) Ubicar el Perú. (2) Frente a la costa corre la fosa Perú-Chile: al "
+                "oeste la placa de Nazca, al este la Sudamericana, sobre la que está todo el país. "
+                "Nazca avanza hacia el continente unos 7–8 cm/año (verificar la cifra con Tavera, "
+                "2014). (3) Corte A–A′: Nazca se hunde bajo la Sudamericana; el contacto se traba, "
+                "acumula energía y la libera en sismos. (4) Por eso los grandes sismos están frente "
+                "a la costa: Lima 1940 (tras él llegó la albañilería confinada), Áncash 1970, "
+                "Arequipa 2001, Pisco 2007. Fosa y epicentros son aproximados."
+            ),
+        ),
+        SectionStep(
             name="Problemática · sistema sísmico",
             build=seismic,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. Perú en el Cinturón de Fuego (Tavera, 2014). La albañilería confinada "
-                "llegó tras el terremoto de Lima de 1940. Explicar el proceso: primero el muro con "
+                "45 s. La albañilería confinada llegó tras el terremoto de Lima de 1940. "
+                "Explicar el proceso: primero el muro con "
                 "extremos dentados, después se vacían columnas y viga solera; el conjunto trabaja "
                 "como una unidad y gana ductilidad (Gonzales, 1992). Por eso la E.070 pide densidad "
                 "mínima de muros en ambas direcciones y conexión con los confinamientos."
