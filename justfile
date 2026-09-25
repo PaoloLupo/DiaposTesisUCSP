@@ -11,4 +11,4 @@ reinstall:
 
 # Una imagen por pausa en snapshots/DiaposTesisUCSP/current (p. ej. just capture --stops 12,30).
 capture *args:
-    gaanim --diff --example . --capture-stops --no-gui --tests-root snapshots {{args}}
+    gaanim --diff --example . --capture-stops --capture-only --no-gui --tests-root snapshots {{args}}

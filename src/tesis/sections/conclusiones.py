@@ -11,7 +11,7 @@ from gaanim import (
     stagger,
 )
 
-from tesis.building import draw_plan
+from tesis.building import draw_plan, grow_walls
 from tesis.data.thesis import (
     DRIFTS,
     SEISMIC_FORCES,
@@ -19,11 +19,19 @@ from tesis.data.thesis import (
     crack_failures,
     relative,
 )
-from tesis.kit import LEFT_EDGE, header, label, panel, source, t
+from tesis.kit import (
+    LEFT_EDGE,
+    RIGHT_EDGE,
+    dash,
+    header,
+    heading,
+    label,
+    panel,
+    source,
+    t,
+)
 from tesis.theme import (
     BRICK,
-    BRICK_DEEP,
-    BRICK_SOFT,
     CARD,
     DISPLAY,
     FAIL,
@@ -31,9 +39,8 @@ from tesis.theme import (
     INK_SOFT,
     MUTED,
     PASS,
-    PASS_SOFT,
+    RULE,
     STEEL,
-    STEEL_SOFT,
 )
 
 KICKER = "08 · Conclusiones"
@@ -100,22 +107,14 @@ def objectives(scene: Scene) -> None:
                 each=0.07,
             )
         )
-    band = panel(
-        scene,
-        LEFT_EDGE,
-        -2.55,
-        14.6,
-        1.0,
-        fill=PASS_SOFT,
-        border=None,
-        anchor=Anchor.LEFT,
-    )
-    tag = label(scene, "Hipótesis", LEFT_EDGE + 0.3, -2.2, color=PASS, size=0.14)
+    # La hipótesis cierra la lámina bajo un filete, sin recuadro de color.
+    band = scene.geometry.line(LEFT_EDGE, -1.98, RIGHT_EDGE, -1.98).stroke(RULE, 0.014)
+    tag = label(scene, "Hipótesis", LEFT_EDGE, -2.2, color=PASS, size=0.14)
     text = t(
         scene,
         "El marco integrado a ETABS por API sistematiza la extracción, el procesamiento, la "
         "verificación y la documentación.",
-        LEFT_EDGE + 0.3,
+        LEFT_EDGE,
         -2.45,
         size=0.23,
         weight=700,
@@ -123,7 +122,7 @@ def objectives(scene: Scene) -> None:
     )
     scene.play(
         [
-            band.animate.fade_in().duration(0.3),
+            band.animate.create().duration(0.4),
             tag.animate.fade_in().duration(0.3),
             text.animate.fade_in_from(Direction.UP, 0.06).duration(0.5),
         ]
@@ -202,29 +201,21 @@ def findings(scene: Scene) -> None:
                 each=0.08,
             )
         )
-    quote = panel(
-        scene,
-        LEFT_EDGE,
-        -1.55,
-        14.6,
-        1.05,
-        fill=BRICK_SOFT,
-        border=None,
-        anchor=Anchor.TOP_LEFT,
-    )
+    # Cita final con el mismo tratamiento que los takeaways: filete fino encima.
+    quote = scene.geometry.line(LEFT_EDGE, -1.4, RIGHT_EDGE, -1.4).stroke(RULE, 0.014)
     quote_t = t(
         scene,
         "El criterio del ingeniero sigue siendo el factor determinante: Alba es una herramienta\n"
         "de apoyo, de código libre, para extraer, verificar y documentar.",
-        LEFT_EDGE + 0.3,
-        -1.7,
+        LEFT_EDGE,
+        -1.72,
         font=DISPLAY,
         size=0.27,
         weight=700,
-        color=BRICK_DEEP,
+        color=INK,
     )
     scene.play(
-        [quote.animate.fade_in().duration(0.3), quote_t.animate.fade_in().duration(0.5)]
+        [quote.animate.create().duration(0.5), quote_t.animate.fade_in().duration(0.5)]
     )
     source(
         scene,
@@ -251,47 +242,22 @@ FUTURE = [
 
 def outlook(scene: Scene) -> None:
     header(scene, KICKER, "Alcance actual y líneas de continuidad")
-    for x0, title, items, color, soft in [
-        (LEFT_EDGE, "Limitaciones", LIMITS, STEEL, STEEL_SOFT),
-        (0.25, "Recomendaciones y trabajo futuro", FUTURE, BRICK, BRICK_SOFT),
+    for x0, title, items, color in [
+        (LEFT_EDGE, "Limitaciones", LIMITS, STEEL),
+        (0.25, "Recomendaciones y trabajo futuro", FUTURE, BRICK),
     ]:
         w = 7.05
-        card = panel(scene, x0, 2.35, w, 4.85, fill=CARD, anchor=Anchor.TOP_LEFT)
-        band = panel(
-            scene,
-            x0,
-            2.35,
-            w,
-            0.6,
-            fill=soft,
-            border=None,
-            anchor=Anchor.TOP_LEFT,
-            radius=0.1,
-        )
-        head = t(
-            scene,
-            title,
-            x0 + 0.3,
-            2.05,
-            size=0.25,
-            weight=900,
-            color=color,
-            anchor=Anchor.LEFT,
-        )
+        head = heading(scene, title, x0, 1.95, w, color=color, size=0.26)
         rows: list[Drawable] = []
         for i, item in enumerate(items):
-            y = 1.3 - i * 0.78
+            y = 1.25 - i * 0.82
+            rows.append(dash(scene, x0 + 0.08, y, color=color))
             rows.append(
-                scene.geometry.circle(0.06).fill(color).no_stroke().move_to(x0 + 0.4, y)
-            )
-            rows.append(
-                t(scene, item, x0 + 0.65, y, size=0.23, color=INK, anchor=Anchor.LEFT)
+                t(scene, item, x0 + 0.4, y, size=0.25, color=INK, anchor=Anchor.LEFT)
             )
         scene.play(
             stagger(
-                card.animate.fade_in().duration(0.3),
-                band.animate.fade_in().duration(0.3),
-                head.animate.fade_in().duration(0.3),
+                *[h.animate.fade_in().duration(0.3) for h in head],
                 stagger(
                     *[
                         r.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.3)
@@ -314,9 +280,6 @@ def closing(scene: Scene) -> None:
     plan = draw_plan(scene, (3.9, 0.0), 6.3, drawn_thickness=0.075)
     thanks = t(
         scene, "Gracias", LEFT_EDGE, 1.7, font=DISPLAY, size=1.2, weight=700, color=INK
-    )
-    rule = scene.geometry.line(LEFT_EDGE, 0.05, LEFT_EDGE + 1.2, 0.05).stroke(
-        BRICK, 0.045
     )
     prompt = t(
         scene,
@@ -346,7 +309,6 @@ def closing(scene: Scene) -> None:
     scene.play(
         stagger(
             thanks.animate.fade_in_from(Direction.UP, 0.12).duration(0.7),
-            rule.animate.create().duration(0.4),
             prompt.animate.fade_in().duration(0.5),
             authors.animate.fade_in().duration(0.4),
             advisor.animate.fade_in().duration(0.4),
@@ -361,10 +323,7 @@ def closing(scene: Scene) -> None:
             ),
             plan.slab.animate.fade_in().duration(0.5),
             plan.void.animate.fade_in().duration(0.3),
-            stagger(
-                *[w.animate.grow_from_center().duration(0.35) for w in plan.all_walls],
-                each=0.03,
-            ),
+            grow_walls(plan.all_walls, total=0.9, duration=0.35),
             each=0.2,
         )
     )

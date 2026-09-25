@@ -12,6 +12,7 @@ from gaanim import (
     Color,
     Direction,
     Drawable,
+    Easing,
     Scene,
     Text,
     TextStyle,
@@ -25,14 +26,12 @@ from tesis.theme import (
     CARD,
     DISPLAY,
     FAIL,
-    FAIL_SOFT,
     INK,
     INK_SOFT,
     KICKER,
     MONO,
     MUTED,
     PASS,
-    PASS_SOFT,
     RULE,
     SANS,
     TITLE,
@@ -68,13 +67,18 @@ def t(
 def header(
     scene: Scene, kicker: str, title: str, *, rule: bool = False
 ) -> list[Drawable]:
-    """Kicker en versalitas terracota y título-afirmación en Aleo."""
+    """Kicker en versalitas terracota y título-afirmación en Aleo.
+
+    El título sube palabra por palabra detrás de una máscara por renglón.
+    """
     kick = t(scene, kicker.upper(), LEFT_EDGE, 3.98, style=KICKER)
     head = t(scene, title, LEFT_EDGE, 3.66, style=TITLE)
     items: list[Drawable] = [kick, head]
     anims = [
-        kick.animate.fade_in_from(Direction.RIGHT, 0.12).duration(0.45),
-        head.animate.write().duration(1),
+        kick.animate.fade_in_from(Direction.RIGHT, 0.12)
+        .duration(0.5)
+        .easing(Easing.SMOOTH_SPRING),
+        head.animate.reveal(style="slide_up", by="word", stagger=0.045).duration(0.9),
     ]
     if rule:
         line = scene.geometry.line(length= RIGHT_EDGE- LEFT_EDGE).stroke(
@@ -93,20 +97,26 @@ def source(scene: Scene, reference: str) -> Text:
 
 
 def takeaway(
-    scene: Scene, content: str, y: float = -3.05, *, color: Color = INK
+    scene: Scene,
+    content: str,
+    y: float = -3.05,
+    *,
+    color: Color = INK,
 ) -> Drawable:
-    """Mensaje final de la diapositiva: marca terracota + frase en negrita."""
-    mark = (
-        scene.geometry.rect(0.07, 0.34)
-        .fill(BRICK)
-        .no_stroke()
-        .move_to(LEFT_EDGE + 0.035, y)
+    """Mensaje final de la diapositiva: filete fino encima y frase en Aleo.
+
+    Sin marca de color al costado: la conclusión se distingue por la tipografía
+    de los títulos y por el filete que la separa del contenido.
+    """
+    rule = scene.geometry.line(LEFT_EDGE, y + 0.36, RIGHT_EDGE, y + 0.36).stroke(
+        RULE, 0.014
     )
     text = t(
         scene,
         content,
-        LEFT_EDGE + 0.3,
+        LEFT_EDGE,
         y,
+        font=DISPLAY,
         size=0.3,
         color=color,
         weight=700,
@@ -114,11 +124,11 @@ def takeaway(
     )
     scene.play(
         [
-            mark.animate.grow_from_center().duration(0.35),
-            text.animate.fade_in_from(Direction.LEFT, 0.12).duration(0.55),
+            rule.animate.create().duration(0.5),
+            text.animate.reveal(style="slide_up", by="word", stagger=0.03).duration(0.7),
         ]
     )
-    return scene.geometry.group([mark, text])
+    return scene.geometry.group([rule, text])
 
 
 def pill(
@@ -136,10 +146,11 @@ def pill(
     pad: tuple[float, float] = (0.16, 0.07),
     anchor: Anchor = Anchor.CENTER,
 ) -> Drawable:
-    """Etiqueta compacta con fondo redondeado; se ubica por su centro o una esquina."""
+    """Etiqueta compacta de esquinas rectas; se ubica por su centro o una esquina."""
     return scene.slides.badge(
         content,
         padding=pad,
+        radius=0.0,
         font_size=size,
         font=font,
         weight=weight,
@@ -158,19 +169,52 @@ def status(
     anchor: Anchor = Anchor.CENTER,
     size: float = 0.2,
 ) -> Drawable:
-    """Chip de diagnóstico: CUMPLE en verde o NO CUMPLE en rojo."""
-    return pill(
+    """Diagnóstico como texto: «✓ Cumple» en verde o «✕ No cumple» en rojo, sin fondo."""
+    return t(
         scene,
-        "✓  CUMPLE" if ok else "✕  NO CUMPLE",
+        "✓ Cumple" if ok else "✕ No cumple",
         x,
         y,
-        color=PASS if ok else FAIL,
-        background=PASS_SOFT if ok else FAIL_SOFT,
         size=size,
-        font=SANS,
+        color=PASS if ok else FAIL,
         weight=900,
         anchor=anchor,
     )
+
+
+def heading(
+    scene: Scene,
+    content: str,
+    x: float,
+    y: float,
+    w: float,
+    *,
+    color: Color = INK,
+    size: float = 0.24,
+) -> list[Drawable]:
+    """Encabezado de columna: nombre en negrita sobre un filete del mismo color.
+
+    ``y`` es la línea del filete; el nombre queda encima. Se alinea por arriba
+    (la mayúscula inicial) para que dos encabezados vecinos coincidan aunque
+    uno tenga letras con descendente («y», «j») y el otro no.
+    """
+    name = t(
+        scene,
+        content,
+        x,
+        y + 0.14 + size,
+        size=size,
+        weight=900,
+        color=color,
+        anchor=Anchor.TOP_LEFT,
+    )
+    rule = scene.geometry.line(x, y, x + w, y).stroke(color, 0.018)
+    return [name, rule]
+
+
+def dash(scene: Scene, x: float, y: float, *, color: Color = MUTED) -> Drawable:
+    """Raya corta como marcador de lista, centrada en ``(x, y)``."""
+    return scene.geometry.rect(0.16, 0.024).fill(color).no_stroke().move_to(x, y)
 
 
 def panel(
@@ -182,10 +226,10 @@ def panel(
     *,
     fill: Color | str = CARD,
     border: Color | str | None = RULE,
-    radius: float = 0.12,
     anchor: Anchor = Anchor.CENTER,
 ) -> Drawable:
-    box = scene.geometry.rounded_rect(w, h, radius).fill(fill)
+    """Recuadro de esquinas rectas con filete fino."""
+    box = scene.geometry.rect(w, h).fill(fill)
     box = box.stroke(border, 0.014) if border is not None else box.no_stroke()
     return box.move_to(x, y, anchor)
 

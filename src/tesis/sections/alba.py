@@ -4,10 +4,12 @@ from gaanim import (
     Anchor,
     Direction,
     Drawable,
+    Playable,
     Scene,
     Section,
     SectionStep,
     Transition,
+    parallel,
     sequence,
     stagger,
 )
@@ -256,56 +258,56 @@ def api(scene: Scene) -> None:
     scene.play(
         [alba.animate.fade_in().duration(0.3), etabs.animate.fade_in().duration(0.3)]
     )
-    rows: list[Drawable] = []
+    rules = [
+        scene.geometry.line(LEFT_EDGE, y - 0.28, 7.3, y - 0.28).stroke("#E9E4DA", 0.008)
+        for y in (1.72 - i * 0.56 for i in range(len(API_ROWS) - 1))
+    ]
+    # Cada fila es una consulta: el método se teclea, la flecha va a ETABS y
+    # aparece lo que devuelve. Las filas se solapan como consultas seguidas.
+    rows: list[Playable] = []
     for i, (cat, method, answer) in enumerate(API_ROWS):
         y = 1.72 - i * 0.56
+        category = label(
+            scene, cat, LEFT_EDGE, y, color=MUTED, size=0.12, anchor=Anchor.LEFT
+        )
+        call = t(
+            scene,
+            method,
+            mid - 0.15,
+            y,
+            font=MONO,
+            size=0.17,
+            color=INK,
+            anchor=Anchor.RIGHT,
+        )
+        arrow = link(scene, (mid, y), (right_col + 0.1, y), color=BRICK)
+        reply = t(
+            scene,
+            answer,
+            right_col + 0.3,
+            y,
+            size=0.21,
+            color=INK_SOFT,
+            anchor=Anchor.LEFT,
+        )
         rows.append(
-            scene.geometry.group(
-                [
-                    label(
-                        scene,
-                        cat,
-                        LEFT_EDGE,
-                        y,
-                        color=MUTED,
-                        size=0.12,
-                        anchor=Anchor.LEFT,
-                    ),
-                    t(
-                        scene,
-                        method,
-                        mid - 0.15,
-                        y,
-                        font=MONO,
-                        size=0.17,
-                        color=INK,
-                        anchor=Anchor.RIGHT,
-                    ),
-                    link(scene, (mid, y), (right_col + 0.1, y), color=BRICK),
-                    t(
-                        scene,
-                        answer,
-                        right_col + 0.3,
-                        y,
-                        size=0.21,
-                        color=INK_SOFT,
-                        anchor=Anchor.LEFT,
-                    ),
-                ]
+            sequence(
+                parallel(
+                    category.animate.fade_in().duration(0.2),
+                    call.animate.typewriter(cps=60, cursor="▍", keep_cursor=False),
+                ),
+                parallel(
+                    arrow.animate.grow_arrow().duration(0.25),
+                    reply.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.3),
+                ),
             )
         )
-        if i < len(API_ROWS) - 1:
-            rows.append(
-                scene.geometry.line(LEFT_EDGE, y - 0.28, 7.3, y - 0.28).stroke(
-                    "#E9E4DA", 0.008
-                )
-            )
     _ = left_col
     scene.play(
-        stagger(
-            *[r.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.3) for r in rows],
-            each=0.08,
-        )
+        [
+            stagger(*[r.animate.fade_in().duration(0.3) for r in rules], each=0.04),
+            stagger(*rows, each=0.35),
+        ]
     )
     note = panel(
         scene,
@@ -377,7 +379,6 @@ def interface(scene: Scene) -> None:
         height + 0.12,
         fill="#FFFFFF",
         border=RULE,
-        radius=0.06,
     )
     shot = scene.media.image(
         thesis_image("cap7/ui_alba.png"),
@@ -394,7 +395,7 @@ def interface(scene: Scene) -> None:
         zx0, zx1 = x_left + px0 * s, x_left + px1 * s
         zy0, zy1 = y_top - py0 * s, y_top - py1 * s
         outline = (
-            scene.geometry.rounded_rect(zx1 - zx0, zy0 - zy1, 0.05)
+            scene.geometry.rect(zx1 - zx0, zy0 - zy1)
             .no_fill()
             .stroke(BRICK, 0.03)
             .move_to((zx0 + zx1) / 2, (zy0 + zy1) / 2)
@@ -476,7 +477,6 @@ def report(scene: Scene) -> None:
         3.4,
         fill="#FFFFFF",
         border=RULE,
-        radius=0.06,
         anchor=Anchor.TOP_LEFT,
     )
     fragment = scene.media.image(
@@ -502,7 +502,6 @@ def report(scene: Scene) -> None:
         3.4,
         fill="#23262E",
         border=None,
-        radius=0.1,
         anchor=Anchor.TOP_LEFT,
     )
     code_lines = REPORT_CODE.split("\n")

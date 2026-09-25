@@ -114,9 +114,9 @@ Matices que conviene respetar al exponer (también están en las notas):
 revisión en el guion:
 
 ```powershell
-gaanim --diff --example . --capture-stops --no-gui --tests-root snapshots
-gaanim --diff --example . --capture-stops --stops 12,30 --no-gui --tests-root snapshots
-gaanim --diff --example . --capture-stops --sections resultados --no-gui --tests-root snapshots
+gaanim --diff --example . --capture-stops --capture-only --no-gui --tests-root snapshots
+gaanim --diff --example . --capture-stops --capture-only --stops 12,30 --no-gui --tests-root snapshots
+gaanim --diff --example . --capture-stops --capture-only --sections resultados --no-gui --tests-root snapshots
 ```
 
 Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) quedan en

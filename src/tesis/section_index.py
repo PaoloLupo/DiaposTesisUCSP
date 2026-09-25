@@ -12,6 +12,7 @@ from gaanim import (
     Anchor,
     Direction,
     Drawable,
+    Easing,
     NavigationEntry,
     Playable,
     ProgressRail,
@@ -94,19 +95,13 @@ AGENDA_X = 1.9
 AGENDA_TOP = 2.35
 AGENDA_GAP = 0.66
 RAIL_Y = -4.46
-# Cabecera corrida: el título de la tesis centrado en el borde superior, sobre el
-# kicker, entre dos filetes que llegan a los márgenes.
-RUNNING_HEAD = (
-    "Marco de trabajo para la automatización del diseño de la distribución "
-    "de muros en planta para edificios de albañilería confinada"
-)
-RUNNING_HEAD_Y = 4.24
-RUNNING_HEAD_HALF = 4.6  # semiancho aproximado del texto con este estilo
-RUNNING_HEAD_STYLE = TextStyle(
-    font=SANS, size=0.1, weight=700, color=INK_SOFT, letter_spacing=0.015
-)
-# Escenas que ya muestran el título completo (como la portada) no llevan cabecera.
-NO_RUNNING_HEAD = {"Cierre"}
+# Sello: el escudo de la UCSP, pequeño y en gris, sobre el kicker de cada escena.
+SEAL_Y = 4.24
+# Número de lámina: a la derecha, en la línea de la fuente, para que el jurado
+# pueda pedir «vuelva a la lámina 23».
+NUMBER_Y = -3.72
+# Escenas que no llevan sello ni número (el cierre repite la portada).
+UNNUMBERED = {"Cierre"}
 
 
 def _agenda_row(scene: Scene, entry: NavigationEntry, state: str) -> Drawable:
@@ -144,8 +139,9 @@ class SectionIndex:
         self.scene = scene
         self._previous: int | None = None
         self._rail: ProgressRail | None = None
-        self._head: Drawable | None = None
-        self._head_visible = False
+        self._seal: Drawable | None = None
+        self._seal_visible = False
+        self._slide = 0
 
     def build(self, section: Section, *, transition: Transition | None = None) -> None:
         if section.key not in KEYS:
@@ -157,7 +153,10 @@ class SectionIndex:
         divider = SectionStep(
             name="Índice",
             build=lambda scene: self._divider(scene, active),
-            transition=transition or Transition.cross_fade(0.45),
+            # Cambio de capítulo: un barrido suave hacia la izquierda; dentro de
+            # cada bloque las diapositivas siguen con fundido cruzado.
+            transition=transition
+            or Transition.wipe(0.6, direction="left", feather=0.2, easing=Easing.SMOOTH),
             notes=(
                 f"Bloque {active + 1} de {len(SECTIONS)}: {title}. "
                 f"Pregunta guía: {question} Transición breve, 5-10 s."
@@ -173,7 +172,7 @@ class SectionIndex:
         _, title, question, _ = SECTIONS[active]
         _ = scene.camera.reset()
         rail = self._rail or self._build_rail()
-        self._set_running_head(False)
+        self._set_seal(False)
 
         # El numeral rueda desde el bloque anterior hasta el actual.
         numeral = scene.viz.rolling_number(
@@ -195,9 +194,6 @@ class SectionIndex:
             color=INK,
         )
         prompt = t(scene, question, LEFT_EDGE, -0.05, size=0.34, color=INK_SOFT)
-        prompt_rule = scene.geometry.line(
-            LEFT_EDGE, -0.72, LEFT_EDGE + 1.2, -0.72
-        ).stroke(BRICK, 0.035)
         divider = scene.geometry.line(1.35, 2.7, 1.35, -3.0).stroke(RULE, 0.012)
 
         agenda = scene.sections.agenda(
@@ -205,8 +201,9 @@ class SectionIndex:
             previous if previous is not None else active,
             pitch=AGENDA_GAP,
             item=_agenda_row,
+            # Única marca vertical de la presentación: señala el bloque actual.
             marker=lambda scene: (
-                scene.geometry.rounded_rect(0.07, 0.42, 0.035).fill(BRICK).no_stroke()
+                scene.geometry.rect(0.07, 0.42).fill(BRICK).no_stroke()
             ),
         )
         agenda.root.shift_by(AGENDA_X, AGENDA_TOP)
@@ -214,16 +211,16 @@ class SectionIndex:
         scene.play(
             stagger(
                 numeral.visual.animate.fade_in().duration(0.4),
-                heading.animate.fade_in_from(Direction.UP, 0.12).duration(0.6),
+                heading.animate.reveal(style="slide_up", by="word", stagger=0.06)
+                .duration(0.7),
                 prompt.animate.fade_in().duration(0.5),
-                prompt_rule.animate.create().duration(0.5),
                 divider.animate.create().duration(0.5),
                 agenda.root.animate.fade_in().duration(0.4),
                 each=0.08,
             )
         )
         animations: list[Playable] = [
-            agenda.animate.focus(active),
+            agenda.animate.focus(active, easing=Easing.SMOOTH_SPRING),
             rail.animate.enter(active),
         ]
         if previous is not None:
@@ -241,7 +238,7 @@ class SectionIndex:
             track=lambda scene, w, h: scene.geometry.rect(w, h).fill(FAINT).no_stroke(),
             fill_color=BRICK,
             captions=True,
-            caption_style=TextStyle(font=SANS, size=0.115, weight=900),
+            caption_style=TextStyle(font=SANS, size=0.13, weight=900),
             caption_colors={"done": MUTED, "current": BRICK, "upcoming": MUTED},
         )
         rail.root.shift_by(0, RAIL_Y).hud().z_index(100)
@@ -251,46 +248,46 @@ class SectionIndex:
         return rail
 
     def _advance(self, scene: Scene, progress: SectionProgress) -> None:
-        """Al entrar a cada escena el tramo activo del riel avanza (el divisor no cuenta)."""
+        """Al entrar a cada escena el riel avanza y aparece su número (el divisor no cuenta)."""
         if progress.index == 1 or self._rail is None:
             return
-        self._set_running_head(progress.step.name not in NO_RUNNING_HEAD)
+        numbered = progress.step.name not in UNNUMBERED
+        self._set_seal(numbered)
         active = KEYS.index(progress.key)
         share = (progress.index - 1) / (progress.total - 1)
-        scene.play(
-            self._rail.animate.to((active + share) / len(SECTIONS)), duration=0.35
-        )
+        animations: list[Playable] = [
+            self._rail.animate.to((active + share) / len(SECTIONS))
+        ]
+        if numbered:
+            self._slide += 1
+            number = t(
+                scene,
+                f"{self._slide:02d}",
+                RIGHT_EDGE,
+                NUMBER_Y,
+                font=MONO,
+                size=0.17,
+                color=MUTED,
+                anchor=Anchor.TOP_RIGHT,
+            )
+            animations.append(number.animate.fade_in())
+        scene.play(animations, duration=0.35)
 
-    def _set_running_head(self, visible: bool) -> None:
-        """Muestra el título de la tesis en las escenas y lo oculta en los divisores."""
-        if visible == self._head_visible:
+    def _set_seal(self, visible: bool) -> None:
+        """Muestra el escudo en las escenas y lo oculta en los divisores y el cierre."""
+        if visible == self._seal_visible:
             return
         scene = self.scene
-        if self._head is None:
-            y, gap = RUNNING_HEAD_Y, RUNNING_HEAD_HALF + 0.25
-            text = t(
-                scene,
-                RUNNING_HEAD.upper(),
-                0,
-                y,
-                style=RUNNING_HEAD_STYLE,
-                anchor=Anchor.CENTER,
-            )
-            # Escudo pequeño y en gris al inicio del filete izquierdo: sello discreto.
-            logo = (
+        if self._seal is None:
+            seal = (
                 scene.media.svg("logoucsp.svg")
                 .scale_to(0.00033)
                 .fill(MUTED)
-                .move_to(LEFT_EDGE + 0.09, y)
+                .move_to(LEFT_EDGE + 0.09, SEAL_Y)
             )
-            rules = [
-                scene.geometry.line(LEFT_EDGE + 0.3, y, -gap, y).stroke(RULE, 0.012),
-                scene.geometry.line(gap, y, RIGHT_EDGE, y).stroke(RULE, 0.012),
-            ]
-            head = scene.geometry.group([logo, rules[0], text, rules[1]])
-            head.hud().z_index(100)
-            scene.persist(head)
-            self._head = head
-        anim = self._head.animate.fade_in() if visible else self._head.animate.fade_out()
+            seal.hud().z_index(100)
+            scene.persist(seal)
+            self._seal = seal
+        anim = self._seal.animate.fade_in() if visible else self._seal.animate.fade_out()
         scene.play(anim, duration=0.3)
-        self._head_visible = visible
+        self._seal_visible = visible

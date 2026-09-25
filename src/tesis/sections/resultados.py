@@ -18,7 +18,7 @@ from gaanim import (
     stagger,
 )
 
-from tesis.building import WALLS, WIDTH, Plan, draw_plan
+from tesis.building import DEPTH, WALLS, WIDTH, Plan, draw_plan
 from tesis.data.thesis import (
     CRACKING_FLOOR1,
     DRIFT_LIMIT,
@@ -79,7 +79,7 @@ def models(scene: Scene) -> None:
     heads: list[Drawable] = []
     for model, x in cols.items():
         heads.append(
-            panel(scene, x, 2.05, 2.9, 1.0, fill=SOFT[model], border=None, radius=0.12)
+            panel(scene, x, 2.05, 2.9, 1.0, fill=SOFT[model], border=None)
         )
         heads.append(
             t(
@@ -401,7 +401,7 @@ def _profile_panel(
             plane.plot_data(list(values), list(FLOORS), color=color, width=0.03)
         )
         visuals.append(
-            plane.scatter_data(list(values), list(FLOORS), color=color, radius=0.055)
+            plane.scatter_data(list(values), list(FLOORS), color=color)
         )
     return plane, visuals
 
@@ -500,16 +500,22 @@ def drifts(scene: Scene) -> None:
     planes, _ = _draw_panels(
         scene, 0.55, None, 2, series, "distorsión (%)", limit=DRIFT_LIMIT * 100
     )
-    limit_note = t(
-        scene,
-        "Línea roja: límite E.030 para albañilería, 0.5 %",
-        0,
-        -2.9,
-        size=0.21,
-        weight=700,
-        color=FAIL,
-        anchor=Anchor.CENTER,
-    )
+    # El límite se rotula sobre su propia línea, en gris, en lugar de explicarse abajo.
+    tags: list[Drawable] = []
+    for plane, cx in zip(planes, (-3.6, 3.6), strict=True):
+        lx, ly = plane.data_to_local(DRIFT_LIMIT * 100, 4.5)
+        tags.append(
+            t(
+                scene,
+                "límite E.030 · 0.5 %",
+                cx + lx + 0.1,
+                PANEL_Y + ly,
+                size=0.16,
+                color=MUTED,
+                anchor=Anchor.TOP_LEFT,
+            )
+        )
+    limit_note = scene.geometry.group(tags)
     scene.play(limit_note.animate.fade_in().duration(0.3))
     scene.stop("derivas-limite")
 
@@ -592,7 +598,7 @@ def shear(scene: Scene) -> None:
 
 def resistance(scene: Scene) -> None:
     header(
-        scene, KICKER, "Resistencia global: el piso 1 X-X de MSTA no alcanza la demanda"
+        scene, KICKER, "Resistencia global: MSTA no cumple en el piso 1 X-X"
     )
     legend = _legend(scene, 2.45)
     scene.play([x.animate.fade_in().duration(0.3) for x in legend])
@@ -623,43 +629,43 @@ def resistance(scene: Scene) -> None:
     scene.stop("resistencia-grafico")
     demand, cap_msta = SHEAR_DEMAND["X"]["MSTA"][0], SHEAR_CAPACITY["X"]["MSTA"][0]
     cap_mct = SHEAR_CAPACITY["X"]["MCT"][0]
-    box = panel(
+    # El diagnóstico como cifra protagonista: D/C en grande y su lectura al lado.
+    box = t(
         scene,
+        f"{demand / cap_msta:.3f}",
         LEFT_EDGE,
-        -3.0,
-        14.6,
-        0.9,
-        fill=FAIL_SOFT,
-        border=None,
-        anchor=Anchor.LEFT,
+        -2.62,
+        font=DISPLAY,
+        size=0.62,
+        weight=700,
+        color=FAIL,
     )
+    box_w, _ = scene.text.measure(f"{demand / cap_msta:.3f}", size=0.62, font=DISPLAY)
     line1 = t(
         scene,
-        f"MSTA · piso 1 · X-X:  $sum V_m$ = {cap_msta:.1f} < $V_E$ = {demand:.1f} tonf  →  "
-        f"D/C = {demand / cap_msta:.3f}",
-        LEFT_EDGE + 0.3,
-        -2.8,
+        f"D/C en MSTA · piso 1 · X-X:  $sum V_m$ = {cap_msta:.1f} < $V_E$ = {demand:.1f} tonf",
+        LEFT_EDGE + box_w + 0.4,
+        -2.75,
         size=0.22,
         weight=900,
-        color=FAIL,
-        anchor=Anchor.LEFT,
+        color=INK,
     )
     line2 = t(
         scene,
         f"MCT obtiene $sum V_m$ = {cap_mct:.1f} tonf ({abs(relative(cap_mct, cap_msta)):.1f} % más): "
         "$P_g$ del metrado automático y redistribución de la losa",
-        LEFT_EDGE + 0.3,
-        -3.2,
+        LEFT_EDGE + box_w + 0.4,
+        -3.12,
         size=0.19,
-        color=INK,
-        anchor=Anchor.LEFT,
+        color=INK_SOFT,
     )
     scene.play(
-        [
-            box.animate.fade_in().duration(0.3),
+        stagger(
+            box.animate.fade_in_from(Direction.UP, 0.08).duration(0.45),
             line1.animate.fade_in().duration(0.4),
             line2.animate.fade_in().duration(0.4),
-        ]
+            each=0.12,
+        )
     )
     source(
         scene,
@@ -761,7 +767,8 @@ def cracking(scene: Scene) -> None:
                         anchor=anchor,
                     )
                 )
-        scene.play(stagger(*recolor, each=0.03))
+        # El diagnóstico barre la planta de izquierda a derecha, como una inspección.
+        scene.play(stagger(*recolor, total=0.9, origin=plan.to_scene(0, DEPTH / 2)))
         scene.play(
             [
                 *[g.animate.fade_in().duration(0.3) for g in tags],

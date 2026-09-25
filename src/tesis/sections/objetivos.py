@@ -11,7 +11,7 @@ from gaanim import (
     stagger,
 )
 
-from tesis.kit import LEFT_EDGE, header, label, panel, pill, source, t, takeaway
+from tesis.kit import LEFT_EDGE, header, label, panel, source, t, takeaway
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -22,7 +22,6 @@ from tesis.theme import (
     INK_SOFT,
     MONO,
     MUTED,
-    PAPER_DEEP,
     RULE,
     STEEL,
     STEEL_SOFT,
@@ -213,14 +212,15 @@ def specific(scene: Scene) -> None:
         )
         verb_t = t(scene, verb, x0 + 0.3, 0.95, size=0.36, weight=900, color=INK)
         body_t = t(scene, body, x0 + 0.3, 0.4, size=0.235, color=INK_SOFT)
-        tag = pill(
+        # El producto de cada objetivo como rótulo técnico, sin etiqueta de color.
+        tag = t(
             scene,
             product,
             x0 + 0.3,
             -1.45,
+            font=MONO,
+            size=0.16,
             color=BRICK_DEEP,
-            background=BRICK_SOFT,
-            size=0.15,
             anchor=Anchor.LEFT,
         )
         items.append([card, number, verb_t, body_t, tag])
@@ -279,13 +279,13 @@ def method(scene: Scene) -> None:
     tiles: list[Drawable] = []
     for i, (name, value) in enumerate(facts):
         x0 = LEFT_EDGE + i * 3.72
-        tiles.append(scene.geometry.line(x0, 2.4, x0, 1.45).stroke(BRICK, 0.035))
-        tiles.append(label(scene, name, x0 + 0.22, 2.38, color=MUTED, size=0.14))
+        tiles.append(scene.geometry.line(x0, 2.58, x0 + 3.4, 2.58).stroke(RULE, 0.014))
+        tiles.append(label(scene, name, x0, 2.38, color=MUTED, size=0.14))
         tiles.append(
             t(
                 scene,
                 value,
-                x0 + 0.22,
+                x0,
                 2.08,
                 font=DISPLAY,
                 size=0.36,
@@ -298,7 +298,7 @@ def method(scene: Scene) -> None:
         scene,
         "Un edificio de albañilería confinada de 4 pisos (San Bartolomé, 2006) "
         "para probar el método manual y el marco automatizado.",
-        LEFT_EDGE + 0.22,
+        LEFT_EDGE,
         1.25,
         size=0.2,
         color=INK_SOFT,
@@ -354,23 +354,20 @@ def method(scene: Scene) -> None:
 
     tools = ["ETABS v22", "Python", "Typst", "Excel", "Norma E.030", "Norma E.070"]
     tool_label = label(scene, "Instrumentos", LEFT_EDGE, -2.05, color=MUTED, size=0.14)
+    # Instrumentos en una línea, separados por puntos medios.
     chips: list[Drawable] = []
     x = LEFT_EDGE + 1.75
-    for name in tools:
-        w_, _ = scene.text.measure(name, size=0.18, font=MONO)
+    for i, name in enumerate(tools):
+        w_, _ = scene.text.measure(name, size=0.19, font=MONO)
         chips.append(
-            pill(
-                scene,
-                name,
-                x,
-                -2.1,
-                size=0.18,
-                color=INK,
-                background=PAPER_DEEP,
-                anchor=Anchor.LEFT,
-            )
+            t(scene, name, x, -2.1, font=MONO, size=0.19, color=INK, anchor=Anchor.LEFT)
         )
-        x += w_ + 0.55
+        x += w_
+        if i < len(tools) - 1:
+            chips.append(
+                t(scene, "·", x + 0.2, -2.1, size=0.19, color=MUTED, anchor=Anchor.CENTER)
+            )
+            x += 0.4
     scene.play(
         [
             tool_label.animate.fade_in().duration(0.3),

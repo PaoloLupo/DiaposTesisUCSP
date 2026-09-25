@@ -28,7 +28,7 @@ def process(
     color: Color | str = INK,
 ) -> Drawable:
     box = (
-        scene.geometry.rounded_rect(w, h, 0.08)
+        scene.geometry.rect(w, h)
         .fill(fill)
         .stroke(border, 0.014)
         .move_to(cx, cy)

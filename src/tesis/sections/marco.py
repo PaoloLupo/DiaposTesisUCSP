@@ -4,6 +4,8 @@ from gaanim import (
     Anchor,
     Direction,
     Drawable,
+    Easing,
+    EasingCurve,
     Scene,
     Section,
     SectionStep,
@@ -15,7 +17,18 @@ from gaanim import (
 from tesis.building import density, wall_area_sum
 from tesis.data.thesis import DENSITY_MIN, SHEAR_CAPACITY, SHEAR_DEMAND
 from tesis.diagram import decision, io, link, process, terminal
-from tesis.kit import LEFT_EDGE, header, label, panel, pill, source, status, t, takeaway
+from tesis.kit import (
+    LEFT_EDGE,
+    header,
+    heading,
+    label,
+    panel,
+    pill,
+    source,
+    status,
+    t,
+    takeaway,
+)
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -40,49 +53,27 @@ def scope(scene: Scene) -> None:
     header(
         scene,
         KICKER,
-        "Se automatiza lo repetitivo; las decisiones siguen en el ingeniero",
+        "Se automatiza lo repetitivo; decide el ingeniero",
     )
     crit_label = label(
         scene, "Un proceso es clave si…", LEFT_EDGE, 2.42, color=MUTED, size=0.14
     )
-    criteria = [
-        "se repite en cada iteración",
-        "maneja muchos datos iguales",
-        "expone a errores de transcripción",
-        "aplica un criterio normativo explícito",
-        "alimenta la revisión del ingeniero",
-    ]
-    chips: list[Drawable] = []
-    x = LEFT_EDGE
-    y = 1.95
-    for c in criteria:
-        w_, _ = scene.text.measure(c, size=0.2, font="Lato")
-        if x + w_ + 0.4 > 7.3:
-            x, y = LEFT_EDGE, y - 0.5
-        chips.append(
-            pill(
-                scene,
-                c,
-                x,
-                y,
-                size=0.2,
-                font="Lato",
-                color=INK,
-                background=PAPER_DEEP,
-                anchor=Anchor.LEFT,
-            )
-        )
-        x += w_ + 0.5
+    # Los criterios se leen como una frase que completa el rótulo, en dos líneas
+    # equilibradas y en gris, para no competir con la tabla de abajo.
+    criteria = t(
+        scene,
+        "se repite en cada iteración, maneja muchos datos iguales, expone a errores de "
+        "transcripción,\naplica un criterio normativo explícito y alimenta la revisión "
+        "del ingeniero.",
+        LEFT_EDGE,
+        2.12,
+        size=0.23,
+        color=INK_SOFT,
+    )
     scene.play(
         [
             crit_label.animate.fade_in().duration(0.3),
-            stagger(
-                *[
-                    c.animate.fade_in_from(Direction.UP, 0.06).duration(0.3)
-                    for c in chips
-                ],
-                each=0.08,
-            ),
+            criteria.animate.fade_in_from(Direction.UP, 0.06).duration(0.5),
         ]
     )
     scene.stop("criterios-procesos-clave")
@@ -92,7 +83,6 @@ def scope(scene: Scene) -> None:
             LEFT_EDGE,
             "Ingeniero estructural",
             STEEL,
-            STEEL_SOFT,
             [
                 ("Estructura", "define la distribución de muros"),
                 ("Modela y analiza", "construye el modelo en ETABS"),
@@ -104,7 +94,6 @@ def scope(scene: Scene) -> None:
             1.0,
             "Marco de trabajo · Alba",
             BRICK,
-            BRICK_SOFT,
             [
                 ("Extracción", "lee y valida datos del modelo por API"),
                 ("Verificación", "ejecuta los módulos E.070 y E.030"),
@@ -113,55 +102,37 @@ def scope(scene: Scene) -> None:
             ],
         ),
     ]
-    for x0, name, color, soft, items in columns:
+    for x0, name, color, items in columns:
         w = 6.3
-        card = panel(scene, x0, 0.75, w, 3.35, fill=CARD, anchor=Anchor.TOP_LEFT)
-        band = panel(
-            scene,
-            x0,
-            0.75,
-            w,
-            0.55,
-            fill=soft,
-            border=None,
-            anchor=Anchor.TOP_LEFT,
-            radius=0.1,
-        )
-        title = t(
-            scene,
-            name,
-            x0 + 0.25,
-            0.475,
-            size=0.24,
-            weight=900,
-            color=color,
-            anchor=Anchor.LEFT,
-        )
+        head_items = heading(scene, name, x0, 0.45, w, color=color)
         rows: list[Drawable] = []
         for i, (head, body) in enumerate(items):
             yy = -0.05 - i * 0.66
-            rows.append(
-                scene.geometry.circle(0.06)
-                .fill(color)
-                .no_stroke()
-                .move_to(x0 + 0.35, yy - 0.12)
-            )
-            rows.append(t(scene, head, x0 + 0.6, yy, size=0.22, weight=900, color=INK))
-            rows.append(t(scene, body, x0 + 2.75, yy, size=0.21, color=INK_SOFT))
+            rows.append(t(scene, head, x0, yy, size=0.22, weight=900, color=INK))
+            rows.append(t(scene, body, x0 + 2.4, yy, size=0.21, color=INK_SOFT))
         scene.play(
             stagger(
-                card.animate.fade_in().duration(0.3),
-                band.animate.fade_in().duration(0.3),
-                title.animate.fade_in().duration(0.3),
+                *[h.animate.fade_in().duration(0.3) for h in head_items],
                 stagger(*[r.animate.fade_in().duration(0.25) for r in rows], each=0.04),
                 each=0.1,
             )
         )
-    to_alba = link(scene, (-0.85, 0.05), (0.85, 0.05), color=MUTED)
-    to_eng = link(scene, (0.85, -1.5), (-0.85, -1.5), color=MUTED)
-    lab1 = t(scene, "modelo", 0, 0.12, size=0.15, color=MUTED, anchor=Anchor.BOTTOM)
+    # Cada flecha a la altura de las filas que conecta: Estructura → Extracción y
+    # Retroalimentación → Interpreta.
+    row_mid = [-0.05 - i * 0.66 - 0.14 for i in range(4)]
+    to_alba = link(scene, (-0.85, row_mid[0]), (0.85, row_mid[0]), color=MUTED)
+    to_eng = link(scene, (0.85, row_mid[2]), (-0.85, row_mid[2]), color=MUTED)
+    lab1 = t(
+        scene, "modelo", 0, row_mid[0] + 0.08, size=0.15, color=MUTED, anchor=Anchor.BOTTOM
+    )
     lab2 = t(
-        scene, "diagnóstico", 0, -1.43, size=0.15, color=MUTED, anchor=Anchor.BOTTOM
+        scene,
+        "diagnóstico",
+        0,
+        row_mid[2] + 0.08,
+        size=0.15,
+        color=MUTED,
+        anchor=Anchor.BOTTOM,
     )
     scene.play(
         [
@@ -196,11 +167,18 @@ def general_flow(scene: Scene) -> None:
         3.95,
         fill=PAPER_DEEP,
         border=None,
-        radius=0.2,
         anchor=Anchor.TOP_LEFT,
     )
     loop_tag = label(
         scene, "Se repite en cada iteración", -2.7, 2.08, color=MUTED, size=0.13
+    )
+    # Pulso terracota que da una vuelta al lazo por los centros de las cajas. Se
+    # crea antes que ellas para quedar detrás: solo se ve sobre las flechas.
+    lap = (
+        scene.geometry.polygon([(-1.35, y1), (4.95, y1), (4.95, y2), (-1.35, y2)])
+        .no_fill()
+        .stroke(BRICK, 0.11)
+        .trim(0.0, 0.0)
     )
     t0 = terminal(scene, -6.75, y1, "Inicio", w=0.95)
     p1 = io(
@@ -314,13 +292,13 @@ def general_flow(scene: Scene) -> None:
     scene.play(
         stagger(
             t0.animate.fade_in().duration(0.3),
-            links[0].animate.create().duration(0.2),
+            links[0].animate.grow_arrow().duration(0.2),
             p1.animate.fade_in().duration(0.3),
-            links[1].animate.create().duration(0.2),
+            links[1].animate.grow_arrow().duration(0.2),
             r2.animate.fade_in().duration(0.3),
-            links[2].animate.create().duration(0.2),
+            links[2].animate.grow_arrow().duration(0.2),
             r3.animate.fade_in().duration(0.3),
-            links[3].animate.create().duration(0.2),
+            links[3].animate.grow_arrow().duration(0.2),
             r4.animate.fade_in().duration(0.3),
             each=0.18,
         )
@@ -336,22 +314,22 @@ def general_flow(scene: Scene) -> None:
     scene.stop("flujo-importacion")
     scene.play(
         stagger(
-            links[4].animate.create().duration(0.25),
+            links[4].animate.grow_arrow().duration(0.25),
             p5.animate.fade_in().duration(0.3),
-            links[5].animate.create().duration(0.2),
+            links[5].animate.grow_arrow().duration(0.2),
             d6.animate.fade_in().duration(0.3),
             stagger(
-                yes.animate.create().duration(0.25),
+                yes.animate.grow_arrow().duration(0.25),
                 yes_t.animate.fade_in().duration(0.2),
                 r9.animate.fade_in().duration(0.3),
-                back.animate.create().duration(0.3),
+                back.animate.grow_arrow().duration(0.3),
                 each=0.12,
             ),
             stagger(
-                no.animate.create().duration(0.25),
+                no.animate.grow_arrow().duration(0.25),
                 no_t.animate.fade_in().duration(0.2),
                 p7.animate.fade_in().duration(0.3),
-                end.animate.create().duration(0.2),
+                end.animate.grow_arrow().duration(0.2),
                 t8.animate.fade_in().duration(0.3),
                 each=0.12,
             ),
@@ -364,18 +342,19 @@ def general_flow(scene: Scene) -> None:
             loop_tag.animate.fade_in().duration(0.5),
         ]
     )
-    token = scene.geometry.circle(0.1).fill(BRICK).no_stroke().move_to(-1.35, y1 + 0.62)
-    scene.play(token.animate.fade_in().duration(0.2))
-    path = [
-        (1.8, y1 + 0.62),
-        (4.95, y1 + 0.62),
-        (5.55, y2 + 0.62),
-        (1.8, y2 + 0.8),
-        (-0.3, y2 - 0.25),
-        (-1.35, y1 + 0.62),
-    ]
-    scene.play(sequence(*[token.animate.move_to(x, y).duration(0.45) for x, y in path]))
-    scene.play(token.animate.fade_out().duration(0.2))
+    # El pulso recorre el lazo y se recoge donde empezó.
+    tail = 0.1
+    scene.play(
+        sequence(
+            lap.animate.trim(end=tail)
+            .duration(0.45)
+            .easing(Easing.ease_in(EasingCurve.CUBIC)),
+            lap.animate.trim(offset=1 - tail).duration(1.9).easing(Easing.LINEAR),
+            lap.animate.trim(start=tail)
+            .duration(0.45)
+            .easing(Easing.ease_out(EasingCurve.CUBIC)),
+        )
+    )
     source(
         scene,
         "Tesis · Figura 42, p. 103; §6.1.3 Evaluación de cumplimiento y retroalimentación al usuario, p. 100",
@@ -572,7 +551,6 @@ def traceability(scene: Scene) -> None:
         (
             "Desde ETABS · API",
             BRICK,
-            BRICK_SOFT,
             [
                 "Geometría de muros y niveles",
                 "Materiales y secciones",
@@ -583,56 +561,21 @@ def traceability(scene: Scene) -> None:
         (
             "Declarado por el usuario",
             STEEL,
-            STEEL_SOFT,
             [
                 "Datos del proyecto",
                 "Z, U, S y factores de irregularidad",
-                "f'm, f'c · N y A_p",
+                "f'm, f'c · N y $A_p$",
                 "Nombres de combinaciones a usar",
             ],
         ),
     ]
     items: list[Drawable] = []
-    for i, (name, color, soft, rows) in enumerate(inputs):
+    for i, (name, color, rows) in enumerate(inputs):
         y0 = 2.4 - i * 2.35
-        items.append(
-            panel(scene, LEFT_EDGE, y0, 4.85, 2.15, fill=CARD, anchor=Anchor.TOP_LEFT)
-        )
-        items.append(
-            panel(
-                scene,
-                LEFT_EDGE,
-                y0,
-                4.85,
-                0.48,
-                fill=soft,
-                border=None,
-                anchor=Anchor.TOP_LEFT,
-                radius=0.1,
-            )
-        )
-        items.append(
-            t(
-                scene,
-                name,
-                LEFT_EDGE + 0.22,
-                y0 - 0.24,
-                size=0.2,
-                weight=900,
-                color=color,
-                anchor=Anchor.LEFT,
-            )
-        )
+        items.extend(heading(scene, name, LEFT_EDGE, y0 - 0.42, 4.85, color=color, size=0.21))
         for j, row in enumerate(rows):
             items.append(
-                t(
-                    scene,
-                    "· " + row,
-                    LEFT_EDGE + 0.22,
-                    y0 - 0.66 - j * 0.35,
-                    size=0.19,
-                    color=INK,
-                )
+                t(scene, row, LEFT_EDGE, y0 - 0.62 - j * 0.36, size=0.2, color=INK)
             )
     core = scene.geometry.circle(0.85).fill(BRICK).no_stroke().move_to(-0.95, 0.05)
     core_t = t(
@@ -659,30 +602,11 @@ def traceability(scene: Scene) -> None:
         "Derivas: tabla y gráfico por dirección",
         "Fecha, combinaciones y diagnósticos",
     ]
-    out_card = panel(scene, 1.05, 2.4, 6.25, 4.5, fill=CARD, anchor=Anchor.TOP_LEFT)
-    out_band = panel(
-        scene,
-        1.05,
-        2.4,
-        6.25,
-        0.48,
-        fill=PAPER_DEEP,
-        border=None,
-        anchor=Anchor.TOP_LEFT,
-        radius=0.1,
-    )
-    out_title = t(
-        scene,
-        "Salidas · interfaz y reporte PDF",
-        1.27,
-        2.16,
-        size=0.2,
-        weight=900,
-        color=INK,
-        anchor=Anchor.LEFT,
+    out_head = heading(
+        scene, "Salidas · interfaz y reporte PDF", 1.05, 1.98, 6.25, size=0.21
     )
     out_rows = [
-        t(scene, f"{i + 1:02d}  {row}", 1.27, 1.7 - i * 0.55, size=0.21, color=INK)
+        t(scene, f"{i + 1:02d}  {row}", 1.05, 1.7 - i * 0.55, size=0.21, color=INK)
         for i, row in enumerate(outputs)
     ]
     scene.play(stagger(*[x.animate.fade_in().duration(0.25) for x in items], each=0.03))
@@ -698,9 +622,7 @@ def traceability(scene: Scene) -> None:
     )
     scene.play(
         stagger(
-            out_card.animate.fade_in().duration(0.3),
-            out_band.animate.fade_in().duration(0.3),
-            out_title.animate.fade_in().duration(0.3),
+            *[h.animate.fade_in().duration(0.3) for h in out_head],
             stagger(
                 *[
                     r.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.25)
@@ -751,8 +673,9 @@ def traceability(scene: Scene) -> None:
             stagger(
                 *[
                     c.animate.fade_in_from(Direction.UP, 0.08).duration(0.3)
-                    for c in [*chips, chip]
+                    for c in chips
                 ],
+                chip.animate.fade_in().duration(0.3),
                 each=0.1,
             ),
         ]

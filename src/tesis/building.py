@@ -1,8 +1,9 @@
 """Dibujo de la planta del caso de estudio; los datos viven en ``tesis.data.planta``."""
 
 from dataclasses import dataclass
+from typing import Literal
 
-from gaanim import Anchor, Color, Drawable, Scene, Text
+from gaanim import Anchor, Color, Composition, Drawable, Scene, Text, stagger
 
 from tesis.data.planta import (
     AXIS_X,
@@ -33,6 +34,7 @@ __all__ = [
     "Wall",
     "density",
     "draw_plan",
+    "grow_walls",
     "wall_area_sum",
 ]
 
@@ -64,6 +66,24 @@ class Plan:
     @property
     def all_walls(self) -> list[Drawable]:
         return list(self.walls.values())
+
+
+def grow_walls(
+    walls: list[Drawable],
+    *,
+    total: float = 0.9,
+    duration: float = 0.4,
+    origin: Literal["center", "edges", "random"] | tuple[float, float] = "center",
+) -> Composition:
+    """Los muros crecen en orden de distancia a ``origin``, no en el orden de la lista.
+
+    Con el origen al centro, la planta se levanta desde el núcleo hacia la fachada.
+    """
+    return stagger(
+        *[w.animate.grow_from_center().duration(duration) for w in walls],
+        total=total,
+        origin=origin,
+    )
 
 
 def _wall_segments() -> list[tuple[str, Wall, float, float, float, float]]:

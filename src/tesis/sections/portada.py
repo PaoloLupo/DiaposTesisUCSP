@@ -2,7 +2,7 @@
 
 from gaanim import Anchor, Direction, Scene, stagger
 
-from tesis.building import DEPTH, WIDTH, draw_plan
+from tesis.building import DEPTH, WIDTH, draw_plan, grow_walls
 from tesis.kit import LEFT_EDGE, dimension, label, t
 from tesis.theme import BRICK, DISPLAY, INK, INK_SOFT, MONO, MUTED
 
@@ -38,50 +38,56 @@ def build(scene: Scene) -> None:
         color=MUTED,
     )
 
+    # Retícula: universidad arriba; título y planta en la banda central, con la
+    # fila de ejes de la planta a la altura del kicker; créditos abajo a la izquierda.
     kicker = label(
         scene,
         "Tesis para optar el título profesional de Ingeniero Civil",
         LEFT_EDGE,
-        2.45,
+        2.55,
         color=BRICK,
         size=0.15,
     )
     title = t(
         scene,
-        "Marco de trabajo para la\nautomatización del diseño de la\n"
-        "distribución de muros en planta\npara edificios de albañilería\nconfinada",
+        # Seis líneas por unidades de sentido: el título llena el alto de la
+        # columna, desde el rótulo hasta los créditos, sin invadir la planta.
+        "Marco de trabajo para\nla automatización\ndel diseño de la\n"
+        "distribución de muros\nen planta para edificios\nde albañilería confinada",
         LEFT_EDGE,
-        2.1,
+        2.2,
         font=DISPLAY,
-        size=0.5,
+        size=0.63,
         weight=700,
         color=INK,
     )
-    rule = scene.geometry.line(LEFT_EDGE, -1.02, LEFT_EDGE + 1.1, -1.02).stroke(
-        BRICK, 0.04
-    )
-    authors = t(
-        scene,
-        "Paolo Cesar Guillen Lupo\nPamela Lucyla Banda Alarta",
-        LEFT_EDGE,
-        -1.3,
-        size=0.29,
-        weight=700,
-        color=INK,
-    )
-    advisor = t(
-        scene,
-        "Asesor: Mgtr. David Miguel Chalco Pari",
-        LEFT_EDGE,
-        -2.2,
-        size=0.22,
-        color=INK_SOFT,
-    )
-    place = t(scene, "Arequipa, 2026", LEFT_EDGE, -2.62, size=0.2, color=MUTED)
 
-    plan = draw_plan(scene, (3.95, 0.35), 6.1, drawn_thickness=0.075)
+    plan = draw_plan(scene, (4.0, 0.5), 5.95, drawn_thickness=0.075)
     ox, oy = plan.origin
     s = plan.scale
+
+    # Créditos apilados bajo el título y anclados al margen inferior: autores,
+    # asesor y, sin rótulo, ciudad y año.
+    credits = [
+        t(
+            scene,
+            "Paolo Cesar Guillen Lupo  ·  Pamela Lucyla Banda Alarta",
+            LEFT_EDGE,
+            -2.35,
+            size=0.29,
+            weight=700,
+            color=INK,
+        ),
+        t(
+            scene,
+            "Asesor: Mgtr. David Miguel Chalco Pari",
+            LEFT_EDGE,
+            -2.9,
+            size=0.23,
+            color=INK_SOFT,
+        ),
+        t(scene, "Arequipa, 2026", LEFT_EDGE, -3.3, size=0.21, color=MUTED),
+    ]
     dims = [
         dimension(
             scene, (ox, oy), (ox + WIDTH * s, oy), "16.60 m", side="below", offset=0.4
@@ -92,22 +98,20 @@ def build(scene: Scene) -> None:
             (ox + WIDTH * s, oy + DEPTH * s),
             "8.00 m",
             side="right",
-            offset=0.4,
+            offset=0.28,
         ),
     ]
     caption = t(
         scene,
         "Caso de estudio · San Bartolomé (2006) · planta típica, 4 pisos",
-        3.95,
-        -2.3,
+        ox + WIDTH * s / 2,
+        -1.95,
         font=MONO,
         size=0.14,
         color=MUTED,
         anchor=Anchor.TOP,
     )
 
-    walls_x = [plan.walls[n] for n in plan.walls if n.startswith("X")]
-    walls_y = [plan.walls[n] for n in plan.walls if n.startswith("Y")]
     scene.play(
         stagger(
             stagger(
@@ -117,14 +121,8 @@ def build(scene: Scene) -> None:
                 each=0.08,
             ),
             kicker.animate.fade_in_from(Direction.RIGHT, 0.12).duration(0.5),
-            title.animate.fade_in_from(Direction.UP, 0.12).duration(0.9),
-            rule.animate.create().duration(0.5),
-            stagger(
-                authors.animate.fade_in().duration(0.5),
-                advisor.animate.fade_in().duration(0.5),
-                place.animate.fade_in().duration(0.5),
-                each=0.1,
-            ),
+            title.animate.reveal(style="slide_up", by="line", stagger=0.08).duration(1.1),
+            stagger(*[c.animate.fade_in().duration(0.5) for c in credits], each=0.06),
             each=0.18,
         )
     )
@@ -136,14 +134,7 @@ def build(scene: Scene) -> None:
             ),
             plan.slab.animate.fade_in().duration(0.6),
             plan.void.animate.fade_in().duration(0.4),
-            stagger(
-                *[w.animate.grow_from_center().duration(0.45) for w in walls_x],
-                each=0.05,
-            ),
-            stagger(
-                *[w.animate.grow_from_center().duration(0.45) for w in walls_y],
-                each=0.05,
-            ),
+            grow_walls(plan.all_walls, total=1.1, duration=0.45),
             stagger(*[d.animate.create().duration(0.5) for d in dims], each=0.1),
             caption.animate.fade_in().duration(0.4),
             each=0.25,

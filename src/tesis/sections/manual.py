@@ -15,7 +15,7 @@ from gaanim import (
 )
 
 from tesis.app import thesis_image
-from tesis.building import DEPTH, WIDTH, draw_plan
+from tesis.building import DEPTH, WIDTH, draw_plan, grow_walls
 from tesis.data.thesis import (
     AUTOMATIC_DRIFT,
     CASE,
@@ -67,10 +67,7 @@ def case_study(scene: Scene) -> None:
             ),
             plan.slab.animate.fade_in().duration(0.4),
             plan.void.animate.fade_in().duration(0.3),
-            stagger(
-                *[w.animate.grow_from_center().duration(0.35) for w in plan.all_walls],
-                each=0.025,
-            ),
+            grow_walls(plan.all_walls, total=0.8, duration=0.35),
             stagger(
                 *[lab.animate.fade_in().duration(0.25) for lab in plan.labels.values()],
                 each=0.015,
@@ -447,7 +444,7 @@ def manual_cycle(scene: Scene) -> None:
     for text, angle in stages:
         a = math.radians(angle)
         x, y = cx + r * math.cos(a), cy + r * math.sin(a)
-        box = panel(scene, x, y, 2.25, 0.82, fill=CARD, border=RULE, radius=0.14)
+        box = panel(scene, x, y, 2.25, 0.82, fill=CARD, border=RULE)
         caption = t(
             scene, text, x, y, size=0.19, weight=700, color=INK, anchor=Anchor.CENTER
         )

@@ -27,6 +27,7 @@ from tesis.building import (
     WALLS,
     density,
     draw_plan,
+    grow_walls,
     wall_area_sum,
 )
 from tesis.data.thesis import (
@@ -40,7 +41,16 @@ from tesis.data.thesis import (
     SHEAR_CAPACITY,
     SHEAR_DEMAND,
 )
-from tesis.kit import LEFT_EDGE, header, label, panel, source, status, t, takeaway
+from tesis.kit import (
+    LEFT_EDGE,
+    header,
+    label,
+    panel,
+    source,
+    status,
+    t,
+    takeaway,
+)
 from tesis.theme import (
     BRICK,
     BRICK_SOFT,
@@ -171,10 +181,7 @@ def density_check(scene: Scene) -> None:
         scene.play(
             parallel(
                 *[i.animate.fade_in().duration(0.3) for i in items],
-                stagger(
-                    *[w.animate.grow_from_center().duration(0.35) for w in walls],
-                    each=0.05,
-                ),
+                grow_walls(walls, total=0.5, duration=0.35),
             )
         )
     scene.play(stair_note.animate.fade_out().duration(0.3))
@@ -225,7 +232,7 @@ def density_check(scene: Scene) -> None:
         counter.move_to(x0 + 1.55, y - 0.28, Anchor.LEFT)
         track_left, track_w = x0 + 2.95, 2.9
         track = (
-            scene.geometry.rounded_rect(track_w, 0.16, 0.02)
+            scene.geometry.rect(track_w, 0.16)
             .fill(FAINT)
             .no_stroke()
             .move_to(track_left + track_w / 2, y - 0.28)
@@ -315,14 +322,16 @@ def density_check(scene: Scene) -> None:
         scene.play(
             [
                 result.animate.fade_in_from(Direction.UP, 0.06).duration(0.5),
-                chip.animate.fade_in().duration(0.4),
+                chip.animate.fade_in().duration(0.3),
             ]
         )
         scene.stop(f"densidad-{direction.lower()}")
 
     scene.play([w.animate.opacity(1).duration(0.4) for w in plan.all_walls])
     takeaway(
-        scene, "Cumple en ambas direcciones; Y queda más cerca del mínimo", y=-3.22
+        scene,
+        "Cumple en ambas direcciones; Y queda más cerca del mínimo",
+        y=-3.22,
     )
     source(
         scene,
