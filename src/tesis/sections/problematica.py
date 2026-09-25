@@ -27,14 +27,21 @@ from tesis.data.materiales_inei import (
 from tesis.data.sudamerica import COUNTRIES, Ring
 from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
 from tesis.data.thesis import CRACKING_FLOOR1
-from tesis.kit import header, label, panel, pill, source, t, takeaway
+from tesis.kit import (
+    header,
+    label,
+    numeral,
+    panel,
+    pill,
+    source,
+    t,
+    takeaway,
+)
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
     BRICK_SOFT,
     CARD,
-    CONCRETE,
-    CONCRETE_SOFT,
     FAIL,
     DISPLAY,
     FAINT,
@@ -48,6 +55,7 @@ from tesis.theme import (
     STEEL,
     STEEL_SOFT,
 )
+from tesis.vivienda import House, Iso, draw_house
 
 KICKER = "01 · Problemática"
 MATERIAL_LABELS = {
@@ -192,93 +200,6 @@ def materials(scene: Scene) -> None:
         "El material de las paredes no acredita confinamiento ni desempeño sísmico.",
     )
     scene.stop("materiales-listo")
-
-
-def _brick_wall(scene: Scene, cx: float, cy: float, width: float, height: float):
-    """Muro confinado en elevación: ladrillos en soga, columnas dentadas y solera."""
-    col_w, beam_h = 0.36, 0.3
-    brick_w, brick_h, joint = 0.40, 0.13, 0.035
-    left = cx - width / 2 + col_w
-    right = cx + width / 2 - col_w
-    bottom = cy - height / 2
-    rows: list[Drawable] = []
-    n_rows = int((height - beam_h) / (brick_h + joint))
-    tooth = 0.07
-    for r in range(n_rows):
-        y = bottom + joint / 2 + brick_h / 2 + r * (brick_h + joint)
-        # El dentado: cada dos hiladas el ladrillo extremo entra en la columna.
-        toothed = (r // 2) % 2 == 0
-        x0 = left - (tooth if toothed else 0)
-        x1 = right + (tooth if toothed else 0)
-        x = x0 - (brick_w / 2 if r % 2 else 0)
-        bricks: list[Drawable] = []
-        while x < x1 - 0.02:
-            a, b = max(x, x0), min(x + brick_w, x1)
-            if b - a > 0.05:
-                bricks.append(
-                    scene.geometry.rect(b - a - joint, brick_h)
-                    .fill(BRICK)
-                    .no_stroke()
-                    .move_to((a + b) / 2, y)
-                )
-            x += brick_w
-        rows.append(scene.geometry.group(bricks))
-    top_bricks = bottom + n_rows * (brick_h + joint)
-
-    def column(x_in: float, x_out: float) -> Drawable:
-        pts = [(x_out, bottom), (x_out, top_bricks)]
-        sign = 1 if x_in > x_out else -1
-        for r in reversed(range(n_rows)):
-            y1 = bottom + (r + 1) * (brick_h + joint)
-            y0 = bottom + r * (brick_h + joint)
-            toothed = (r // 2) % 2 == 0
-            xi = x_in - sign * tooth if toothed else x_in
-            pts += [(xi, y1), (xi, y0)]
-        return pts
-
-    # Las siluetas de concreto sirven de máscara para el vaciado y quedan ocultas;
-    # el contorno visible es una copia aparte (el encofrado).
-    column_pts = [column(left, left - col_w), column(right, right + col_w)]
-    columns = [
-        scene.geometry.polygon(pts).fill(CONCRETE_SOFT).no_stroke().opacity(0)
-        for pts in column_pts
-    ]
-    forms = [
-        scene.geometry.polygon(pts).no_fill().stroke(CONCRETE, 0.014).z_index(4)
-        for pts in column_pts
-    ]
-    beam_y = top_bricks + beam_h / 2
-    beam = (
-        scene.geometry.rect(width, beam_h)
-        .fill(CONCRETE_SOFT)
-        .no_stroke()
-        .opacity(0)
-        .move_to(cx, beam_y)
-    )
-    forms.append(
-        scene.geometry.rect(width, beam_h)
-        .no_fill()
-        .stroke(CONCRETE, 0.014)
-        .z_index(4)
-        .move_to(cx, beam_y)
-    )
-    ground = scene.geometry.line(
-        cx - width / 2 - 0.4, bottom, cx + width / 2 + 0.4, bottom
-    ).stroke(INK_SOFT, 0.02)
-    hatch = [
-        scene.geometry.line(x, bottom, x - 0.14, bottom - 0.14).stroke(MUTED, 0.01)
-        for x in [
-            cx - width / 2 - 0.3 + 0.22 * i for i in range(int((width + 0.8) / 0.22))
-        ]
-    ]
-    return (
-        rows,
-        columns,
-        beam,
-        forms,
-        scene.geometry.group([ground, *hatch]),
-        top_bricks,
-    )
 
 
 # Mapa de placas en Mercator, a todo el ancho útil. El alto del marco va de 1° N a
@@ -763,118 +684,276 @@ def _quake_shake(scene: Scene, mw: float, duration: float, *, seed: int):
     )
 
 
-def seismic(scene: Scene) -> None:
-    header(scene, KICKER, "Frente al sismo, el muro confinado trabaja como unidad")
+# Proceso constructivo en el orden de obra, y lo que hace el conjunto en un sismo.
+STEPS = (
+    ("Cimiento y sobrecimiento", "Concreto ciclópeo bajo todos los muros"),
+    ("Acero de columnas", "Se ancla al cimiento antes de asentar el muro"),
+    ("Muro de ladrillo", "Extremos dentados y dinteles sobre los vanos"),
+    ("Vaciado de columnas", "El concreto llena el dentado y amarra el muro"),
+    ("Viga solera y losa", "Cierran el confinamiento y unen todos los muros"),
+)
+IN_QUAKE = (
+    ("El sismo no tiene una dirección fija", "se idealiza con sus componentes en X y en Y"),
+    ("La losa reparte la fuerza", "entre todos los muros, como un diafragma rígido"),
+    ("La vivienda se deforma como unidad", "columnas y vigas soleras amarran cada paño"),
+    ("Cada muro resiste en su plano", "por eso hacen falta muros en X y en Y"),
+)
+LIST_X, LIST_TOP, LIST_GAP = 0.9, 2.1, 0.92
+DRIFT = 0.3  # m en la losa; exagerado para que se vea
+# Diagrama del sismo sobre el terreno, frente a la fachada (m, en planta).
+QUAKE_TAIL, QUAKE_REACH, QUAKE_ANGLE = (1.6, -2.27), 3.0, math.radians(35)
 
-    cx, cy, w, h = -0.8, -0.2, 3.7, 3.2
-    rows, columns, beam, forms, ground, top_bricks = _brick_wall(scene, cx, cy, w, h)
-    col_forms, beam_form = forms[:2], forms[2]
 
-    # Fases constructivas en el orden de obra: asentado del muro, vaciado de
-    # columnas y, al final, la viga solera.
-    phases = [
-        t(
-            scene,
-            text,
-            cx,
-            cy + h / 2 + 0.55,
-            font=MONO,
-            size=0.16,
-            color=MUTED,
-            anchor=Anchor.BOTTOM,
-        )
-        for text in (
-            "Fase 1 · asentado del muro",
-            "Fase 2 · encofrado y vaciado de columnas",
-            "Fase 3 · encofrado y vaciado de la viga solera",
-        )
-    ]
-    scene.play(
-        [
-            ground.animate.create().duration(0.5),
-            phases[0].animate.fade_in().duration(0.3),
-        ]
-    )
-    scene.play(
-        stagger(
-            *[
-                r.animate.fade_in_from(Direction.DOWN, 0.05).duration(0.25)
-                for r in rows
-            ],
-            each=0.12,
-        )
-    )
-    wall_note = _callout(
-        scene,
-        "Muro de ladrillo",
-        "se asienta primero,\ncon los extremos dentados",
-        (cx + 0.7, cy - 0.5),
-        (cx + w / 2 + 0.85, -0.75),
-    )
-    scene.play(wall_note)
+def _entry(
+    scene: Scene, title: str, body: str, y: float, number: str | None = None
+) -> Drawable:
+    x = LIST_X + (0.55 if number else 0)
+    parts: list[Drawable] = []
+    if number:
+        parts.append(numeral(scene, number, LIST_X, y + 0.04, size=0.36))
+    parts.append(t(scene, title, x, y, size=0.24, weight=700, color=INK))
+    parts.append(t(scene, body, x, y - 0.34, size=0.19, color=INK_SOFT))
+    return scene.geometry.group(parts)
 
-    fills = [
-        scene.geometry.fill_level(
-            c, CONCRETE_SOFT, 0, direction="up", keep_outline=False
-        )
-        for c in columns
-    ]
-    scene.play(
-        [
-            phases[0].animate.fade_out().duration(0.25),
-            phases[1].animate.fade_in().duration(0.3),
-            *[f.animate.create().duration(0.5) for f in col_forms],
-        ]
-    )
-    scene.play([f.animate.fill_level(1).duration(1.2) for f in fills])
 
-    beam_fill = scene.geometry.fill_level(
-        beam, CONCRETE_SOFT, 0, direction="right", keep_outline=False
-    )
-    scene.play(
-        [
-            phases[1].animate.fade_out().duration(0.25),
-            phases[2].animate.fade_in().duration(0.3),
-            beam_form.animate.create().duration(0.4),
-        ]
-    )
-    scene.play(beam_fill.animate.fill_level(1).duration(0.8))
-    scene.play(phases[2].animate.fade_out().duration(0.3))
-    col_note = _callout(
-        scene,
-        "Columnas y viga solera",
-        "se vacían después y\nconfinan el muro",
-        (cx + w / 2 - 0.18, top_bricks - 0.6),
-        (cx + w / 2 + 0.85, 1.2),
-    )
-    scene.play(col_note)
-    force = (
+def _ground_vector(
+    scene: Scene,
+    iso: Iso,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    color: Color,
+) -> Drawable:
+    """Vector dibujado sobre el terreno, en coordenadas de planta."""
+    (x0, y0), (x1, y1) = iso(*start, 0), iso(*end, 0)
+    return (
         scene.geometry.arrow(
-            cx - w / 2 - 1.2,
-            top_bricks + 0.15,
-            cx - w / 2 - 0.08,
-            top_bricks + 0.15,
-            head_length=0.2,
-            head_width=0.2,
-            body_width=0.05,
+            x0, y0, x1, y1, head_length=0.2, head_width=0.2, body_width=0.05
         )
-        .fill(STEEL)
+        .fill(color)
         .no_stroke()
     )
-    force_label = t(
+
+
+def _nudge(point: tuple[float, float], dx: float, dy: float) -> tuple[float, float]:
+    return point[0] + dx, point[1] + dy
+
+
+def _sway(house: House, dx: float, dy: float):
+    """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura."""
+    swings = []
+    previous = 0.0
+    for amplitude in (1.0, -0.75, 0.5, -0.3, 0.12, 0.0):
+        step = amplitude - previous
+        swings.append(
+            parallel(
+                *[
+                    layer.animate.shift_by(step * dx * share, step * dy * share)
+                    .duration(0.36)
+                    .easing(Easing.ease_in_out(EasingCurve.SINE))
+                    for layer, share in house.layers
+                ]
+            )
+        )
+        previous = amplitude
+    return sequence(*swings)
+
+
+def seismic(scene: Scene) -> None:
+    header(scene, KICKER, "Frente al sismo, la vivienda confinada trabaja como unidad")
+
+    iso = Iso((-6.6, -0.33), 0.63)
+    house = draw_house(scene, iso)
+    heading = label(scene, "Proceso constructivo", LIST_X, 2.62, color=MUTED, size=0.14)
+    steps = [
+        _entry(scene, title, body, LIST_TOP - i * LIST_GAP, str(i + 1))
+        for i, (title, body) in enumerate(STEPS)
+    ]
+
+    def enter(i: int):
+        """Aparece el paso i y el anterior pasa a segundo plano."""
+        anims = [steps[i].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35)]
+        if i:
+            anims.append(steps[i - 1].animate.opacity(0.35).duration(0.35))
+        return anims
+
+    # 1 · Cimiento corrido y sobrecimiento.
+    scene.play(
+        [
+            heading.animate.fade_in().duration(0.3),
+            *enter(0),
+            house.ground.animate.fade_in().duration(0.4),
+            stagger(
+                *[
+                    p.animate.fade_in_from(Direction.DOWN, 0.04).duration(0.3)
+                    for p in house.footing + house.plinth
+                ],
+                each=0.04,
+            ),
+        ]
+    )
+    scene.wait(0.3)
+
+    # 2 · El acero de las columnas sube desde el cimiento.
+    scene.play(
+        [
+            *enter(1),
+            stagger(
+                *[g.animate.fade_in().duration(0.12) for g in house.steel], each=0.035
+            ),
+        ]
+    )
+    scene.wait(0.3)
+
+    # 3 · Hilada por hilada; la cara superior acompaña a la última asentada.
+    courses = []
+    for k, bricks in enumerate(house.masonry):
+        parts = [
+            bricks.animate.fade_in_from(Direction.DOWN, 0.03).duration(0.14),
+            house.tops[k].animate.fade_in().duration(0.08),
+        ]
+        if k:
+            parts.append(house.tops[k - 1].animate.fade_out().duration(0.08))
+        courses.append(parallel(*parts))
+    scene.play([*enter(2), stagger(*courses, each=0.09)])
+    scene.wait(0.3)
+
+    # 4 · El concreto de las columnas sube y cubre el acero.
+    scene.play(
+        [
+            *enter(3),
+            stagger(
+                *[
+                    parallel(
+                        pour.animate.fade_in().duration(0.12),
+                        bars.animate.fade_out().duration(0.12),
+                    )
+                    for pour, bars in zip(house.concrete, house.steel)
+                ],
+                each=0.05,
+            ),
+        ]
+    )
+    scene.wait(0.3)
+
+    # 5 · Viga solera y losa, vaciadas juntas.
+    scene.play(
+        [
+            *enter(4),
+            stagger(*[b.animate.fade_in().duration(0.3) for b in house.beams], each=0.05),
+            house.steel[-1].animate.fade_out().duration(0.3),
+        ]
+    )
+    scene.play(house.slab.animate.fill_level(1).duration(0.9))
+    scene.play([s.animate.opacity(1).duration(0.4) for s in steps[:-1]])
+    scene.stop("proceso-constructivo")
+
+    # En el sismo: la dirección real es cualquiera; se idealiza con sus componentes
+    # en X y en Y, y la vivienda completa se deforma junta en cada una.
+    quake_heading = label(scene, "En un sismo", LIST_X, 2.62, color=MUTED, size=0.14)
+    notes = [
+        _entry(scene, title, body, LIST_TOP - i * LIST_GAP)
+        for i, (title, body) in enumerate(IN_QUAKE)
+    ]
+    # Triángulo de vectores: el sismo es la hipotenusa; X e Y, los catetos.
+    x0, y0 = QUAKE_TAIL
+    corner = (x0 + QUAKE_REACH * math.cos(QUAKE_ANGLE), y0)
+    tip = (corner[0], y0 + QUAKE_REACH * math.sin(QUAKE_ANGLE))
+    quake = _ground_vector(scene, iso, QUAKE_TAIL, tip, INK_SOFT)
+    x_comp = _ground_vector(scene, iso, QUAKE_TAIL, corner, BRICK)
+    y_comp = _ground_vector(scene, iso, corner, tip, STEEL)
+
+    def middle(p: tuple[float, float], q: tuple[float, float]) -> tuple[float, float]:
+        return iso((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, 0)
+
+    quake_label = t(
         scene,
-        "V sísmico",
-        cx - w / 2 - 1.2,
-        top_bricks + 0.32,
+        "Sismo",
+        *_nudge(middle(QUAKE_TAIL, tip), 0, 0.14),
         size=0.2,
-        color=STEEL,
         weight=700,
-        anchor=Anchor.BOTTOM_LEFT,
+        color=INK_SOFT,
+        anchor=Anchor.BOTTOM,
+    )
+    x_label = t(
+        scene,
+        "X",
+        *_nudge(middle(QUAKE_TAIL, corner), -0.1, -0.1),
+        size=0.24,
+        weight=700,
+        color=BRICK,
+        anchor=Anchor.TOP_RIGHT,
+    )
+    y_label = t(
+        scene,
+        "Y",
+        *_nudge(middle(corner, tip), 0.12, -0.1),
+        size=0.24,
+        weight=700,
+        color=STEEL,
+        anchor=Anchor.TOP_LEFT,
+    )
+    exaggerated = t(
+        scene,
+        "Deformación exagerada",
+        LIST_X,
+        LIST_TOP - len(IN_QUAKE) * LIST_GAP + 0.2,
+        font=MONO,
+        size=0.13,
+        color=MUTED,
     )
     scene.play(
         [
-            force.animate.grow_arrow().duration(0.5),
-            force_label.animate.fade_in().duration(0.4),
+            heading.animate.fade_out().duration(0.3),
+            *[s.animate.fade_out().duration(0.3) for s in steps],
+        ]
+    )
+    scene.play(
+        [
+            quake_heading.animate.fade_in().duration(0.3),
+            notes[0].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
+            quake.animate.grow_arrow().duration(0.6),
+            quake_label.animate.fade_in().duration(0.3).delay(0.2),
+        ]
+    )
+    scene.play(
+        [
+            x_comp.animate.grow_arrow().duration(0.5),
+            x_label.animate.fade_in().duration(0.3).delay(0.3),
+            y_comp.animate.grow_arrow().duration(0.5).delay(0.5),
+            y_label.animate.fade_in().duration(0.3).delay(0.8),
+            quake.animate.opacity(0.5).duration(0.4).delay(1.0),
+        ]
+    )
+    scene.stop("componentes-del-sismo")
+
+    scene.play(
+        [
+            y_comp.animate.opacity(0.25).duration(0.3),
+            y_label.animate.opacity(0.25).duration(0.3),
+            notes[1].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
+            exaggerated.animate.fade_in().duration(0.3),
+        ]
+    )
+    scene.play(
+        [
+            _sway(house, *iso.along(DRIFT, 0)),
+            notes[2].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35).delay(0.7),
+        ]
+    )
+    scene.play(
+        [
+            x_comp.animate.opacity(0.25).duration(0.3),
+            x_label.animate.opacity(0.25).duration(0.3),
+            y_comp.animate.opacity(1).duration(0.3),
+            y_label.animate.opacity(1).duration(0.3),
+            notes[3].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
+        ]
+    )
+    scene.play(_sway(house, *iso.along(0, DRIFT)))
+    scene.play(
+        [
+            x_comp.animate.opacity(1).duration(0.3),
+            x_label.animate.opacity(1).duration(0.3),
         ]
     )
     takeaway(
@@ -883,53 +962,10 @@ def seismic(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · §1.1 Problemática, p. 1; §3.1 Albañilería confinada, p. 21 (Gonzales, 1992; Tavera, 2014; San Bartolomé, 2018)",
+        "Tesis · §1.1 Problemática, p. 1; §3.1 Albañilería confinada, p. 21 (Gonzales, 1992; "
+        "Tavera, 2014; San Bartolomé, 2018). Vivienda esquemática.",
     )
-    scene.stop("muro-confinado")
-
-
-def _callout(
-    scene: Scene,
-    title: str,
-    body: str,
-    target: tuple[float, float],
-    anchor: tuple[float, float],
-    *,
-    align_right: bool = False,
-):
-    ax, ay = anchor
-    dot = (
-        scene.geometry.circle(0.05).fill(INK).no_stroke().move_to(*target).z_index(6)
-    )
-    lead = (
-        scene.geometry.line(target, (ax, ay - 0.16)).stroke(INK_SOFT, 0.01).z_index(6)
-    )
-    head = t(
-        scene,
-        title,
-        ax,
-        ay,
-        size=0.22,
-        weight=900,
-        color=INK,
-        anchor=Anchor.BOTTOM_RIGHT if align_right else Anchor.BOTTOM_LEFT,
-    )
-    sub = t(
-        scene,
-        body,
-        ax,
-        ay - 0.05,
-        size=0.18,
-        color=INK_SOFT,
-        anchor=Anchor.TOP_RIGHT if align_right else Anchor.TOP_LEFT,
-    )
-    return stagger(
-        dot.animate.grow_from_center().duration(0.25),
-        lead.animate.create().duration(0.35),
-        head.animate.fade_in().duration(0.3),
-        sub.animate.fade_in().duration(0.3),
-        each=0.12,
-    )
+    scene.stop("vivienda-en-conjunto")
 
 
 def manual_transfer(scene: Scene) -> None:
@@ -1321,11 +1357,18 @@ SECTION = Section(
             build=seismic,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. La albañilería confinada llegó tras el terremoto de Lima de 1940. "
-                "Explicar el proceso: primero el muro con "
-                "extremos dentados, después se vacían columnas y viga solera; el conjunto trabaja "
-                "como una unidad y gana ductilidad (Gonzales, 1992). Por eso la E.070 pide densidad "
-                "mínima de muros en ambas direcciones y conexión con los confinamientos."
+                "60 s. La albañilería confinada llegó tras el terremoto de Lima de 1940. (1) Seguir "
+                "la obra en orden: cimiento y sobrecimiento; el acero de las columnas se ancla "
+                "antes del muro; el muro se asienta con los extremos dentados; luego se vacían las "
+                "columnas contra el dentado y, al final, la viga solera junto con la losa "
+                "(Gonzales, 1992; San Bartolomé, 2018). Puerta y ventana llevan columnas a los "
+                "lados y dintel. (2) El sismo llega en cualquier dirección; para el análisis se "
+                "descompone en sus componentes X e Y (triángulo sobre el terreno). (3) En cada "
+                "componente la losa reparte la fuerza y columnas y soleras amarran cada paño: la "
+                "vivienda se deforma como unidad y gana "
+                "ductilidad. Cada muro resiste en su plano: en X trabaja la fachada; en Y, los "
+                "muros laterales. Por eso la E.070 pide densidad mínima de muros en ambas "
+                "direcciones y conexión con los confinamientos. La deformación está exagerada."
             ),
         ),
         SectionStep(
