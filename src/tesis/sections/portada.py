@@ -19,7 +19,7 @@ NOTES = (
 def build(scene: Scene) -> None:
     _ = scene.segment("Portada", notes=NOTES)
 
-    logo = scene.media.svg("logoucsp.svg").scale_to(0.00072).fill(INK)
+    logo = scene.media.svg("logoucsp.svg").scale_to(0.072).fill(INK)
     logo.move_to(LEFT_EDGE + 0.2, 3.72)
     university = label(
         scene,

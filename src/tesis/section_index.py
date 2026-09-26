@@ -281,7 +281,7 @@ class SectionIndex:
         if self._seal is None:
             seal = (
                 scene.media.svg("logoucsp.svg")
-                .scale_to(0.00033)
+                .scale_to(0.033)
                 .fill(MUTED)
                 .move_to(LEFT_EDGE + 0.09, SEAL_Y)
             )

@@ -114,9 +114,9 @@ Matices que conviene respetar al exponer (también están en las notas):
 revisión en el guion:
 
 ```powershell
-gaanim --diff --example . --capture-stops --capture-only --no-gui --tests-root snapshots
-gaanim --diff --example . --capture-stops --capture-only --stops 12,30 --no-gui --tests-root snapshots
-gaanim --diff --example . --capture-stops --capture-only --sections resultados --no-gui --tests-root snapshots
+gaanim --diff --example . --capture-stops --capture-only --tests-root snapshots
+gaanim --diff --example . --capture-stops --capture-only --stops 12,30 --tests-root snapshots
+gaanim --diff --example . --capture-stops --capture-only --sections resultados --tests-root snapshots
 ```
 
 Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) quedan en
@@ -124,8 +124,9 @@ Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) 
 
 ## Actualizar Gaanim
 
-El proyecto usa el wheel local de `../../rust/gaanim/target/wheels`. Tras reconstruirlo
-(`just wheel` en Gaanim) conserva la versión 0.2.0, así que hay que forzar la reinstalación:
+El proyecto usa el wheel de `C:/Tools/gaanim` (0.4.2), fijado en `[tool.uv.sources]` de
+`pyproject.toml`. Al cambiar de versión, actualiza esa ruta; si el wheel se reconstruye con el
+mismo número de versión, fuerza la reinstalación:
 
 ```powershell
 just reinstall

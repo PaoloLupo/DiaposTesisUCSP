@@ -77,8 +77,8 @@ def materials(scene: Scene) -> None:
     outline = (
         scene.media.svg("peru.svg")
         .no_fill()
-        .stroke(INK_SOFT, 1.6)
-        .scale_to(0.0058)
+        .stroke(INK_SOFT, 0.016)
+        .scale_to(0.58)
         .move_to(-4.75, -0.15)
     )
     counter = scene.viz.rolling_number(
