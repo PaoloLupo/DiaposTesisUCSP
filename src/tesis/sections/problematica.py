@@ -28,11 +28,10 @@ from tesis.data.sudamerica import COUNTRIES, Ring
 from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
 from tesis.data.thesis import CRACKING_FLOOR1
 from tesis.kit import (
+    dash,
     header,
     label,
     numeral,
-    panel,
-    pill,
     source,
     t,
     takeaway,
@@ -43,8 +42,8 @@ from tesis.theme import (
     BRICK_SOFT,
     CARD,
     FAIL,
+    FAIL_SOFT,
     DISPLAY,
-    FAINT,
     INK,
     INK_SOFT,
     MONO,
@@ -968,275 +967,458 @@ def seismic(scene: Scene) -> None:
     scene.stop("vivienda-en-conjunto")
 
 
+# Normas de diseño de muros que ofrece ETABS (extracto, con sus nombres en el
+# programa): todas de concreto armado y extranjeras; la E.070 no figura.
+ETABS_WALL_CODES = (
+    "ACI 318-19",
+    "AS 3600-2018",
+    "BS 8110-97",
+    "CSA A23.3-19",
+    "Eurocode 2-2004",
+    "Indian IS 456:2000",
+    "Mexican RCDF 2017",
+    "NZS 3101:2006",
+)
+ETABS_OFFER = (
+    ("Normas de concreto armado", "ACI, Eurocódigo, CSA, NZS: todas extranjeras"),
+    ("Ninguna de albañilería", "la E.070 no está implementada en el programa"),
+    ("La verificación queda fuera", "se resuelve a mano en hojas de cálculo"),
+)
+TRANSFER_RISKS = ("¿fila y muro correctos?", "¿combinación de carga?", "¿unidades y signos?")
+TRANSFER_PIERS = ("X1", "X3", "X4", "X5", "X6", "X7")
+
+
+def _cells(
+    scene: Scene,
+    values: tuple[str, ...],
+    xs: tuple[float, ...],
+    y: float,
+    *,
+    weight: int = 400,
+    color: Color = INK,
+    size: float = 0.15,
+) -> list[Drawable]:
+    return [
+        t(scene, v, x, y, font=MONO, size=size, weight=weight, color=color, anchor=Anchor.LEFT)
+        for v, x in zip(values, xs, strict=True)
+    ]
+
+
+def _arc(
+    p: tuple[float, float], q: tuple[float, float], *, sag: float, samples: int = 48
+) -> list[tuple[float, float]]:
+    """Arco circular de ``p`` a ``q`` que se comba ``sag`` por debajo de la cuerda."""
+    (x0, y0), (x1, y1) = p, q
+    chord = math.hypot(x1 - x0, y1 - y0)
+    nx, ny = -(y1 - y0) / chord, (x1 - x0) / chord
+    if ny > 0:
+        nx, ny = -nx, -ny  # normal hacia abajo
+    radius = (chord**2 / 4 + sag**2) / (2 * sag)
+    cx = (x0 + x1) / 2 - nx * (radius - sag)
+    cy = (y0 + y1) / 2 - ny * (radius - sag)
+    a0 = math.atan2(y0 - cy, x0 - cx)
+    sweep = (math.atan2(y1 - cy, x1 - cx) - a0 + math.pi) % (2 * math.pi) - math.pi
+    return [
+        (cx + radius * math.cos(a0 + sweep * i / samples), cy + radius * math.sin(a0 + sweep * i / samples))
+        for i in range(samples + 1)
+    ]
+
+
+def _arrow_head(
+    scene: Scene,
+    tail: tuple[float, float],
+    tip: tuple[float, float],
+    color: Color,
+    *,
+    length: float = 0.18,
+    width: float = 0.18,
+) -> Drawable:
+    """Punta de flecha en ``tip`` orientada según el último tramo del trazo."""
+    ux, uy = tip[0] - tail[0], tip[1] - tail[1]
+    norm = math.hypot(ux, uy)
+    ux, uy = ux / norm, uy / norm
+    bx, by = tip[0] - ux * length, tip[1] - uy * length
+    return (
+        scene.geometry.polygon(
+            [tip, (bx - uy * width / 2, by + ux * width / 2), (bx + uy * width / 2, by - ux * width / 2)]
+        )
+        .fill(color)
+        .no_stroke()
+    )
+
+
+def _packets(
+    scene: Scene,
+    count: int,
+    start: tuple[float, float],
+    fork: tuple[float, float],
+    targets: tuple[tuple[float, float], ...],
+    *,
+    each: float,
+):
+    """Filas que recorren el tronco y se reparten entre los destinos."""
+    trips = []
+    for i in range(count):
+        packet = scene.geometry.rect(0.32, 0.07).fill(BRICK).no_stroke().move_to(*start).z_index(5)
+        trips.append(
+            sequence(
+                packet.animate.fade_in().duration(0.08),
+                packet.animate.move_to(*fork).duration(0.45),
+                packet.animate.move_to(*targets[i % len(targets)]).duration(0.25),
+                packet.animate.fade_out().duration(0.08),
+                gap=0.01,
+            )
+        )
+    return stagger(*trips, each=each)
+
+
 def manual_transfer(scene: Scene) -> None:
     header(scene, KICKER, "ETABS no verifica la E.070: se hace un proceso manual")
 
-    # Ventana de resultados del modelo: valores reales de V_e, piso 1, MCT (tb:agriet_xy).
-    piers = ["X1", "X3", "X4", "X5", "X6"]
-    etabs = _window(
-        scene, -5.15, 0.85, 3.9, 2.75, "ETABS · Pier Forces", icon=ETABS_ICON
+    # 1 · La lista de normas de diseño de muros no incluye la E.070.
+    dialog = _window(
+        scene, -3.9, 0.2, 6.4, 4.6, "ETABS · Shear Wall Design Preferences", icon=ETABS_ICON
     )
-    head = ["Story", "Pier", "Ve (tonf)"]
-    xs = [-6.8, -5.6, -4.3]
-    table: list[Drawable] = [
-        t(
-            scene,
-            h_,
-            x,
-            1.55,
-            font=MONO,
-            size=0.15,
-            weight=700,
-            color=INK_SOFT,
-            anchor=Anchor.LEFT,
-        )
-        for h_, x in zip(head, xs, strict=True)
-    ]
-    records: list[list[Drawable]] = []
-    for i, pier in enumerate(piers):
-        y = 1.15 - i * 0.36
-        cells: list[Drawable] = [
-            t(
-                scene,
-                "Story1",
-                xs[0],
-                y,
-                font=MONO,
-                size=0.16,
-                color=INK,
-                anchor=Anchor.LEFT,
-            ),
-            t(
-                scene,
-                pier,
-                xs[1],
-                y,
-                font=MONO,
-                size=0.16,
-                color=INK,
-                anchor=Anchor.LEFT,
-            ),
-            t(
-                scene,
-                f"{CRACKING_FLOOR1['MCT'][pier][0]:.3f}",
-                xs[2],
-                y,
-                font=MONO,
-                size=0.16,
-                color=INK,
-                anchor=Anchor.LEFT,
-            ),
-        ]
-        records.append(cells)
-    sheet = _window(
-        scene,
-        4.4,
-        0.85,
-        4.6,
-        2.75,
-        "Excel · Verificación E.070",
-        icon=EXCEL_ICON,
-        tint=PASS_TINT,
+    field_x0, field_x1, row_h = -4.6, -1.0, 0.34
+    field_cx, field_w = (field_x0 + field_x1) / 2, field_x1 - field_x0
+    code_label = t(
+        scene, "Design Code", -6.8, 1.75, font=MONO, size=0.15, color=INK_SOFT, anchor=Anchor.LEFT
     )
-    letters = [
-        t(
-            scene,
-            c,
-            2.55 + i * 1.2,
-            1.55,
-            font=MONO,
-            size=0.14,
-            color=MUTED,
-            anchor=Anchor.CENTER,
-        )
-        for i, c in enumerate("ABCD")
-    ]
-    grid = [
-        scene.geometry.line(2.2, 1.35 - j * 0.36, 6.6, 1.35 - j * 0.36).stroke(
-            FAINT, 0.01
-        )
-        for j in range(6)
-    ] + [
-        scene.geometry.line(
-            2.2 + i * 1.2 - 0.05, 1.4, 2.2 + i * 1.2 - 0.05, -0.45
-        ).stroke(FAINT, 0.01)
-        for i in range(1, 4)
-    ]
-    scene.play(
-        [
-            etabs.animate.fade_in().duration(0.4),
-            *[x.animate.fade_in().duration(0.4) for x in table],
-        ]
+    field = (
+        scene.geometry.rect(field_w, row_h)
+        .fill(CARD)
+        .stroke(RULE, 0.014)
+        .move_to(field_cx, 1.75)
     )
-    scene.play(
-        stagger(
-            *[c.animate.fade_in().duration(0.2) for row in records for c in row],
-            each=0.02,
-        )
-    )
-    scene.play(
-        [
-            sheet.animate.fade_in().duration(0.4),
-            *[x.animate.fade_in().duration(0.4) for x in letters + grid],
-        ]
-    )
-
-    steps = [("exportar", -2.25), ("filtrar", -0.6), ("copiar", 1.05)]
-    step_labels = [
-        pill(
-            scene,
-            name,
-            x,
-            1.72,
-            color=BRICK_DEEP,
-            background=BRICK_SOFT,
-            size=0.19,
-            font=MONO,
-        )
-        for name, x in steps
-    ]
-    arrow = (
-        scene.geometry.arrow(
-            -3.0, 1.3, 1.9, 1.3, head_length=0.18, head_width=0.16, body_width=0.03
-        )
-        .fill(BRICK)
+    chevron = (
+        scene.geometry.polygon([(-1.3, 1.8), (-1.14, 1.8), (-1.22, 1.7)])
+        .fill(INK_SOFT)
         .no_stroke()
     )
+    current = t(
+        scene, ETABS_WALL_CODES[0], field_x0 + 0.15, 1.75, font=MONO, size=0.16, anchor=Anchor.LEFT
+    )
+    list_top = 1.75 - row_h / 2 - 0.04
+    list_box = (
+        scene.geometry.rect(field_w, row_h * len(ETABS_WALL_CODES))
+        .fill(CARD)
+        .stroke(RULE, 0.014)
+        .move_to(field_cx, list_top - row_h * len(ETABS_WALL_CODES) / 2)
+    )
+    row_y = [list_top - row_h * (i + 0.5) for i in range(len(ETABS_WALL_CODES) + 1)]
+    scan = scene.geometry.rect(field_w - 0.04, row_h - 0.04).fill(STEEL_SOFT).no_stroke()
+    scan.move_to(field_cx, row_y[0])
+    codes = [
+        t(scene, code, field_x0 + 0.15, y, font=MONO, size=0.15, color=INK, anchor=Anchor.LEFT)
+        for code, y in zip(ETABS_WALL_CODES, row_y, strict=False)
+    ]
+    # El hueco donde debería estar la norma peruana de albañilería.
+    gap_y = row_y[-1] - 0.12
+    corners = [
+        (field_x0, gap_y + row_h / 2),
+        (field_x1, gap_y + row_h / 2),
+        (field_x1, gap_y - row_h / 2),
+        (field_x0, gap_y - row_h / 2),
+    ]
+    missing_box = [
+        scene.geometry.dashed_line(*p, *q, dash_length=0.07, gap_length=0.05).stroke(FAIL, 0.014)
+        for p, q in zip(corners, corners[1:] + corners[:1], strict=True)
+    ]
+    missing = t(
+        scene,
+        "E.070 · Albañilería",
+        field_x0 + 0.15,
+        gap_y,
+        font=MONO,
+        size=0.15,
+        color=FAIL,
+        anchor=Anchor.LEFT,
+    )
+    missing_note = t(
+        scene, "no disponible", field_x1 - 0.12, gap_y, size=0.15, weight=700, color=FAIL, anchor=Anchor.RIGHT
+    )
+    offer_heading = label(scene, "Lo que ofrece ETABS", LIST_X, 2.62, color=MUTED, size=0.14)
+    offer = [
+        _entry(scene, title, body, LIST_TOP - i * LIST_GAP)
+        for i, (title, body) in enumerate(ETABS_OFFER)
+    ]
     scene.play(
         stagger(
-            arrow.animate.grow_arrow().duration(0.4),
-            *[p.animate.fade_in().duration(0.25) for p in step_labels],
-            each=0.12,
+            dialog.animate.fade_in().duration(0.4),
+            parallel(
+                code_label.animate.fade_in().duration(0.3),
+                field.animate.fade_in().duration(0.3),
+                chevron.animate.fade_in().duration(0.3),
+                current.animate.fade_in().duration(0.3),
+            ),
+            parallel(
+                list_box.animate.fade_in().duration(0.3),
+                stagger(*[c.animate.fade_in().duration(0.2) for c in codes], each=0.05),
+            ),
+            each=0.25,
         )
     )
-    # Cada fila viaja de la tabla del modelo a la hoja; es la misma cifra, trasladada.
-    moves = []
-    for i, row in enumerate(records):
-        y = 1.15 - i * 0.36
-        copies = [
-            t(
-                scene,
-                "1",
-                2.55,
-                y,
-                font=MONO,
-                size=0.16,
-                color=INK,
-                anchor=Anchor.CENTER,
-            ),
-            t(
-                scene,
-                piers[i],
-                3.75,
-                y,
-                font=MONO,
-                size=0.16,
-                color=INK,
-                anchor=Anchor.CENTER,
-            ),
-            t(
-                scene,
-                f"{CRACKING_FLOOR1['MCT'][piers[i]][0]:.3f}",
-                4.95,
-                y,
-                font=MONO,
-                size=0.16,
-                color=INK,
-                anchor=Anchor.CENTER,
+    # Un resaltado recorre la lista buscando la E.070 y termina en el hueco.
+    scene.play(
+        [
+            offer_heading.animate.fade_in().duration(0.3),
+            offer[0].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
+            sequence(
+                scan.animate.fade_in().duration(0.15),
+                *[
+                    scan.animate.move_to(field_cx, y).duration(0.16)
+                    for y in row_y[1 : len(ETABS_WALL_CODES)]
+                ],
+                scan.animate.move_to(field_cx, gap_y).duration(0.2),
+                parallel(
+                    scan.animate.fill(FAIL_SOFT).duration(0.25),
+                    *[d.animate.create().duration(0.3) for d in missing_box],
+                    missing.animate.fade_in().duration(0.3),
+                ),
+                gap=0.01,
             ),
         ]
-        moves.append(
-            sequence(
-                *[r.animate.indicate().duration(0.3) for r in row[1:2]],
-                *[
-                    c.animate.fade_in_from(Direction.LEFT, 0.5).duration(0.35)
-                    for c in copies
-                ],
-            )
-        )
-    scene.play(stagger(*moves, each=0.35))
-    risks = [
-        ("¿fila y Pier correctos?", -0.55, 0.65),
-        ("¿combinación de carga?", -0.55, 0.15),
-        ("¿unidades y signos?", -0.55, -0.35),
-    ]
-    risk_pills = [
-        pill(
-            scene,
-            r,
-            x,
-            y,
-            color=INK_SOFT,
-            background=CARD,
-            border=RULE,
-            size=0.17,
-            font="Lato",
-        )
-        for r, x, y in risks
-    ]
-    scene.play(
-        stagger(
-            *[
-                p.animate.fade_in_from(Direction.UP, 0.08).duration(0.35)
-                for p in risk_pills
-            ],
-            each=0.12,
-        )
     )
+    scene.play(
+        [
+            missing_note.animate.fade_in().duration(0.3),
+            offer[1].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
+            offer[2].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35).delay(0.3),
+        ]
+    )
+    scene.stop("sin-e070")
+
+    # 2 · El ingeniero traslada las tablas del modelo a Excel o Mathcad.
+    first: list[Drawable] = [
+        dialog, code_label, field, chevron, current, list_box, scan, *codes,
+        *missing_box, missing, missing_note, offer_heading, *offer,
+    ]
+    tables = [
+        # Cada ventana asoma su barra de título completa detrás de la siguiente.
+        _window(scene, -5.0 + d, 0.5 + 2.4 * d, 4.2, 2.9, name, icon=ETABS_ICON)
+        for d, name in (
+            (0.3, "ETABS · Story Drifts"),
+            (0.15, "ETABS · Pier Section Properties"),
+            (0.0, "ETABS · Pier Forces"),
+        )
+    ]
+    etabs_xs = (-6.8, -5.55, -4.3)
+    etabs_rows = [_cells(scene, ("Story", "Pier", "Ve (tonf)"), etabs_xs, 1.5, weight=700, color=INK_SOFT)]
+    for i, pier in enumerate(TRANSFER_PIERS):
+        ve = CRACKING_FLOOR1["MCT"][pier][0]
+        etabs_rows.append(_cells(scene, ("Story1", pier, f"{ve:.3f}"), etabs_xs, 1.15 - i * 0.3))
+    etabs_more = t(scene, "⋮", -5.55, -0.7, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
+    count = t(
+        scene,
+        "24 muros × 4 pisos = 96 filas por tabla y combinación",
+        -7.1,
+        -1.2,
+        font=MONO,
+        size=0.14,
+        color=MUTED,
+    )
+
+    trunk_y, fork_x = 0.5, 0.0
+    trunk = (
+        scene.geometry.line(-2.45, trunk_y, fork_x, trunk_y).stroke(BRICK, 0.03)
+    )
+    branches = [
+        scene.geometry.arrow(fork_x, trunk_y, 1.2, y, head_length=0.16, head_width=0.16, body_width=0.03)
+        .fill(BRICK)
+        .no_stroke()
+        for y in (1.3, -0.35)
+    ]
+    steps = t(
+        scene,
+        "exportar · filtrar · copiar",
+        -1.22,
+        trunk_y + 0.2,
+        font=MONO,
+        size=0.15,
+        color=BRICK_DEEP,
+        anchor=Anchor.BOTTOM,
+    )
+    excel = _window(scene, 4.2, 1.35, 5.8, 1.9, "Excel · Verificación E.070", icon=EXCEL_ICON, tint=PASS_TINT)
+    excel_xs = (1.55, 2.75, 3.95, 5.4)
+    excel_rows = [_cells(scene, ("Piso", "Muro", "Ve", "0.55 Vm"), excel_xs, 1.8, weight=700, color=INK_SOFT)]
+    # Tramos (x0, x1, y) de cada valor copiado: se tachan cuando quedan desactualizados.
+    copied_spans: list[tuple[float, float, float]] = []
+    for i, pier in enumerate(TRANSFER_PIERS[:3]):
+        ve, limit = CRACKING_FLOOR1["MCT"][pier]
+        y = 1.5 - i * 0.28
+        values = (f"{ve:.3f}", f"{limit:.3f}")
+        excel_rows.append(_cells(scene, ("1", pier, *values), excel_xs, y))
+        for value, x in zip(values, excel_xs[2:], strict=True):
+            width, _ = scene.text.measure(value, font=MONO, size=0.15)
+            copied_spans.append((x, x + width, y))
+    excel_more = t(scene, "⋮", 2.75, 0.62, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
+    mathcad = _window(scene, 4.2, -0.75, 5.8, 1.9, "Mathcad · Verificación E.070", icon=MATHCAD_ICON)
+    ve, limit = CRACKING_FLOOR1["MCT"]["X1"]
+    formulas = (
+        (f'$V_e := {ve:.3f} "tonf"$', -0.42),
+        ("$V_m := 0.5 v'_m alpha t L + 0.23 P_g$", -0.82),
+        (f'$V_e <= 0.55 V_m = {limit:.3f} "tonf"$', -1.22),
+    )
+    worksheet = [
+        t(scene, line, 1.6, y, size=0.19, color=INK, anchor=Anchor.LEFT) for line, y in formulas
+    ]
+    for line, y in formulas:
+        width, _ = scene.text.measure(line, size=0.19)
+        copied_spans.append((1.6, 1.6 + width, y))
+    mathcad_more = t(scene, "⋮", 1.6, -1.52, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
+    risks = [
+        item
+        for i, text in enumerate(TRANSFER_RISKS)
+        for item in (
+            dash(scene, -2.3, -0.35 - i * 0.36, color=INK_SOFT),
+            t(scene, text, -2.12, -0.35 - i * 0.36, size=0.18, color=INK_SOFT, anchor=Anchor.LEFT),
+        )
+    ]
+
+    scene.play([d.animate.fade_out().duration(0.35) for d in first])
+    scene.play(
+        [
+            stagger(*[w.animate.fade_in_from(Direction.UP, 0.06).duration(0.35) for w in tables], each=0.15),
+            stagger(
+                *[c.animate.fade_in().duration(0.15) for row in etabs_rows for c in row],
+                each=0.02,
+            ).delay(0.4),
+            etabs_more.animate.fade_in().duration(0.2).delay(1.0),
+            count.animate.fade_in().duration(0.3).delay(1.1),
+        ]
+    )
+    scene.play(
+        [
+            trunk.animate.create().duration(0.4),
+            *[b.animate.grow_arrow().duration(0.4).delay(0.3) for b in branches],
+            steps.animate.fade_in().duration(0.3).delay(0.2),
+            excel.animate.fade_in().duration(0.4).delay(0.4),
+            mathcad.animate.fade_in().duration(0.4).delay(0.5),
+        ]
+    )
+    # Las filas viajan una a una por el mismo camino hacia la hoja o el documento.
+    trip = ((-2.5, trunk_y), (fork_x, trunk_y), ((1.25, 1.3), (1.25, -0.35)))
+    scene.play(
+        [
+            _packets(scene, 18, *trip, each=0.13),
+            stagger(
+                *[c.animate.fade_in().duration(0.15) for row in excel_rows for c in row],
+                each=0.06,
+            ).delay(0.6),
+            excel_more.animate.fade_in().duration(0.2).delay(1.9),
+            stagger(
+                *[w.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.3) for w in worksheet],
+                each=0.45,
+            ).delay(0.8),
+            mathcad_more.animate.fade_in().duration(0.2).delay(2.2),
+        ]
+    )
+    scene.play(stagger(*[r.animate.fade_in().duration(0.25) for r in risks], each=0.08))
     scene.stop("traslado-manual")
 
-    loop = (
-        scene.geometry.curved_arrow(
-            4.4,
-            -0.6,
-            -5.15,
-            -0.6,
-            -0.3,
-            head_length=0.16,
-            head_width=0.16,
-            body_width=0.028,
-        )
-        .fill(BRICK)
-        .no_stroke()
-    )
+    # 3 · Si algo no cumple, se modifica el modelo y el traslado empieza de nuevo.
+    # La flecha de regreso es un arco propio: un punto la recorre en cada vuelta.
+    loop_path = _arc((4.2, -1.8), (-5.0, -1.5), sag=0.38)
+    loop = scene.geometry.polyline(loop_path).no_fill().stroke(BRICK, 0.028)
+    loop_head = _arrow_head(scene, loop_path[-2], loop_path[-1], BRICK)
     loop_label = t(
         scene,
         "Si un muro no cumple: modificar el modelo, reanalizar y repetir el traslado",
         -0.4,
-        -1.35,
-        size=0.21,
+        -2.14,
+        size=0.2,
         color=BRICK_DEEP,
         anchor=Anchor.TOP,
     )
+    change = scene.geometry.circle(0.07).fill(BRICK).no_stroke().move_to(*loop_path[0]).z_index(6)
+    # Contador de vueltas: anillo con flecha que gira una vez por iteración.
+    badge = (-0.7, 1.75)  # arriba al centro, sobre el traslado que se repite
+    # Sin pivote, el arco giraría alrededor del origen de la escena.
+    ring = (
+        scene.geometry.curved_arrow_arc(
+            *badge,
+            0.38,
+            math.radians(110),
+            math.radians(300),
+            head_length=0.17,
+            head_width=0.17,
+            body_width=0.036,
+        )
+        .fill(BRICK)
+        .no_stroke()
+        .with_pivot(*badge)
+    )
+    turns = scene.viz.rolling_number(
+        1, font_family=DISPLAY, weight=700, font_size=0.34, color=BRICK_DEEP
+    )
+    turns.move_to(*badge, Anchor.CENTER)
+    etabs_values = [row[2] for row in etabs_rows[1:]]
+    copied = [c for row in excel_rows[1:] for c in row[2:]] + worksheet
     scene.play(
         [
-            loop.animate.grow_arrow().duration(0.9),
-            loop_label.animate.fade_in().duration(0.5),
+            *[r.animate.opacity(0.35).duration(0.3) for r in risks],
+            loop.animate.create().duration(0.8),
+            loop_head.animate.fade_in().duration(0.2).delay(0.7),
+            loop_label.animate.fade_in().duration(0.5).delay(0.4),
+            ring.animate.fade_in().duration(0.3).delay(0.6),
+            turns.visual.animate.fade_in().duration(0.3).delay(0.6),
         ]
     )
-    question = panel(
-        scene, 0, -2.55, 14.6, 0.8, fill=PAPER_DEEP, border=None
-    )
-    q_text = t(
+    # Cada vuelta: el cambio viaja al modelo, lo copiado queda tachado, ETABS
+    # reanaliza (barra de progreso) y se vuelve a exportar, filtrar y copiar todo.
+    for n in (2, 3):
+        strikes = [
+            scene.geometry.line(x0 - 0.03, y, x1 + 0.03, y).stroke(BRICK, 0.016).z_index(6)
+            for x0, x1, y in copied_spans
+        ]
+        progress = scene.geometry.line(-7.08, 1.59, -2.92, 1.59).stroke(STEEL, 0.03)
+        scene.play(
+            [
+                sequence(
+                    change.animate.fade_in().duration(0.1),
+                    change.animate.move_along(loop).duration(0.9),
+                    change.animate.fade_out().duration(0.1),
+                    gap=0.01,
+                ),
+                ring.animate.rotate_by(2 * math.pi).duration(1.0).easing(Easing.SMOOTH),
+                turns.count_to(n, duration=0.5).delay(0.3),
+                *[c.animate.opacity(0.35).duration(0.3) for c in copied],
+                stagger(*[st.animate.create().duration(0.2) for st in strikes], each=0.04),
+                *[v.animate.opacity(0.2).duration(0.25).delay(0.85) for v in etabs_values],
+            ]
+        )
+        scene.play(
+            [
+                progress.animate.create().duration(0.6),
+                stagger(
+                    *[v.animate.opacity(1).duration(0.2) for v in etabs_values], each=0.06
+                ).delay(0.5),
+                progress.animate.fade_out().duration(0.2).delay(0.95),
+            ]
+        )
+        scene.play(
+            [
+                _packets(scene, 10, *trip, each=0.1),
+                stagger(
+                    *[
+                        parallel(
+                            c.animate.opacity(1).duration(0.2),
+                            st.animate.fade_out().duration(0.2),
+                        )
+                        for c, st in zip(copied, strikes, strict=True)
+                    ],
+                    each=0.06,
+                ).delay(0.6),
+            ]
+        )
+    takeaway(
         scene,
         "¿Cómo sistematizar la verificación de la norma E.070 a partir de un modelo de ETABS?",
-        0,
-        -2.55,
-        font=DISPLAY,
-        size=0.3,
-        weight=700,
-        color=INK,
-        anchor=Anchor.CENTER,
-    )
-    scene.play(
-        [
-            question.animate.fade_in().duration(0.4),
-            q_text.animate.fade_in_from(Direction.UP, 0.08).duration(0.6),
-        ]
     )
     source(
         scene,
-        "Tesis · §1.1 Problemática y §1.2 Justificación, pp. 1–2. Valores: $V_e$ del piso 1, MCT (Tabla 35, p. 86).",
+        "Tesis · §1.1 Problemática y §1.2 Justificación, pp. 1–2. Valores: $V_e$ y $0.55 V_m$ del "
+        "piso 1, MCT (Tabla 35, p. 86). Normas: extracto de la lista de ETABS.",
     )
     scene.stop("pregunta-de-investigacion")
 
@@ -1244,6 +1426,7 @@ def manual_transfer(scene: Scene) -> None:
 PASS_TINT = STEEL_SOFT
 ETABS_ICON = ("E", "#2B6CB0")
 EXCEL_ICON = ("X", "#107C41")
+MATHCAD_ICON = ("M", "#5B4A8B")
 
 
 def _window(
@@ -1376,12 +1559,16 @@ SECTION = Section(
             build=manual_transfer,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1.25 min. Los programas comerciales (ETABS, SAP2000) no implementan la E.070; el "
-                "ingeniero exporta tablas, filtra, copia a hojas de cálculo y verifica. Las cifras "
-                "son V_e reales del piso 1 del modelo MCT (Tabla 35 (p. 86)), usadas solo para ilustrar "
-                "el traslado. Riesgos citados en la tesis: errores de selección, transcripción, "
-                "ordenamiento y verificaciones omitidas; no se midió su frecuencia. Cerrar con la "
-                "pregunta de investigación."
+                "1.25 min. (1) En ETABS, la lista de normas de diseño de muros es de concreto "
+                "armado y extranjera (ACI, Eurocódigo, CSA, NZS...): la E.070 no está, ni ningún "
+                "módulo de albañilería (§1.1). (2) Por eso el ingeniero exporta las tablas del "
+                "modelo (fuerzas y propiedades de los Pier, derivas), filtra y copia a una hoja de "
+                "cálculo o a Mathcad: 24 muros por 4 pisos, 96 filas por tabla y combinación. Las "
+                "cifras son V_e y 0.55 V_m reales del piso 1 del modelo MCT (Tabla 35, p. 86). "
+                "Riesgos citados en la tesis: errores de selección, transcripción, ordenamiento y "
+                "verificaciones omitidas; no se midió su frecuencia. (3) Si un muro no cumple, se "
+                "modifica el modelo y el traslado se repite. Cerrar con la pregunta de "
+                "investigación."
             ),
         ),
     ],
