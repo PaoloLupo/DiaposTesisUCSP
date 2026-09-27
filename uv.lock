@@ -11,14 +11,14 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "gaanim", path = "C:/Tools/gaanim/gaanim-0.5.2-py3-none-any.whl" }]
+requires-dist = [{ name = "gaanim", path = "C:/Tools/gaanim/gaanim-0.6.0-py3-none-any.whl" }]
 
 [[package]]
 name = "gaanim"
-version = "0.5.2"
-source = { path = "C:/Tools/gaanim/gaanim-0.5.2-py3-none-any.whl" }
+version = "0.6.0"
+source = { path = "C:/Tools/gaanim/gaanim-0.6.0-py3-none-any.whl" }
 wheels = [
-    { filename = "gaanim-0.5.2-py3-none-any.whl", hash = "sha256:521d3e0427f1a0a153cc5fc2245f6c2352b4b0b4274a66a607add8cd9de5c326" },
+    { filename = "gaanim-0.6.0-py3-none-any.whl", hash = "sha256:a284d3ed5c41309c148b8e39625d4b801618b307cc4abca5b903d57a1a4408b4" },
 ]
 
 [package.metadata]
