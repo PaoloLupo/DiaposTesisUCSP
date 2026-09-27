@@ -18,6 +18,7 @@ from gaanim import (
     computed,
     parallel,
     part,
+    sequence,
     stagger,
 )
 
@@ -25,6 +26,7 @@ from tesis.building import (
     FLOOR_AREA,
     STAIR,
     WALLS,
+    WIDTH,
     density,
     draw_plan,
     grow_walls,
@@ -43,6 +45,7 @@ from tesis.data.thesis import (
 )
 from tesis.kit import (
     LEFT_EDGE,
+    dimension,
     header,
     label,
     panel,
@@ -208,7 +211,56 @@ def density_check(scene: Scene) -> None:
     ).move_to(x0, 1.12, Anchor.TOP_LEFT)
     scene.play([formula.animate.write().duration(0.9)])
     scene.play(minimum.animate.fade_in_from(Direction.UP, 0.08).duration(0.5))
+
+    # L y t no se leen a escala de planta: un inset amplía el muro X1′ de la esquina
+    # y lo acota. Las cotas viven en una capa que solo muestra el inset.
+    wall = next(w for w in WALLS if w.name == "X1")
+    wx0, wy = plan.to_scene(WIDTH - wall.end, wall.fixed)
+    wx1, _ = plan.to_scene(WIDTH - wall.start, wall.fixed)
+    zoom, half = 2.3, 0.045  # medio espesor dibujado
+    cotas = [
+        dimension(
+            scene,
+            (wx0, wy - half),
+            (wx1, wy - half),
+            f"L = {wall.length:.2f} m",
+            side="below",
+            offset=0.16,
+            size=0.16 / zoom,
+            width=0.01 / zoom,
+        ),
+        dimension(
+            scene,
+            (wx1, wy - half),
+            (wx1, wy + half),
+            f"t = {wall.thickness:.2f} m",
+            side="right",
+            offset=0.1,
+            size=0.16 / zoom,
+            width=0.01 / zoom,
+        ),
+    ]
+    for cota in cotas:
+        cota.view_layer("cotas")
+    detail = scene.camera.inset(
+        ((wx0 + wx1) / 2 + 0.06, wy + 0.14),
+        zoom=zoom,
+        at=(4.3, -1.1),
+        size=4.4,
+        shape="rect",
+        color=INK_SOFT,
+        layers=["cotas"],
+    )
+    scene.play(
+        [
+            detail.animate.pop_out().duration(0.8),
+            # En su capa solo las ve el inset; entran cuando la pantalla ya brotó.
+            *[c.animate.fade_in().duration(0.3).delay(0.6) for c in cotas],
+        ]
+    )
     scene.stop("densidad-formula")
+    # El inset vuelve al muro antes de sumar por dirección.
+    scene.play(detail.animate.pop_in().duration(0.5))
 
     rows: tuple[tuple[Literal["X", "Y"], float], ...] = (("X", 0.2), ("Y", -1.45))
     for direction, y in rows:

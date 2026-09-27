@@ -362,6 +362,14 @@ UI_ZONES = [
         "errores de conexión, datos faltantes\no inconsistentes en la importación",
     ),
 ]
+# Centro (px) del detalle que amplía la cámara en cada zona; la barra se recorre
+# de «Importar datos» a «Exportar Excel».
+UI_DETAILS = [
+    ((215, 60), (813, 60)),
+    ((183, 270),),
+    ((528, 678),),
+    ((528, 935),),
+]
 
 
 def interface(scene: Scene) -> None:
@@ -391,7 +399,32 @@ def interface(scene: Scene) -> None:
         [frame.animate.fade_in().duration(0.4), shot.animate.fade_in().duration(0.6)]
     )
     legend_x = 3.95
-    for i, ((px0, py0, px1, py1), name, body) in enumerate(UI_ZONES):
+
+    def at(px: float, py: float) -> tuple[float, float]:
+        """Píxel de la captura a coordenadas de escena."""
+        return x_left + px * s, y_top - py * s
+
+    def legend_item(i: int, y: float) -> list[Drawable]:
+        _, name, body = UI_ZONES[i]
+        return [
+            t(scene, f"{i + 1}", legend_x, y, font=DISPLAY, size=0.36, weight=700, color=BRICK),
+            t(scene, name, legend_x + 0.45, y + 0.02, size=0.23, weight=900, color=INK),
+            t(scene, body, legend_x + 0.45, y - 0.32, size=0.18, color=INK_SOFT),
+        ]
+
+    # Una segunda cámara amplía un detalle legible de cada zona; el marco sobre la
+    # captura indica qué se amplía y la zona se describe bajo la pantalla.
+    detail = scene.camera.inset(
+        at(*UI_DETAILS[0][0]),
+        zoom=1.8,
+        at=(legend_x + 3.35 / 2, 1.3),
+        size=3.35,
+        shape="rect",
+        color=INK_SOFT,
+        connectors=False,
+    )
+    current: list[Drawable] = []
+    for i, ((px0, py0, px1, py1), _, _) in enumerate(UI_ZONES):
         zx0, zx1 = x_left + px0 * s, x_left + px1 * s
         zy0, zy1 = y_top - py0 * s, y_top - py1 * s
         outline = (
@@ -400,55 +433,44 @@ def interface(scene: Scene) -> None:
             .stroke(BRICK, 0.03)
             .move_to((zx0 + zx1) / 2, (zy0 + zy1) / 2)
         )
-        # Insignias sin superponerse: 1 al final de la barra, 2 fuera a la izquierda, 3 y 4 dentro.
-        bx, by = [
-            (zx1 + 0.25, (zy0 + zy1) / 2),
-            (zx0 - 0.25, (zy0 + zy1) / 2),
+        # Numerales sin superponerse: 1 al final de la barra, 2 fuera a la izquierda, 3 y 4 dentro.
+        nx, ny = [
+            (zx1 + 0.22, (zy0 + zy1) / 2),
+            (zx0 - 0.22, (zy0 + zy1) / 2),
             (zx1 - 0.3, zy0 - 0.3),
             (zx1 - 0.3, zy0 - 0.3),
         ][i]
-        badge = scene.geometry.circle(0.17).fill(BRICK).no_stroke().move_to(bx, by)
-        badge_n = t(
-            scene,
-            str(i + 1),
-            bx,
-            by,
-            size=0.2,
-            weight=900,
-            color="#FFFFFF",
-            anchor=Anchor.CENTER,
+        numeral = t(
+            scene, str(i + 1), nx, ny, font=DISPLAY, size=0.36, weight=700, color=BRICK, anchor=Anchor.CENTER
         )
-        y = 2.2 - i * 1.25
-        item_n = t(
-            scene,
-            f"{i + 1}",
-            legend_x,
-            y,
-            font=DISPLAY,
-            size=0.36,
-            weight=700,
-            color=BRICK,
-        )
-        item_t = t(
-            scene, name, legend_x + 0.45, y + 0.02, size=0.23, weight=900, color=INK
-        )
-        item_b = t(scene, body, legend_x + 0.45, y - 0.32, size=0.18, color=INK_SOFT)
+        item = legend_item(i, 0.0)
+        first, *rest = UI_DETAILS[i]
+        view = detail.animate.pop_out() if i == 0 else detail.animate.pan_to(*at(*first))
         scene.play(
-            stagger(
+            [
                 outline.animate.create().duration(0.5),
-                badge.animate.grow_from_center().duration(0.25),
-                badge_n.animate.fade_in().duration(0.2),
-                stagger(
-                    item_n.animate.fade_in().duration(0.3),
-                    item_t.animate.fade_in().duration(0.3),
-                    item_b.animate.fade_in().duration(0.3),
-                    each=0.06,
-                ),
-                each=0.12,
-            )
+                numeral.animate.fade_in().duration(0.3).delay(0.2),
+                view.duration(0.8),
+                *[c.animate.fade_out().duration(0.25) for c in current],
+                stagger(*[c.animate.fade_in().duration(0.3) for c in item], each=0.06).delay(0.4),
+            ]
         )
+        # La barra de herramientas no cabe entera: la cámara la recorre.
+        for point in rest:
+            scene.play(detail.animate.pan_to(*at(*point)).duration(1.2))
+        current = item
         if i < len(UI_ZONES) - 1:
             scene.stop(f"interfaz-zona-{i + 1}")
+
+    # Cierre: la pantalla vuelve a la captura y queda la leyenda completa.
+    legend = [c for i in range(len(UI_ZONES)) for c in legend_item(i, 2.2 - i * 1.25)]
+    scene.play(
+        [
+            detail.animate.pop_in().duration(0.5),
+            *[c.animate.fade_out().duration(0.25) for c in current],
+            stagger(*[c.animate.fade_in().duration(0.25) for c in legend], each=0.04).delay(0.4),
+        ]
+    )
     source(
         scene,
         "Tesis · Figura 51, p. 121 · captura de Alba v0.1.0 con el modelo del caso (ModeloBartolomes.EDB)",
@@ -552,24 +574,21 @@ def report(scene: Scene) -> None:
     chain: list[Drawable] = []
     x = LEFT_EDGE
     for i, step in enumerate(steps):
-        w_, _ = scene.text.measure(step, size=0.19, font=MONO)
-        chain.append(
-            pill(
-                scene,
-                step,
-                x,
-                -1.75,
-                size=0.19,
-                color=BRICK_DEEP if i == 3 else INK,
-                background=BRICK_SOFT if i == 3 else PAPER_DEEP,
-                anchor=Anchor.LEFT,
-            )
+        chip = pill(
+            scene,
+            step,
+            x,
+            -1.75,
+            size=0.19,
+            color=BRICK_DEEP if i == 3 else INK,
+            background=BRICK_SOFT if i == 3 else PAPER_DEEP,
+            anchor=Anchor.LEFT,
         )
+        chain.append(chip)
+        right = chip.bounds().right
         if i < len(steps) - 1:
-            chain.append(
-                link(scene, (x + w_ + 0.42, -1.75), (x + w_ + 0.82, -1.75), color=MUTED)
-            )
-        x += w_ + 0.95
+            chain.append(link(scene, (right + 0.1, -1.75), (right + 0.5, -1.75), color=MUTED))
+        x = right + 0.63
     sections = [
         "Datos de diseño",
         "Requisitos mínimos",
@@ -584,7 +603,6 @@ def report(scene: Scene) -> None:
     chips: list[Drawable] = []
     x = LEFT_EDGE
     for name in sections:
-        w_, _ = scene.text.measure(name, size=0.18, font="Lato")
         chips.append(
             pill(
                 scene,
@@ -599,7 +617,7 @@ def report(scene: Scene) -> None:
                 anchor=Anchor.LEFT,
             )
         )
-        x += w_ + 0.5
+        x = chips[-1].bounds().right + 0.18
     scene.play(
         stagger(
             *[

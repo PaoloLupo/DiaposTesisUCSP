@@ -1,6 +1,7 @@
 """Bloque 1 · Problemática: material, sistema sísmico y traslado manual de datos."""
 
 import math
+from dataclasses import dataclass
 
 from gaanim import (
     Anchor,
@@ -76,7 +77,7 @@ def materials(scene: Scene) -> None:
     outline = (
         scene.media.svg("peru.svg")
         .no_fill()
-        .stroke(INK_SOFT, 0.016)
+        .stroke(INK_SOFT, 0.0093)
         .scale_to(0.58)
         .move_to(-4.75, -0.15)
     )
@@ -472,23 +473,42 @@ def plates(scene: Scene) -> None:
         ]
     )
 
-    # La placa de Nazca converge hacia el este-noreste, contra el continente.
-    pushes: list[Drawable] = []
-    for lat in (-9.5, -15.0):
+    # La placa de Nazca converge hacia el este-noreste, contra el continente. En cada
+    # carril una flecha avanza a velocidad constante y se desvanece mientras sale la
+    # siguiente, como la placa que se mueve; la última se queda para la pausa.
+    body_dx, body_dy = 1.2, 0.24  # de la cola a la punta
+    # Cada flecha recorre algo más que su largo: la siguiente no la alcanza.
+    travel = 1.3 / math.hypot(body_dx, body_dy)
+    step_x, step_y = body_dx * travel, body_dy * travel
+    cycle, departures = 1.0, (0.0, 0.9, 1.8)
+    flow = []
+    for lane, lat in enumerate((-9.5, -15.0)):
         x1, y1 = _geo(-83.2, lat)
-        pushes.append(
-            scene.geometry.arrow(
-                x1 - 1.2,
-                y1 - 0.24,
-                x1,
-                y1,
-                head_length=0.2,
-                head_width=0.22,
-                body_width=0.07,
+        for k, departure in enumerate(departures):
+            arrow = (
+                scene.geometry.arrow(
+                    x1 - body_dx,
+                    y1 - body_dy,
+                    x1,
+                    y1,
+                    head_length=0.2,
+                    head_width=0.22,
+                    body_width=0.07,
+                )
+                .fill(STEEL)
+                .no_stroke()
+                .shift_by(-step_x, -step_y)
             )
-            .fill(STEEL)
-            .no_stroke()
-        )
+            stays = k == len(departures) - 1
+            motion = [
+                arrow.animate.shift_by(step_x, step_y)
+                .duration(cycle)
+                .easing(Easing.ease_out(EasingCurve.SINE) if stays else Easing.LINEAR),
+                arrow.animate.fade_in().duration(0.3 * cycle),
+            ]
+            if not stays:
+                motion.append(arrow.animate.fade_out().duration(0.35 * cycle).delay(0.65 * cycle))
+            flow.append(parallel(*motion).delay(departure + 0.2 * lane))
     ax, ay = _geo(-83.2, -15.0)
     rate = t(
         scene,
@@ -502,38 +522,41 @@ def plates(scene: Scene) -> None:
     )
     scene.play(
         [
-            *[a.animate.grow_arrow().duration(0.6) for a in pushes],
-            rate.animate.fade_in().duration(0.5),
+            *flow,
+            rate.animate.fade_in().duration(0.5).delay(1.6),
         ]
     )
     scene.stop("dos-placas")
 
-    # Paso temporal al mecanismo: la cámara entra en la fosa frente a Lima y el mapa
-    # cede la pantalla al bloque en 3D. Lo que aparece encima se construye en
-    # coordenadas de pantalla (divididas por el zoom) alrededor del centro de la vista.
-    zoom = 3.0
+    # Mecanismo: una segunda cámara mira la fosa frente a Lima y su pantalla brota de
+    # ahí sobre el océano; dentro, un corte en 3D sustituye al mapa. El corte vive en
+    # una capa que solo ve esa pantalla, así que el mapa sigue a la vista alrededor.
+    # Lo de adentro se diseña en unidades de la pantalla (origen en su centro) y se
+    # lleva a la escena dividiendo por el aumento.
+    lens = 3.5  # aumento de la pantalla del corte
     cx, cy = _geo(-78.4, -12.0)
+    screen_w, screen_h = 6.4, 3.6
 
-    def at(sx: float, sy: float) -> tuple[float, float]:
-        return cx + sx / zoom, cy + sy / zoom
+    def inside(sx: float, sy: float) -> tuple[float, float]:
+        return cx + sx / lens, cy + sy / lens
 
     veil = (
-        scene.geometry.rect(16 / zoom + 0.2, 9 / zoom + 0.2)
+        scene.geometry.rect(screen_w / lens + 0.1, screen_h / lens + 0.1)
         .fill(PAPER)
         .no_stroke()
         .move_to(cx, cy)
         .z_index(30)
     )
-    block_scale, block_y = 0.72, 0.35
+    block_scale, block_y = 0.36, 0.25
     block = scene.media.lottie("placas_subduccion_paleta.lottie")
-    block.scale_by(block_scale / zoom).move_to(*at(0, block_y)).z_index(31)
+    block.scale_by(block_scale / lens).move_to(*inside(0, block_y)).z_index(31)
     block_labels = [
         t(
             scene,
             name,
-            *at(dx * block_scale, block_y + dy * block_scale),
+            *inside(dx * block_scale, block_y + dy * block_scale),
             font=MONO,
-            size=0.2 / zoom,
+            size=0.15 / lens,
             weight=700,
             color=color,
             anchor=Anchor.CENTER,
@@ -547,16 +570,24 @@ def plates(scene: Scene) -> None:
         scene,
         "La placa de Nazca se hunde (subduce) bajo la Sudamericana.\n"
         "El contacto se traba, acumula energía y la libera en sismos.",
-        *at(0, -2.75),
-        size=0.26 / zoom,
+        *inside(0, -1.2),
+        size=0.165 / lens,
         color=INK_SOFT,
         anchor=Anchor.TOP,
     ).z_index(31)
-    scene.play(
-        scene.camera.animate.to(scene.camera.state_2d((cx, cy), zoom))
-        .duration(1.2)
-        .easing(Easing.ease_in_out(EasingCurve.CUBIC))
+    section_view = [veil, block, *block_labels, explain]
+    for part in section_view:
+        part.view_layer("corte")
+    cut = scene.camera.inset(
+        (cx, cy),
+        zoom=lens,
+        at=(-3.7, 0.2),  # cubre las puntas de las flechas y el rótulo de la fosa
+        size=screen_w,
+        shape="rect",
+        color=INK_SOFT,
+        layers=["corte"],
     )
+    scene.play(cut.animate.pop_out().duration(1.0).easing(Easing.ease_in_out(EasingCurve.CUBIC)))
     scene.play(
         [
             veil.animate.fade_in().duration(0.6),
@@ -566,13 +597,12 @@ def plates(scene: Scene) -> None:
         ]
     )
     scene.stop("subduccion")
+    # El corte se apaga y la pantalla vuelve a la fosa.
     scene.play(
-        [
-            block.animate.fade_out().duration(0.5),
-            *[b.animate.fade_out().duration(0.4) for b in block_labels],
-            explain.animate.fade_out().duration(0.4),
-            veil.animate.fade_out().duration(0.6).delay(0.3),
-        ]
+        sequence(
+            parallel(*[p.animate.fade_out().duration(0.4) for p in section_view]),
+            cut.animate.pop_in().duration(0.6),
+        )
     )
 
     # Grandes sismos del último siglo: todos frente a la costa, sobre el contacto.
@@ -630,10 +660,11 @@ def plates(scene: Scene) -> None:
                 each=0.15,
             )
         )
-    # Desde la fosa, la cámara recorre la costa de norte a sur y sacude la escena en
+    # La cámara entra en la costa y la recorre de norte a sur, sacudiendo la escena en
     # cada evento con un trauma proporcional a la magnitud: Arequipa (8.4) sacude
     # visiblemente más que Áncash (7.9). El encuadre no sale del mapa y al final
     # vuelve a la vista completa.
+    zoom = 3.0
     half_w, half_h = 8 / zoom, 4.5 / zoom
     tour = []
     shake_time = 0.8
@@ -646,7 +677,7 @@ def plates(scene: Scene) -> None:
         tour.append(
             sequence(
                 scene.camera.animate.to(scene.camera.state_2d(view, zoom))
-                .duration(0.8)
+                .duration(1.2 if i == 0 else 0.8)  # el primero parte de la vista completa
                 .easing(Easing.ease_in_out(EasingCurve.CUBIC)),
                 parallel(mark, _quake_shake(scene, mw, shake_time, seed=i)),
                 gap=-0.1,
@@ -984,8 +1015,60 @@ ETABS_OFFER = (
     ("Ninguna de albañilería", "la E.070 no está implementada en el programa"),
     ("La verificación queda fuera", "se resuelve a mano en hojas de cálculo"),
 )
-TRANSFER_RISKS = ("¿fila y muro correctos?", "¿combinación de carga?", "¿unidades y signos?")
+# Riesgos del traslado manual con los términos de la tesis (§1.1 y cap. 6).
+TRANSFER_RISKS = (
+    "Errores de selección",
+    "Errores de transcripción",
+    "Errores de ordenamiento",
+    "Verificaciones omitidas",
+)
 TRANSFER_PIERS = ("X1", "X3", "X4", "X5", "X6", "X7")
+# Vueltas del traslado. La última copia los valores reales (MCT, piso 1, Tabla 35);
+# las previas son ilustrativas: X1 no cumple, se agranda en el modelo y, más rígido,
+# atrae más cortante y deja algo menos a los demás muros.
+X1_EARLIER = ((6.214, 5.873), (6.688, 6.502))  # (Ve, 0.55 Vm) de X1 en las vueltas 1 y 2
+OTHERS_EARLIER = (1.046, 1.022)  # Ve de los demás muros respecto del valor final
+
+type Span = tuple[float, float, float]
+
+
+def _transfer_round(r: int) -> dict[str, tuple[float, float]]:
+    """(Ve, 0.55 Vm) de cada muro del traslado en la vuelta ``r``, desde 0."""
+    final = CRACKING_FLOOR1["MCT"]
+    if r == len(X1_EARLIER):
+        return {pier: final[pier] for pier in TRANSFER_PIERS}
+    values = {pier: (final[pier][0] * OTHERS_EARLIER[r], final[pier][1]) for pier in TRANSFER_PIERS}
+    values["X1"] = X1_EARLIER[r]
+    return values
+
+
+@dataclass(frozen=True)
+class Transcript:
+    """Una vuelta del traslado: lo copiado a mano en Excel y Mathcad."""
+
+    rows: list[list[Drawable]]  # por fila de Excel: Ve, 0.55 Vm y Cumple
+    sheet: list[Drawable]  # V_e y la comprobación en Mathcad
+    spans: list[Span]  # tramos (x0, x1, y) de lo copiado, en el orden de ``pasted``
+
+    @property
+    def pasted(self) -> list[Drawable]:
+        return [cell for row in self.rows for cell in row[:2]] + self.sheet
+
+
+def _copied(
+    scene: Scene,
+    content: str,
+    x: float,
+    y: float,
+    *,
+    size: float,
+    font: str | None = None,
+    color: Color = INK,
+) -> tuple[Drawable, Span]:
+    """Valor copiado a mano y su tramo, que se tacha cuando queda desactualizado."""
+    text = t(scene, content, x, y, font=font, size=size, color=color, anchor=Anchor.LEFT)
+    box = text.bounds()
+    return text, (box.left, box.right, y)
 
 
 def _cells(
@@ -1203,10 +1286,21 @@ def manual_transfer(scene: Scene) -> None:
         )
     ]
     etabs_xs = (-6.8, -5.55, -4.3)
+    etabs_ys = [1.15 - i * 0.3 for i in range(len(TRANSFER_PIERS))]
     etabs_rows = [_cells(scene, ("Story", "Pier", "Ve (tonf)"), etabs_xs, 1.5, weight=700, color=INK_SOFT)]
-    for i, pier in enumerate(TRANSFER_PIERS):
-        ve = CRACKING_FLOOR1["MCT"][pier][0]
-        etabs_rows.append(_cells(scene, ("Story1", pier, f"{ve:.3f}"), etabs_xs, 1.15 - i * 0.3))
+    etabs_rows += [
+        _cells(scene, ("Story1", pier), etabs_xs[:2], y)
+        for pier, y in zip(TRANSFER_PIERS, etabs_ys, strict=True)
+    ]
+    rounds = [_transfer_round(r) for r in range(len(X1_EARLIER) + 1)]
+    # Ve de cada vuelta: cambian cada vez que se reanaliza el modelo modificado.
+    etabs_ve = [
+        [
+            t(scene, f"{values[pier][0]:.3f}", etabs_xs[2], y, font=MONO, size=0.15, anchor=Anchor.LEFT)
+            for pier, y in zip(TRANSFER_PIERS, etabs_ys, strict=True)
+        ]
+        for values in rounds
+    ]
     etabs_more = t(scene, "⋮", -5.55, -0.7, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
     count = t(
         scene,
@@ -1239,39 +1333,66 @@ def manual_transfer(scene: Scene) -> None:
         anchor=Anchor.BOTTOM,
     )
     excel = _window(scene, 4.2, 1.35, 5.8, 1.9, "Excel · Verificación E.070", icon=EXCEL_ICON, tint=PASS_TINT)
-    excel_xs = (1.55, 2.75, 3.95, 5.4)
-    excel_rows = [_cells(scene, ("Piso", "Muro", "Ve", "0.55 Vm"), excel_xs, 1.8, weight=700, color=INK_SOFT)]
-    # Tramos (x0, x1, y) de cada valor copiado: se tachan cuando quedan desactualizados.
-    copied_spans: list[tuple[float, float, float]] = []
-    for i, pier in enumerate(TRANSFER_PIERS[:3]):
-        ve, limit = CRACKING_FLOOR1["MCT"][pier]
-        y = 1.5 - i * 0.28
-        values = (f"{ve:.3f}", f"{limit:.3f}")
-        excel_rows.append(_cells(scene, ("1", pier, *values), excel_xs, y))
-        for value, x in zip(values, excel_xs[2:], strict=True):
-            width, _ = scene.text.measure(value, font=MONO, size=0.15)
-            copied_spans.append((x, x + width, y))
-    excel_more = t(scene, "⋮", 2.75, 0.62, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
-    mathcad = _window(scene, 4.2, -0.75, 5.8, 1.9, "Mathcad · Verificación E.070", icon=MATHCAD_ICON)
-    ve, limit = CRACKING_FLOOR1["MCT"]["X1"]
-    formulas = (
-        (f'$V_e := {ve:.3f} "tonf"$', -0.42),
-        ("$V_m := 0.5 v'_m alpha t L + 0.23 P_g$", -0.82),
-        (f'$V_e <= 0.55 V_m = {limit:.3f} "tonf"$', -1.22),
-    )
-    worksheet = [
-        t(scene, line, 1.6, y, size=0.19, color=INK, anchor=Anchor.LEFT) for line, y in formulas
+    excel_xs = (1.55, 2.5, 3.5, 4.75, 6.1)
+    excel_piers = TRANSFER_PIERS[:3]
+    excel_ys = [1.5 - i * 0.28 for i in range(len(excel_piers))]
+    excel_rows = [
+        _cells(scene, ("Piso", "Muro", "Ve", "0.55 Vm", "Cumple"), excel_xs, 1.8, weight=700, color=INK_SOFT)
     ]
-    for line, y in formulas:
-        width, _ = scene.text.measure(line, size=0.19)
-        copied_spans.append((1.6, 1.6 + width, y))
+    excel_rows += [
+        _cells(scene, ("1", pier), excel_xs[:2], y) for pier, y in zip(excel_piers, excel_ys, strict=True)
+    ]
+    excel_more = t(scene, "⋮", 2.5, 0.62, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
+    mathcad = _window(scene, 4.2, -0.75, 5.8, 1.9, "Mathcad · Verificación E.070", icon=MATHCAD_ICON)
+    vm_line = t(scene, "$V_m := 0.5 v'_m alpha t L + 0.23 P_g$", 1.6, -0.82, size=0.19, color=INK, anchor=Anchor.LEFT)
+
+    def transcribe(values: dict[str, tuple[float, float]]) -> Transcript:
+        """Lo que se copia en una vuelta; la hoja recalcula Cumple y Mathcad la comprobación."""
+        rows: list[list[Drawable]] = []
+        spans: list[Span] = []
+        for pier, y in zip(excel_piers, excel_ys, strict=True):
+            ve, cap = values[pier]
+            ok = ve <= cap
+            ve_text, ve_span = _copied(
+                scene, f"{ve:.3f}", excel_xs[2], y, font=MONO, size=0.15, color=INK if ok else FAIL
+            )
+            cap_text, cap_span = _copied(scene, f"{cap:.3f}", excel_xs[3], y, font=MONO, size=0.15)
+            check = t(
+                scene,
+                "sí" if ok else "no",
+                excel_xs[4],
+                y,
+                font=MONO,
+                size=0.15,
+                weight=400 if ok else 700,
+                color=INK if ok else FAIL,
+                anchor=Anchor.LEFT,
+            )
+            rows.append([ve_text, cap_text, check])
+            spans += [ve_span, cap_span]
+        ve, cap = values["X1"]
+        ok = ve <= cap
+        relation = "<=" if ok else ">"
+        sheet: list[Drawable] = []
+        for line, y, color in (
+            (f'$V_e := {ve:.3f} "tonf"$', -0.42, INK),
+            (f'$V_e {relation} 0.55 V_m = {cap:.3f} "tonf"$', -1.22, INK if ok else FAIL),
+        ):
+            text, span = _copied(scene, line, 1.6, y, size=0.19, color=color)
+            sheet.append(text)
+            spans.append(span)
+        return Transcript(rows, sheet, spans)
+
+    transcripts = [transcribe(values) for values in rounds]
+    first_copy = transcripts[0]
+    worksheet = [first_copy.sheet[0], vm_line, first_copy.sheet[1]]
     mathcad_more = t(scene, "⋮", 1.6, -1.52, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT)
-    risks = [
+    risks = [label(scene, "Riesgos del traslado", -2.38, 0.0, color=MUTED, size=0.14)] + [
         item
         for i, text in enumerate(TRANSFER_RISKS)
         for item in (
-            dash(scene, -2.3, -0.35 - i * 0.36, color=INK_SOFT),
-            t(scene, text, -2.12, -0.35 - i * 0.36, size=0.18, color=INK_SOFT, anchor=Anchor.LEFT),
+            dash(scene, -2.3, -0.42 - i * 0.34, color=INK_SOFT),
+            t(scene, text, -2.12, -0.42 - i * 0.34, size=0.18, color=INK_SOFT, anchor=Anchor.LEFT),
         )
     ]
 
@@ -1280,7 +1401,11 @@ def manual_transfer(scene: Scene) -> None:
         [
             stagger(*[w.animate.fade_in_from(Direction.UP, 0.06).duration(0.35) for w in tables], each=0.15),
             stagger(
-                *[c.animate.fade_in().duration(0.15) for row in etabs_rows for c in row],
+                *[
+                    c.animate.fade_in().duration(0.15)
+                    for c in etabs_rows[0]
+                    + [c for row, ve in zip(etabs_rows[1:], etabs_ve[0], strict=True) for c in (*row, ve)]
+                ],
                 each=0.02,
             ).delay(0.4),
             etabs_more.animate.fade_in().duration(0.2).delay(1.0),
@@ -1302,8 +1427,12 @@ def manual_transfer(scene: Scene) -> None:
         [
             _packets(scene, 18, *trip, each=0.13),
             stagger(
-                *[c.animate.fade_in().duration(0.15) for row in excel_rows for c in row],
-                each=0.06,
+                *[
+                    c.animate.fade_in().duration(0.15)
+                    for c in excel_rows[0]
+                    + [c for row, copy in zip(excel_rows[1:], first_copy.rows, strict=True) for c in (*row, *copy)]
+                ],
+                each=0.05,
             ).delay(0.6),
             excel_more.animate.fade_in().duration(0.2).delay(1.9),
             stagger(
@@ -1352,8 +1481,6 @@ def manual_transfer(scene: Scene) -> None:
         1, font_family=DISPLAY, weight=700, font_size=0.34, color=BRICK_DEEP
     )
     turns.move_to(*badge, Anchor.CENTER)
-    etabs_values = [row[2] for row in etabs_rows[1:]]
-    copied = [c for row in excel_rows[1:] for c in row[2:]] + worksheet
     scene.play(
         [
             *[r.animate.opacity(0.35).duration(0.3) for r in risks],
@@ -1365,11 +1492,12 @@ def manual_transfer(scene: Scene) -> None:
         ]
     )
     # Cada vuelta: el cambio viaja al modelo, lo copiado queda tachado, ETABS
-    # reanaliza (barra de progreso) y se vuelve a exportar, filtrar y copiar todo.
-    for n in (2, 3):
+    # reanaliza (barra de progreso) con nuevos Ve y se vuelve a copiar todo.
+    for n in range(1, len(rounds)):
+        before, after = transcripts[n - 1], transcripts[n]
         strikes = [
             scene.geometry.line(x0 - 0.03, y, x1 + 0.03, y).stroke(BRICK, 0.016).z_index(6)
-            for x0, x1, y in copied_spans
+            for x0, x1, y in before.spans
         ]
         progress = scene.geometry.line(-7.08, 1.59, -2.92, 1.59).stroke(STEEL, 0.03)
         scene.play(
@@ -1381,36 +1509,59 @@ def manual_transfer(scene: Scene) -> None:
                     gap=0.01,
                 ),
                 ring.animate.rotate_by(2 * math.pi).duration(1.0).easing(Easing.SMOOTH),
-                turns.count_to(n, duration=0.5).delay(0.3),
-                *[c.animate.opacity(0.35).duration(0.3) for c in copied],
+                turns.count_to(n + 1, duration=0.5).delay(0.3),
+                *[
+                    c.animate.opacity(0.35).duration(0.3)
+                    for c in before.pasted + [row[2] for row in before.rows]
+                ],
                 stagger(*[st.animate.create().duration(0.2) for st in strikes], each=0.04),
-                *[v.animate.opacity(0.2).duration(0.25).delay(0.85) for v in etabs_values],
+                *[v.animate.opacity(0.2).duration(0.25).delay(0.85) for v in etabs_ve[n - 1]],
             ]
         )
         scene.play(
             [
                 progress.animate.create().duration(0.6),
                 stagger(
-                    *[v.animate.opacity(1).duration(0.2) for v in etabs_values], each=0.06
+                    *[
+                        parallel(old.animate.fade_out().duration(0.15), new.animate.fade_in().duration(0.2))
+                        for old, new in zip(etabs_ve[n - 1], etabs_ve[n], strict=True)
+                    ],
+                    each=0.06,
                 ).delay(0.5),
                 progress.animate.fade_out().duration(0.2).delay(0.95),
             ]
         )
+        # Cada valor tachado da paso al nuevo; la hoja recalcula Cumple después.
+        row_strikes = [strikes[2 * i : 2 * i + 2] for i in range(len(before.rows))]
+        sheet_strikes = strikes[2 * len(before.rows) :]
         scene.play(
             [
                 _packets(scene, 10, *trip, each=0.1),
                 stagger(
                     *[
                         parallel(
-                            c.animate.opacity(1).duration(0.2),
-                            st.animate.fade_out().duration(0.2),
+                            *[x.animate.fade_out().duration(0.2) for x in (*old, *marks)],
+                            *[x.animate.fade_in().duration(0.2) for x in new[:2]],
+                            new[2].animate.fade_in().duration(0.2).delay(0.2),
                         )
-                        for c, st in zip(copied, strikes, strict=True)
+                        for old, marks, new in zip(before.rows, row_strikes, after.rows, strict=True)
                     ],
-                    each=0.06,
+                    each=0.18,
                 ).delay(0.6),
+                stagger(
+                    *[
+                        parallel(
+                            old.animate.fade_out().duration(0.2),
+                            mark.animate.fade_out().duration(0.2),
+                            new.animate.fade_in().duration(0.2),
+                        )
+                        for old, mark, new in zip(before.sheet, sheet_strikes, after.sheet, strict=True)
+                    ],
+                    each=0.3,
+                ).delay(0.8),
             ]
         )
+        scene.wait(0.6)  # tiempo para leer si X1 ya cumple
     takeaway(
         scene,
         "¿Cómo sistematizar la verificación de la norma E.070 a partir de un modelo de ETABS?",
@@ -1563,11 +1714,12 @@ SECTION = Section(
                 "armado y extranjera (ACI, Eurocódigo, CSA, NZS...): la E.070 no está, ni ningún "
                 "módulo de albañilería (§1.1). (2) Por eso el ingeniero exporta las tablas del "
                 "modelo (fuerzas y propiedades de los Pier, derivas), filtra y copia a una hoja de "
-                "cálculo o a Mathcad: 24 muros por 4 pisos, 96 filas por tabla y combinación. Las "
-                "cifras son V_e y 0.55 V_m reales del piso 1 del modelo MCT (Tabla 35, p. 86). "
+                "cálculo o a Mathcad: 24 muros por 4 pisos, 96 filas por tabla y combinación. "
                 "Riesgos citados en la tesis: errores de selección, transcripción, ordenamiento y "
-                "verificaciones omitidas; no se midió su frecuencia. (3) Si un muro no cumple, se "
-                "modifica el modelo y el traslado se repite. Cerrar con la pregunta de "
+                "verificaciones omitidas; no se midió su frecuencia. (3) En la hoja, X1 no cumple: "
+                "se modifica el modelo, ETABS reanaliza, cambian los V_e de todos los muros y hay "
+                "que volver a copiarlo todo; a la tercera vuelta cumple, con V_e y 0.55 V_m reales "
+                "del piso 1 del modelo MCT (Tabla 35, p. 86). Cerrar con la pregunta de "
                 "investigación."
             ),
         ),

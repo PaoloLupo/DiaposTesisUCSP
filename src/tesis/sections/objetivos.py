@@ -4,18 +4,23 @@ from gaanim import (
     Anchor,
     Direction,
     Drawable,
+    Easing,
+    Playable,
     Scene,
     Section,
     SectionStep,
     Transition,
+    parallel,
+    part,
+    sequence,
     stagger,
 )
 
-from tesis.kit import LEFT_EDGE, header, label, panel, source, t, takeaway
+from tesis.kit import LEFT_EDGE, RIGHT_EDGE, header, label, panel, source, t, takeaway
 from tesis.theme import (
+    BODY,
     BRICK,
     BRICK_DEEP,
-    BRICK_SOFT,
     CARD,
     DISPLAY,
     INK,
@@ -30,98 +35,92 @@ from tesis.theme import (
 KICKER = "02 · Objetivos y método"
 
 
+# Cadena del objetivo: cada eslabón y la frase del objetivo general que le corresponde.
+CHAIN = (
+    ("ETABS", "modelo analizado", "etabs"),
+    ("Marco", "procesos y flujos", "marco"),
+    ("Alba", "programa propio", "alba"),
+    ("Reporte", "memoria trazable", "verificacion"),
+)
+
+
 def purpose(scene: Scene) -> None:
     header(scene, KICKER, "Un marco de trabajo entre ETABS y la verificación E.070")
 
     tag = label(scene, "Objetivo general", LEFT_EDGE, 2.35, color=BRICK)
-    objective = t(
-        scene,
-        "Desarrollar un marco de trabajo para la\n"
-        "automatización de la verificación normativa\n"
-        "de la distribución de muros en planta de\n"
-        "edificios de albañilería confinada (E.070),\n"
-        "aplicado en un programa propio que\n"
-        "interactúa con el software ETABS.",
-        LEFT_EDGE,
-        2.0,
+    objective = scene.text(
+        "Desarrollar ",
+        part("marco", "un marco de trabajo"),
+        " para la\nautomatización de la ",
+        part("verificacion", "verificación normativa"),
+        "\nde la distribución de muros en planta de\n"
+        "edificios de albañilería confinada (E.070),\naplicado en ",
+        part("alba", "un programa propio"),
+        " que\ninteractúa con ",
+        part("etabs", "el software ETABS"),
+        ".",
+        style=BODY,
         font=DISPLAY,
         size=0.36,
         weight=400,
         color=INK,
-    )
+    ).move_to(LEFT_EDGE, 2.0, Anchor.TOP_LEFT)
     scene.play(
         stagger(
             tag.animate.fade_in().duration(0.3),
-            objective.animate.fade_in_from(Direction.UP, 0.1).duration(0.8),
+            objective.animate.reveal(style="slide_up", by="line", stagger=0.09).duration(1.0),
             each=0.15,
         )
     )
 
-    chain = [
-        ("ETABS", "modelo analizado"),
-        ("Marco", "procesos y flujos"),
-        ("Alba", "programa propio"),
-        ("Reporte", "memoria trazable"),
+    # Un paquete de datos recorre la cadena; al llegar a cada eslabón aparece su
+    # nombre y se enciende en el objetivo la frase que lo anuncia.
+    line_y = -1.55
+    xs = [LEFT_EDGE + i * 2.55 for i in range(len(CHAIN))]
+    ticks = [
+        scene.geometry.line(x, line_y + 0.1, x, line_y - 0.1).stroke(INK_SOFT, 0.02) for x in xs
     ]
-    nodes: list[Drawable] = []
-    for i, (name, sub) in enumerate(chain):
-        x = LEFT_EDGE + 0.85 + i * 2.25
-        box = panel(
+    segments = [
+        scene.geometry.line(a, line_y, b, line_y).stroke(INK_SOFT, 0.016)
+        for a, b in zip(xs, xs[1:])
+    ]
+    packet = scene.geometry.rect(0.14, 0.14).fill(BRICK).no_stroke().move_to(xs[0], line_y).z_index(5)
+    hops: list[Playable] = [packet.animate.fade_in().duration(0.15)]
+    for i, ((name, sub, key), x) in enumerate(zip(CHAIN, xs, strict=True)):
+        proposal = name in ("Marco", "Alba")
+        title = t(
             scene,
+            name,
             x,
-            -1.85,
-            1.75,
-            0.9,
-            fill=BRICK_SOFT if name in ("Marco", "Alba") else CARD,
-            border=None if name in ("Marco", "Alba") else RULE,
+            line_y - 0.22,
+            size=0.26,
+            weight=900,
+            color=BRICK_DEEP if proposal else INK,
         )
-        nodes.append(box)
-        nodes.append(
-            t(
-                scene,
-                name,
-                x,
-                -1.72,
-                size=0.24,
-                weight=900,
-                color=BRICK_DEEP if name in ("Marco", "Alba") else INK,
-                anchor=Anchor.CENTER,
-            )
-        )
-        nodes.append(
-            t(scene, sub, x, -2.05, size=0.15, color=INK_SOFT, anchor=Anchor.CENTER)
-        )
+        note = t(scene, sub, x, line_y - 0.58, size=0.16, color=INK_SOFT)
         if i:
-            nodes.append(
-                scene.geometry.arrow(
-                    x - 1.37,
-                    -1.85,
-                    x - 0.93,
-                    -1.85,
-                    head_length=0.12,
-                    head_width=0.12,
-                    body_width=0.022,
+            hops.append(
+                parallel(
+                    packet.animate.move_to(x, line_y).duration(0.5).easing(Easing.LINEAR),
+                    segments[i - 1].animate.create().duration(0.5).easing(Easing.LINEAR),
                 )
-                .fill(MUTED)
-                .no_stroke()
             )
-    scene.play(stagger(*[n.animate.fade_in().duration(0.3) for n in nodes], each=0.05))
+        hops.append(
+            parallel(
+                ticks[i].animate.create().duration(0.2),
+                title.animate.fade_in_from(Direction.UP, 0.06).duration(0.3),
+                note.animate.fade_in().duration(0.3).delay(0.1),
+                objective[key].animate.fill(BRICK).duration(0.35),
+            )
+        )
+    hops.append(packet.animate.fade_out().duration(0.2))
+    scene.play(sequence(*hops))
     scene.stop("objetivo-general")
 
-    card = panel(scene, 2.35, 2.45, 4.95, 4.95, fill=CARD, anchor=Anchor.TOP_LEFT)
-    h_badge = scene.geometry.circle(0.26).fill(STEEL).no_stroke().move_to(2.9, 1.95)
-    h_letter = t(
-        scene,
-        "H",
-        2.9,
-        1.95,
-        font=DISPLAY,
-        size=0.3,
-        weight=700,
-        color="#FFFFFF",
-        anchor=Anchor.CENTER,
-    )
-    h_tag = label(scene, "Hipótesis", 3.35, 2.05, color=STEEL)
+    # Hipótesis: el método de verificación (manual → automatizado) incide en el
+    # cumplimiento normativo.
+    hx, dep_x = 2.5, 5.15
+    h_tag = label(scene, "Hipótesis", hx, 2.35, color=STEEL)
     hypothesis = t(
         scene,
         "Un marco automatizado, integrado a ETABS\n"
@@ -130,36 +129,71 @@ def purpose(scene: Scene) -> None:
         "del modelo de elementos finitos, así como\n"
         "ejecutar y documentar las verificaciones\n"
         "normativas.",
-        2.7,
-        1.45,
+        hx,
+        2.0,
         size=0.23,
         color=INK,
     )
-    rule = scene.geometry.line(2.7, -0.35, 6.95, -0.35).stroke(RULE, 0.012)
-    variables = [
-        (
-            "Variable independiente",
-            "Método de verificación:\nmanual o automatizado",
-            -0.55,
-        ),
-        ("Variable dependiente", "Cumplimiento normativo", -1.55),
+    rule = scene.geometry.line(hx, 0.1, RIGHT_EDGE, 0.1).stroke(RULE, 0.012)
+    independent = [
+        label(scene, "Variable independiente", hx, -0.15, color=MUTED, size=0.12),
+        t(scene, "Método de\nverificación", hx, -0.42, size=0.22, weight=700, color=INK),
     ]
-    var_items: list[Drawable] = []
-    for name, body, y in variables:
-        var_items.append(label(scene, name, 2.7, y, color=MUTED, size=0.13))
-        var_items.append(
-            t(scene, body, 2.7, y - 0.25, size=0.22, weight=700, color=INK)
+    dependent = [
+        label(scene, "Variable dependiente", dep_x, -0.15, color=MUTED, size=0.12),
+        t(scene, "Cumplimiento\nnormativo", dep_x, -0.42, size=0.22, weight=700, color=INK),
+    ]
+    relation = (
+        scene.geometry.arrow(4.2, -0.68, 4.9, -0.68, head_length=0.14, head_width=0.14, body_width=0.024)
+        .fill(STEEL)
+        .no_stroke()
+    )
+    levels_y = -1.3
+    manual = t(scene, "manual", hx, levels_y, size=0.19, color=INK_SOFT, anchor=Anchor.LEFT)
+    manual_w = manual.bounds().width
+    shift = (
+        scene.geometry.arrow(
+            hx + manual_w + 0.14,
+            levels_y,
+            hx + manual_w + 0.6,
+            levels_y,
+            head_length=0.1,
+            head_width=0.1,
+            body_width=0.016,
         )
+        .fill(INK_SOFT)
+        .no_stroke()
+    )
+    automated = t(
+        scene,
+        "automatizado",
+        hx + manual_w + 0.72,
+        levels_y,
+        size=0.19,
+        weight=700,
+        color=STEEL,
+        anchor=Anchor.LEFT,
+    )
     scene.play(
         stagger(
-            card.animate.fade_in().duration(0.4),
-            h_badge.animate.grow_from_center().duration(0.3),
-            h_letter.animate.fade_in().duration(0.2),
             h_tag.animate.fade_in().duration(0.3),
-            hypothesis.animate.fade_in().duration(0.6),
-            rule.animate.create().duration(0.4),
-            *[v.animate.fade_in().duration(0.3) for v in var_items],
-            each=0.1,
+            hypothesis.animate.reveal(style="slide_up", by="line", stagger=0.07).duration(0.8),
+            rule.animate.create().duration(0.5),
+            each=0.15,
+        )
+    )
+    # Se lee como una relación causal: la variable independiente, sus dos valores
+    # y la flecha hacia la dependiente.
+    scene.play(
+        sequence(
+            parallel(*[v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35) for v in independent]),
+            parallel(
+                manual.animate.fade_in().duration(0.25),
+                shift.animate.grow_arrow().duration(0.35).delay(0.15),
+                automated.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.35).delay(0.4),
+            ),
+            relation.animate.grow_arrow().duration(0.45),
+            parallel(*[v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35) for v in dependent]),
         )
     )
     source(
@@ -358,11 +392,10 @@ def method(scene: Scene) -> None:
     chips: list[Drawable] = []
     x = LEFT_EDGE + 1.75
     for i, name in enumerate(tools):
-        w_, _ = scene.text.measure(name, size=0.19, font=MONO)
         chips.append(
             t(scene, name, x, -2.1, font=MONO, size=0.19, color=INK, anchor=Anchor.LEFT)
         )
-        x += w_
+        x = chips[-1].bounds().right
         if i < len(tools) - 1:
             chips.append(
                 t(scene, "·", x + 0.2, -2.1, size=0.19, color=MUTED, anchor=Anchor.CENTER)

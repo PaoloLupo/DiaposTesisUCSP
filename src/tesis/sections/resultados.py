@@ -640,7 +640,7 @@ def resistance(scene: Scene) -> None:
         weight=700,
         color=FAIL,
     )
-    box_w, _ = scene.text.measure(f"{demand / cap_msta:.3f}", size=0.62, font=DISPLAY)
+    box_w = box.bounds().width
     line1 = t(
         scene,
         f"D/C en MSTA · piso 1 · X-X:  $sum V_m$ = {cap_msta:.1f} < $V_E$ = {demand:.1f} tonf",
@@ -704,7 +704,7 @@ def cracking(scene: Scene) -> None:
             weight=700,
             color=MODEL_COLORS[model],
         )
-        head_w, _ = scene.text.measure(model, size=0.36, font=DISPLAY)
+        head_w = head.bounds().width
         sub = t(
             scene,
             "modelo completo · Alba"

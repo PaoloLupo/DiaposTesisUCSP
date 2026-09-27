@@ -370,7 +370,6 @@ def density_module(scene: Scene) -> None:
     tab_items: list[Drawable] = []
     x = 0.55
     for i, name in enumerate(tabs):
-        w_, _ = scene.text.measure(name, size=0.17, font="Lato")
         tab_items.append(
             pill(
                 scene,
@@ -385,7 +384,7 @@ def density_module(scene: Scene) -> None:
                 anchor=Anchor.LEFT,
             )
         )
-        x += w_ + 0.5
+        x = tab_items[-1].bounds().right + 0.18
     scene.play(
         stagger(*[c.animate.fade_in().duration(0.25) for c in tab_items], each=0.06)
     )
@@ -650,7 +649,6 @@ def traceability(scene: Scene) -> None:
     chips: list[Drawable] = []
     x = LEFT_EDGE
     for text, color, bg in parts:
-        w_, _ = scene.text.measure(text, size=0.17, font=MONO)
         chips.append(
             pill(
                 scene,
@@ -663,7 +661,7 @@ def traceability(scene: Scene) -> None:
                 anchor=Anchor.LEFT,
             )
         )
-        x += w_ + 0.5
+        x = chips[-1].bounds().right + 0.18
     chip = status(
         scene, capacity >= demand, x - 0.05, -2.75, anchor=Anchor.LEFT, size=0.17
     )
