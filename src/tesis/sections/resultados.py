@@ -556,11 +556,80 @@ def drifts(scene: Scene) -> None:
     scene.stop("derivas-detalle")
 
 
+def _bar_panel(
+    scene: Scene,
+    cx: float,
+    x_max: float,
+    step: float,
+    series: dict[str, tuple[float, ...]],
+    *,
+    width: float = 5.6,
+    height: float = PANEL_H,
+) -> tuple[CoordinateSpace, list[Drawable], list[Drawable]]:
+    """Barras horizontales agrupadas por piso: una por modelo, MCT arriba."""
+    plane = scene.viz.cartesian_2d(
+        Axis.linear(0, x_max).ticks(step).numbers("fixed", precision=0),
+        Axis.linear(0.5, 4.5).ticks(1).numbers("fixed", precision=0),
+        width=width,
+        height=height,
+        grid=False,
+        x_grid=True,
+    )
+    plane.move_to(cx, PANEL_Y)
+    bar_h, pitch = 0.19, 0.23
+    fills: list[Drawable] = []
+    values: list[Drawable] = []
+    for j, model in enumerate(series):
+        for floor, value in zip(FLOORS, series[model], strict=True):
+            x0, y = plane.data_to_local(0, floor)
+            x1, _ = plane.data_to_local(value, floor)
+            y = PANEL_Y + y + (1 - j) * pitch
+            w = x1 - x0
+            mask = (
+                scene.geometry.rect(w, bar_h)
+                .no_fill()
+                .no_stroke()
+                .move_to(cx + x0 + w / 2, y)
+            )
+            fills.append(
+                scene.geometry.fill_level(
+                    mask, MODEL_COLORS[model], 0, direction="right", keep_outline=False
+                )
+            )
+            values.append(
+                t(
+                    scene,
+                    f"{value:.1f}",
+                    cx + x1 + 0.08,
+                    y,
+                    font=MONO,
+                    size=0.13,
+                    color=INK_SOFT,
+                    anchor=Anchor.LEFT,
+                )
+            )
+    return plane, fills, values
+
+
 def shear(scene: Scene) -> None:
     header(scene, KICKER, "Cortante de sismo severo: en Y, MCT reduce la demanda")
     legend = _legend(scene, 2.45)
     scene.play([x.animate.fade_in().duration(0.3) for x in legend])
-    _draw_panels(scene, 200, 50, 0, SHEAR_DEMAND, "$V_E$ (tonf)")
+    for direction, cx in (("X", -3.6), ("Y", 3.6)):
+        plane, fills, values = _bar_panel(scene, cx, 200, 50, SHEAR_DEMAND[direction])
+        labels = _panel_titles(scene, cx, direction, "$V_E$ (tonf)")
+        scene.play(
+            [
+                plane.animate.create().duration(0.6),
+                *[x.animate.fade_in().duration(0.3) for x in labels],
+            ]
+        )
+        scene.play(
+            stagger(*[f.animate.fill_level(1).duration(0.5) for f in fills], each=0.04)
+        )
+        scene.play(
+            stagger(*[v.animate.fade_in().duration(0.2) for v in values], each=0.02)
+        )
     y_gap = max(
         relative(SHEAR_DEMAND["Y"]["MCT"][i], SHEAR_DEMAND["Y"]["MSTA"][i])
         for i in range(4)

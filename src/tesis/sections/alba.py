@@ -16,7 +16,7 @@ from gaanim import (
 
 from tesis.app import thesis_image
 from tesis.diagram import link
-from tesis.kit import LEFT_EDGE, header, label, panel, pill, source, t, takeaway
+from tesis.kit import LEFT_EDGE, RIGHT_EDGE, header, label, panel, pill, source, t, takeaway
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -362,23 +362,17 @@ UI_ZONES = [
         "errores de conexión, datos faltantes\no inconsistentes en la importación",
     ),
 ]
-# Centro (px) del detalle que amplía la cámara en cada zona; la barra se recorre
-# de «Importar datos» a «Exportar Excel».
-UI_DETAILS = [
-    ((215, 60), (813, 60)),
-    ((183, 270),),
-    ((528, 678),),
-    ((528, 935),),
-]
 
 
 def interface(scene: Scene) -> None:
     header(scene, KICKER, "La interfaz sigue las etapas del marco de trabajo")
-    width = 10.4
-    cx, cy = -1.75, -0.35
+    # La captura queda a la izquierda como mapa; a la derecha, una pantalla que toma
+    # la proporción de cada zona la muestra entera.
+    width = 6.8
     s = width / 1920
     height = 1032 * s
-    x_left, y_top = cx - width / 2, cy + height / 2
+    x_left, y_top = LEFT_EDGE + 0.3, 2.5
+    cx, cy = x_left + width / 2, y_top - height / 2
     frame = panel(
         scene,
         cx,
@@ -398,75 +392,100 @@ def interface(scene: Scene) -> None:
     scene.play(
         [frame.animate.fade_in().duration(0.4), shot.animate.fade_in().duration(0.6)]
     )
-    legend_x = 3.95
 
-    def at(px: float, py: float) -> tuple[float, float]:
-        """Píxel de la captura a coordenadas de escena."""
-        return x_left + px * s, y_top - py * s
-
-    def legend_item(i: int, y: float) -> list[Drawable]:
-        _, name, body = UI_ZONES[i]
-        return [
-            t(scene, f"{i + 1}", legend_x, y, font=DISPLAY, size=0.36, weight=700, color=BRICK),
-            t(scene, name, legend_x + 0.45, y + 0.02, size=0.23, weight=900, color=INK),
-            t(scene, body, legend_x + 0.45, y - 0.32, size=0.18, color=INK_SOFT),
-        ]
-
-    # Una segunda cámara amplía un detalle legible de cada zona; el marco sobre la
-    # captura indica qué se amplía y la zona se describe bajo la pantalla.
-    detail = scene.camera.inset(
-        at(*UI_DETAILS[0][0]),
-        zoom=1.8,
-        at=(legend_x + 3.35 / 2, 1.3),
-        size=3.35,
-        shape="rect",
-        color=INK_SOFT,
-        connectors=False,
-    )
-    current: list[Drawable] = []
-    for i, ((px0, py0, px1, py1), _, _) in enumerate(UI_ZONES):
+    def zone_box(i: int) -> tuple[float, float, float, float]:
+        """Centro y tamaño de la zona i en coordenadas de escena."""
+        px0, py0, px1, py1 = UI_ZONES[i][0]
         zx0, zx1 = x_left + px0 * s, x_left + px1 * s
         zy0, zy1 = y_top - py0 * s, y_top - py1 * s
-        outline = (
-            scene.geometry.rect(zx1 - zx0, zy0 - zy1)
-            .no_fill()
-            .stroke(BRICK, 0.03)
-            .move_to((zx0 + zx1) / 2, (zy0 + zy1) / 2)
+        return (zx0 + zx1) / 2, (zy0 + zy1) / 2, zx1 - zx0, zy0 - zy1
+
+    # Caja libre a la derecha: la pantalla crece hasta llenarla por el lado que
+    # limite y queda a la altura de su zona mientras quepa.
+    bx0, bx1, by0, by1 = x_left + width + 0.5, RIGHT_EDGE, y_top, -3.2
+
+    def screen_box(i: int) -> tuple[float, float, float, float]:
+        _, zy, zw, zh = zone_box(i)
+        k = min((bx1 - bx0) / zw, (by0 - by1) / zh)
+        w, h = zw * k, zh * k
+        return (bx0 + bx1) / 2, min(max(zy, by1 + h / 2), by0 - h / 2), w, h
+
+    def legend_item(i: int, x: float, y: float) -> list[Drawable]:
+        _, name, body = UI_ZONES[i]
+        return [
+            t(scene, f"{i + 1}", x, y, font=DISPLAY, size=0.36, weight=700, color=BRICK),
+            t(scene, name, x + 0.45, y + 0.02, size=0.23, weight=900, color=INK),
+            t(scene, body, x + 0.45, y - 0.32, size=0.18, color=INK_SOFT),
+        ]
+
+    outlines: list[Drawable] = []
+    numerals: list[Drawable] = []
+    for i in range(len(UI_ZONES)):
+        zx, zy, zw, zh = zone_box(i)
+        outlines.append(
+            scene.geometry.rect(zw, zh).no_fill().stroke(BRICK, 0.03).move_to(zx, zy)
         )
         # Numerales sin superponerse: 1 al final de la barra, 2 fuera a la izquierda, 3 y 4 dentro.
         nx, ny = [
-            (zx1 + 0.22, (zy0 + zy1) / 2),
-            (zx0 - 0.22, (zy0 + zy1) / 2),
-            (zx1 - 0.3, zy0 - 0.3),
-            (zx1 - 0.3, zy0 - 0.3),
+            (zx + zw / 2 + 0.2, zy),
+            (zx - zw / 2 - 0.2, zy),
+            (zx + zw / 2 - 0.25, zy + zh / 2 - 0.25),
+            (zx + zw / 2 - 0.25, zy + zh / 2 - 0.25),
         ][i]
-        numeral = t(
-            scene, str(i + 1), nx, ny, font=DISPLAY, size=0.36, weight=700, color=BRICK, anchor=Anchor.CENTER
+        numerals.append(
+            t(scene, str(i + 1), nx, ny, font=DISPLAY, size=0.32, weight=700, color=BRICK, anchor=Anchor.CENTER)
         )
-        item = legend_item(i, 0.0)
-        first, *rest = UI_DETAILS[i]
-        view = detail.animate.pop_out() if i == 0 else detail.animate.pan_to(*at(*first))
+
+    # La cámara es un rectángulo invisible que se estira sobre cada zona y la
+    # pantalla se estira igual, así que la zona entra entera y sin deformarse. El
+    # borde va aparte y cambia de forma: estirado, su trazo engordaría por un eje.
+    zx, zy, zw, zh = zone_box(0)
+    sx, sy, sw, sh = screen_box(0)
+    lens = scene.geometry.rect(1, 1).no_fill().no_stroke().move_to(zx, zy).scale_to_3d(zw, zh, 1)
+    screen = scene.geometry.rect(1, 1).fill("#FFFFFF").no_stroke().move_to(sx, sy).scale_to_3d(sw, sh, 1)
+    screen.camera_view(lens, exclude=[*outlines, *numerals])
+    borders = [
+        scene.geometry.rect(w, h).no_fill().stroke(INK_SOFT, 0.02).move_to(x, y)
+        for x, y, w, h in map(screen_box, range(len(UI_ZONES)))
+    ]
+    border = borders[0]
+    scene.geometry.group(borders[1:]).opacity(0)
+
+    current: list[Drawable] = []
+    for i in range(len(UI_ZONES)):
+        zx, zy, zw, zh = zone_box(i)
+        sx, sy, sw, sh = screen_box(i)
+        if i == 0:
+            view = [
+                screen.animate.fade_in().duration(0.6),
+                border.animate.fade_in().duration(0.6),
+            ]
+        else:
+            view = [
+                lens.animate.move_to(zx, zy).scale_to_3d(zw, zh, 1).duration(0.8),
+                screen.animate.move_to(sx, sy).scale_to_3d(sw, sh, 1).duration(0.8),
+                border.animate.transform_to(borders[i]).duration(0.8),
+            ]
+        item = legend_item(i, x_left, y_top - height - 0.45)
         scene.play(
             [
-                outline.animate.create().duration(0.5),
-                numeral.animate.fade_in().duration(0.3).delay(0.2),
-                view.duration(0.8),
+                outlines[i].animate.create().duration(0.5),
+                numerals[i].animate.fade_in().duration(0.3).delay(0.2),
+                *view,
                 *[c.animate.fade_out().duration(0.25) for c in current],
                 stagger(*[c.animate.fade_in().duration(0.3) for c in item], each=0.06).delay(0.4),
             ]
         )
-        # La barra de herramientas no cabe entera: la cámara la recorre.
-        for point in rest:
-            scene.play(detail.animate.pan_to(*at(*point)).duration(1.2))
         current = item
         if i < len(UI_ZONES) - 1:
             scene.stop(f"interfaz-zona-{i + 1}")
 
-    # Cierre: la pantalla vuelve a la captura y queda la leyenda completa.
-    legend = [c for i in range(len(UI_ZONES)) for c in legend_item(i, 2.2 - i * 1.25)]
+    # Cierre: la pantalla se retira y queda la leyenda completa a la derecha.
+    legend = [c for i in range(len(UI_ZONES)) for c in legend_item(i, bx0, 2.2 - i * 1.25)]
     scene.play(
         [
-            detail.animate.pop_in().duration(0.5),
+            screen.animate.fade_out().duration(0.4),
+            border.animate.fade_out().duration(0.4),
             *[c.animate.fade_out().duration(0.25) for c in current],
             stagger(*[c.animate.fade_in().duration(0.25) for c in legend], each=0.04).delay(0.4),
         ]

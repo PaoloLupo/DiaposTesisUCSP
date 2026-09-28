@@ -1,4 +1,3 @@
-exports/*
 !exports/.gitkeep
 snapshots/
 __pycache__/
