@@ -156,7 +156,9 @@ class SectionIndex:
             # Cambio de capítulo: un barrido suave hacia la izquierda; dentro de
             # cada bloque las diapositivas siguen con fundido cruzado.
             transition=transition
-            or Transition.wipe(0.6, direction="left", feather=0.2, easing=Easing.SMOOTH),
+            or Transition.wipe(
+                0.6, direction="left", feather=0.2, easing=Easing.SMOOTH
+            ),
             notes=(
                 f"Bloque {active + 1} de {len(SECTIONS)}: {title}. "
                 f"Pregunta guía: {question} Transición breve, 5-10 s."
@@ -211,8 +213,9 @@ class SectionIndex:
         scene.play(
             stagger(
                 numeral.visual.animate.fade_in().duration(0.4),
-                heading.animate.reveal(style="slide_up", by="word", stagger=0.06)
-                .duration(0.7),
+                heading.animate.reveal(
+                    style="slide_up", by="word", stagger=0.06
+                ).duration(0.7),
                 prompt.animate.fade_in().duration(0.5),
                 divider.animate.create().duration(0.5),
                 agenda.root.animate.fade_in().duration(0.4),
@@ -288,6 +291,8 @@ class SectionIndex:
             seal.hud().z_index(100)
             scene.persist(seal)
             self._seal = seal
-        anim = self._seal.animate.fade_in() if visible else self._seal.animate.fade_out()
+        anim = (
+            self._seal.animate.fade_in() if visible else self._seal.animate.fade_out()
+        )
         scene.play(anim, duration=0.3)
         self._seal_visible = visible

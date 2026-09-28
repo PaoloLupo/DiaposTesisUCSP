@@ -68,7 +68,9 @@ def purpose(scene: Scene) -> None:
     scene.play(
         stagger(
             tag.animate.fade_in().duration(0.3),
-            objective.animate.reveal(style="slide_up", by="line", stagger=0.09).duration(1.0),
+            objective.animate.reveal(
+                style="slide_up", by="line", stagger=0.09
+            ).duration(1.0),
             each=0.15,
         )
     )
@@ -78,13 +80,20 @@ def purpose(scene: Scene) -> None:
     line_y = -1.55
     xs = [LEFT_EDGE + i * 2.55 for i in range(len(CHAIN))]
     ticks = [
-        scene.geometry.line(x, line_y + 0.1, x, line_y - 0.1).stroke(INK_SOFT, 0.02) for x in xs
+        scene.geometry.line(x, line_y + 0.1, x, line_y - 0.1).stroke(INK_SOFT, 0.02)
+        for x in xs
     ]
     segments = [
         scene.geometry.line(a, line_y, b, line_y).stroke(INK_SOFT, 0.016)
         for a, b in zip(xs, xs[1:])
     ]
-    packet = scene.geometry.rect(0.14, 0.14).fill(BRICK).no_stroke().move_to(xs[0], line_y).z_index(5)
+    packet = (
+        scene.geometry.rect(0.14, 0.14)
+        .fill(BRICK)
+        .no_stroke()
+        .move_to(xs[0], line_y)
+        .z_index(5)
+    )
     hops: list[Playable] = [packet.animate.fade_in().duration(0.15)]
     for i, ((name, sub, key), x) in enumerate(zip(CHAIN, xs, strict=True)):
         proposal = name in ("Marco", "Alba")
@@ -101,8 +110,13 @@ def purpose(scene: Scene) -> None:
         if i:
             hops.append(
                 parallel(
-                    packet.animate.move_to(x, line_y).duration(0.5).easing(Easing.LINEAR),
-                    segments[i - 1].animate.create().duration(0.5).easing(Easing.LINEAR),
+                    packet.animate.move_to(x, line_y)
+                    .duration(0.5)
+                    .easing(Easing.LINEAR),
+                    segments[i - 1]
+                    .animate.create()
+                    .duration(0.5)
+                    .easing(Easing.LINEAR),
                 )
             )
         hops.append(
@@ -137,19 +151,39 @@ def purpose(scene: Scene) -> None:
     rule = scene.geometry.line(hx, 0.1, RIGHT_EDGE, 0.1).stroke(RULE, 0.012)
     independent = [
         label(scene, "Variable independiente", hx, -0.15, color=MUTED, size=0.12),
-        t(scene, "Método de\nverificación", hx, -0.42, size=0.22, weight=700, color=INK),
+        t(
+            scene,
+            "Método de\nverificación",
+            hx,
+            -0.42,
+            size=0.22,
+            weight=700,
+            color=INK,
+        ),
     ]
     dependent = [
         label(scene, "Variable dependiente", dep_x, -0.15, color=MUTED, size=0.12),
-        t(scene, "Cumplimiento\nnormativo", dep_x, -0.42, size=0.22, weight=700, color=INK),
+        t(
+            scene,
+            "Cumplimiento\nnormativo",
+            dep_x,
+            -0.42,
+            size=0.22,
+            weight=700,
+            color=INK,
+        ),
     ]
     relation = (
-        scene.geometry.arrow(4.2, -0.68, 4.9, -0.68, head_length=0.14, head_width=0.14, body_width=0.024)
+        scene.geometry.arrow(
+            4.2, -0.68, 4.9, -0.68, head_length=0.14, head_width=0.14, body_width=0.024
+        )
         .fill(STEEL)
         .no_stroke()
     )
     levels_y = -1.3
-    manual = t(scene, "manual", hx, levels_y, size=0.19, color=INK_SOFT, anchor=Anchor.LEFT)
+    manual = t(
+        scene, "manual", hx, levels_y, size=0.19, color=INK_SOFT, anchor=Anchor.LEFT
+    )
     manual_w = manual.bounds().width
     shift = (
         scene.geometry.arrow(
@@ -177,7 +211,9 @@ def purpose(scene: Scene) -> None:
     scene.play(
         stagger(
             h_tag.animate.fade_in().duration(0.3),
-            hypothesis.animate.reveal(style="slide_up", by="line", stagger=0.07).duration(0.8),
+            hypothesis.animate.reveal(
+                style="slide_up", by="line", stagger=0.07
+            ).duration(0.8),
             rule.animate.create().duration(0.5),
             each=0.15,
         )
@@ -186,14 +222,26 @@ def purpose(scene: Scene) -> None:
     # y la flecha hacia la dependiente.
     scene.play(
         sequence(
-            parallel(*[v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35) for v in independent]),
+            parallel(
+                *[
+                    v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35)
+                    for v in independent
+                ]
+            ),
             parallel(
                 manual.animate.fade_in().duration(0.25),
                 shift.animate.grow_arrow().duration(0.35).delay(0.15),
-                automated.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.35).delay(0.4),
+                automated.animate.fade_in_from(Direction.LEFT, 0.08)
+                .duration(0.35)
+                .delay(0.4),
             ),
             relation.animate.grow_arrow().duration(0.45),
-            parallel(*[v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35) for v in dependent]),
+            parallel(
+                *[
+                    v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35)
+                    for v in dependent
+                ]
+            ),
         )
     )
     source(
@@ -398,7 +446,15 @@ def method(scene: Scene) -> None:
         x = chips[-1].bounds().right
         if i < len(tools) - 1:
             chips.append(
-                t(scene, "·", x + 0.2, -2.1, size=0.19, color=MUTED, anchor=Anchor.CENTER)
+                t(
+                    scene,
+                    "·",
+                    x + 0.2,
+                    -2.1,
+                    size=0.19,
+                    color=MUTED,
+                    anchor=Anchor.CENTER,
+                )
             )
             x += 0.4
     scene.play(
@@ -413,7 +469,8 @@ def method(scene: Scene) -> None:
         y=-2.95,
     )
     source(
-        scene, "Tesis · §1.6 Metodología de la investigación y §1.6.3 Población y muestra, p. 5"
+        scene,
+        "Tesis · §1.6 Metodología de la investigación y §1.6.3 Población y muestra, p. 5",
     )
     scene.stop("metodologia")
 

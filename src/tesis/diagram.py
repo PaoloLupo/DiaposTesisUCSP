@@ -27,12 +27,7 @@ def process(
     size: float = 0.18,
     color: Color | str = INK,
 ) -> Drawable:
-    box = (
-        scene.geometry.rect(w, h)
-        .fill(fill)
-        .stroke(border, 0.014)
-        .move_to(cx, cy)
-    )
+    box = scene.geometry.rect(w, h).fill(fill).stroke(border, 0.014).move_to(cx, cy)
     return scene.geometry.group([box, _label(scene, text, cx, cy, size, color)])
 
 

@@ -16,7 +16,17 @@ from gaanim import (
 
 from tesis.app import thesis_image
 from tesis.diagram import link
-from tesis.kit import LEFT_EDGE, RIGHT_EDGE, header, label, panel, pill, source, t, takeaway
+from tesis.kit import (
+    LEFT_EDGE,
+    RIGHT_EDGE,
+    header,
+    label,
+    panel,
+    pill,
+    source,
+    t,
+    takeaway,
+)
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -413,7 +423,16 @@ def interface(scene: Scene) -> None:
     def legend_item(i: int, x: float, y: float) -> list[Drawable]:
         _, name, body = UI_ZONES[i]
         return [
-            t(scene, f"{i + 1}", x, y, font=DISPLAY, size=0.36, weight=700, color=BRICK),
+            t(
+                scene,
+                f"{i + 1}",
+                x,
+                y,
+                font=DISPLAY,
+                size=0.36,
+                weight=700,
+                color=BRICK,
+            ),
             t(scene, name, x + 0.45, y + 0.02, size=0.23, weight=900, color=INK),
             t(scene, body, x + 0.45, y - 0.32, size=0.18, color=INK_SOFT),
         ]
@@ -433,38 +452,49 @@ def interface(scene: Scene) -> None:
             (zx + zw / 2 - 0.25, zy + zh / 2 - 0.25),
         ][i]
         numerals.append(
-            t(scene, str(i + 1), nx, ny, font=DISPLAY, size=0.32, weight=700, color=BRICK, anchor=Anchor.CENTER)
+            t(
+                scene,
+                str(i + 1),
+                nx,
+                ny,
+                font=DISPLAY,
+                size=0.32,
+                weight=700,
+                color=BRICK,
+                anchor=Anchor.CENTER,
+            )
         )
 
     # La cámara es un rectángulo invisible que se estira sobre cada zona y la
-    # pantalla se estira igual, así que la zona entra entera y sin deformarse. El
-    # borde va aparte y cambia de forma: estirado, su trazo engordaría por un eje.
+    # pantalla se estira igual, así que la zona entra entera y sin deformarse.
     zx, zy, zw, zh = zone_box(0)
     sx, sy, sw, sh = screen_box(0)
-    lens = scene.geometry.rect(1, 1).no_fill().no_stroke().move_to(zx, zy).scale_to_3d(zw, zh, 1)
-    screen = scene.geometry.rect(1, 1).fill("#FFFFFF").no_stroke().move_to(sx, sy).scale_to_3d(sw, sh, 1)
+    lens = (
+        scene.geometry.rect(1, 1)
+        .no_fill()
+        .no_stroke()
+        .move_to(zx, zy)
+        .scale_to_3d(zw, zh, 1)
+    )
+    screen = (
+        scene.geometry.rect(1, 1)
+        .fill("#FFFFFF")
+        .stroke(INK_SOFT, 0.02)
+        .move_to(sx, sy)
+        .scale_to_3d(sw, sh, 1)
+    )
     screen.camera_view(lens, exclude=[*outlines, *numerals])
-    borders = [
-        scene.geometry.rect(w, h).no_fill().stroke(INK_SOFT, 0.02).move_to(x, y)
-        for x, y, w, h in map(screen_box, range(len(UI_ZONES)))
-    ]
-    border = borders[0]
-    scene.geometry.group(borders[1:]).opacity(0)
 
     current: list[Drawable] = []
     for i in range(len(UI_ZONES)):
         zx, zy, zw, zh = zone_box(i)
         sx, sy, sw, sh = screen_box(i)
         if i == 0:
-            view = [
-                screen.animate.fade_in().duration(0.6),
-                border.animate.fade_in().duration(0.6),
-            ]
+            view = [screen.animate.fade_in().duration(0.6)]
         else:
             view = [
                 lens.animate.move_to(zx, zy).scale_to_3d(zw, zh, 1).duration(0.8),
                 screen.animate.move_to(sx, sy).scale_to_3d(sw, sh, 1).duration(0.8),
-                border.animate.transform_to(borders[i]).duration(0.8),
             ]
         item = legend_item(i, x_left, y_top - height - 0.45)
         scene.play(
@@ -473,7 +503,9 @@ def interface(scene: Scene) -> None:
                 numerals[i].animate.fade_in().duration(0.3).delay(0.2),
                 *view,
                 *[c.animate.fade_out().duration(0.25) for c in current],
-                stagger(*[c.animate.fade_in().duration(0.3) for c in item], each=0.06).delay(0.4),
+                stagger(
+                    *[c.animate.fade_in().duration(0.3) for c in item], each=0.06
+                ).delay(0.4),
             ]
         )
         current = item
@@ -481,13 +513,16 @@ def interface(scene: Scene) -> None:
             scene.stop(f"interfaz-zona-{i + 1}")
 
     # Cierre: la pantalla se retira y queda la leyenda completa a la derecha.
-    legend = [c for i in range(len(UI_ZONES)) for c in legend_item(i, bx0, 2.2 - i * 1.25)]
+    legend = [
+        c for i in range(len(UI_ZONES)) for c in legend_item(i, bx0, 2.2 - i * 1.25)
+    ]
     scene.play(
         [
             screen.animate.fade_out().duration(0.4),
-            border.animate.fade_out().duration(0.4),
             *[c.animate.fade_out().duration(0.25) for c in current],
-            stagger(*[c.animate.fade_in().duration(0.25) for c in legend], each=0.04).delay(0.4),
+            stagger(
+                *[c.animate.fade_in().duration(0.25) for c in legend], each=0.04
+            ).delay(0.4),
         ]
     )
     source(
@@ -606,7 +641,9 @@ def report(scene: Scene) -> None:
         chain.append(chip)
         right = chip.bounds().right
         if i < len(steps) - 1:
-            chain.append(link(scene, (right + 0.1, -1.75), (right + 0.5, -1.75), color=MUTED))
+            chain.append(
+                link(scene, (right + 0.1, -1.75), (right + 0.5, -1.75), color=MUTED)
+            )
         x = right + 0.63
     sections = [
         "Datos de diseño",
@@ -652,9 +689,7 @@ def report(scene: Scene) -> None:
             stagger(*[c.animate.fade_in().duration(0.25) for c in chips], each=0.06),
         ]
     )
-    source(
-        scene, "Tesis · Figuras 48 y 49, pp. 116–117; Tabla 48, p. 124"
-    )
+    source(scene, "Tesis · Figuras 48 y 49, pp. 116–117; Tabla 48, p. 124")
     scene.stop("reporte-estructura")
 
 

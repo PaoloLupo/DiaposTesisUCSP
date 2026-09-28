@@ -81,9 +81,11 @@ def header(
         head.animate.reveal(style="slide_up", by="word", stagger=0.045).duration(0.9),
     ]
     if rule:
-        line = scene.geometry.line(length= RIGHT_EDGE- LEFT_EDGE).stroke(
-            RULE, 0.012
-        ).next_to(head, Direction.DOWN)
+        line = (
+            scene.geometry.line(length=RIGHT_EDGE - LEFT_EDGE)
+            .stroke(RULE, 0.012)
+            .next_to(head, Direction.DOWN)
+        )
         items.append(line)
         anims.append(line.animate.create().duration(0.6))
     scene.play(stagger(*anims, each=0.12))
@@ -125,7 +127,9 @@ def takeaway(
     scene.play(
         [
             rule.animate.create().duration(0.5),
-            text.animate.reveal(style="slide_up", by="word", stagger=0.03).duration(0.7),
+            text.animate.reveal(style="slide_up", by="word", stagger=0.03).duration(
+                0.7
+            ),
         ]
     )
     return scene.geometry.group([rule, text])

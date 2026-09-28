@@ -545,10 +545,20 @@ def strength_checks(scene: Scene) -> None:
                 )
                 cracks = [
                     scene.geometry.dashed_line(
-                        cx - 0.95, 0.45, cx + 0.95, 1.6, dash_length=0.08, gap_length=0.05
+                        cx - 0.95,
+                        0.45,
+                        cx + 0.95,
+                        1.6,
+                        dash_length=0.08,
+                        gap_length=0.05,
                     ).stroke(STEEL, 0.02),
                     scene.geometry.dashed_line(
-                        cx + 0.95, 0.45, cx - 0.95, 1.6, dash_length=0.08, gap_length=0.05
+                        cx + 0.95,
+                        0.45,
+                        cx - 0.95,
+                        1.6,
+                        dash_length=0.08,
+                        gap_length=0.05,
                     )
                     .stroke(STEEL, 0.02)
                     .opacity(0.35),

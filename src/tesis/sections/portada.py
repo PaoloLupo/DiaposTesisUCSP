@@ -121,7 +121,9 @@ def build(scene: Scene) -> None:
                 each=0.08,
             ),
             kicker.animate.fade_in_from(Direction.RIGHT, 0.12).duration(0.5),
-            title.animate.reveal(style="slide_up", by="line", stagger=0.08).duration(1.1),
+            title.animate.reveal(style="slide_up", by="line", stagger=0.08).duration(
+                1.1
+            ),
             stagger(*[c.animate.fade_in().duration(0.5) for c in credits], each=0.06),
             each=0.18,
         )

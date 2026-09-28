@@ -123,7 +123,13 @@ def scope(scene: Scene) -> None:
     to_alba = link(scene, (-0.85, row_mid[0]), (0.85, row_mid[0]), color=MUTED)
     to_eng = link(scene, (0.85, row_mid[2]), (-0.85, row_mid[2]), color=MUTED)
     lab1 = t(
-        scene, "modelo", 0, row_mid[0] + 0.08, size=0.15, color=MUTED, anchor=Anchor.BOTTOM
+        scene,
+        "modelo",
+        0,
+        row_mid[0] + 0.08,
+        size=0.15,
+        color=MUTED,
+        anchor=Anchor.BOTTOM,
     )
     lab2 = t(
         scene,
@@ -571,7 +577,9 @@ def traceability(scene: Scene) -> None:
     items: list[Drawable] = []
     for i, (name, color, rows) in enumerate(inputs):
         y0 = 2.4 - i * 2.35
-        items.extend(heading(scene, name, LEFT_EDGE, y0 - 0.42, 4.85, color=color, size=0.21))
+        items.extend(
+            heading(scene, name, LEFT_EDGE, y0 - 0.42, 4.85, color=color, size=0.21)
+        )
         for j, row in enumerate(rows):
             items.append(
                 t(scene, row, LEFT_EDGE, y0 - 0.62 - j * 0.36, size=0.2, color=INK)

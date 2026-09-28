@@ -78,9 +78,7 @@ def models(scene: Scene) -> None:
     }
     heads: list[Drawable] = []
     for model, x in cols.items():
-        heads.append(
-            panel(scene, x, 2.05, 2.9, 1.0, fill=SOFT[model], border=None)
-        )
+        heads.append(panel(scene, x, 2.05, 2.9, 1.0, fill=SOFT[model], border=None))
         heads.append(
             t(
                 scene,
@@ -400,9 +398,7 @@ def _profile_panel(
         visuals.append(
             plane.plot_data(list(values), list(FLOORS), color=color, width=0.03)
         )
-        visuals.append(
-            plane.scatter_data(list(values), list(FLOORS), color=color)
-        )
+        visuals.append(plane.scatter_data(list(values), list(FLOORS), color=color))
     return plane, visuals
 
 
@@ -550,9 +546,7 @@ def drifts(scene: Scene) -> None:
         ),
     ]
     scene.play(stagger(*[n.animate.fade_in().duration(0.4) for n in notes], each=0.15))
-    source(
-        scene, "Tesis · Tabla 52, p. 131 · detalle 0–0.2 %, misma escala en X e Y"
-    )
+    source(scene, "Tesis · Tabla 52, p. 131 · detalle 0–0.2 %, misma escala en X e Y")
     scene.stop("derivas-detalle")
 
 
@@ -666,9 +660,7 @@ def shear(scene: Scene) -> None:
 
 
 def resistance(scene: Scene) -> None:
-    header(
-        scene, KICKER, "Resistencia global: MSTA no cumple en el piso 1 X-X"
-    )
+    header(scene, KICKER, "Resistencia global: MSTA no cumple en el piso 1 X-X")
     legend = _legend(scene, 2.45)
     scene.play([x.animate.fade_in().duration(0.3) for x in legend])
     ratios = {
