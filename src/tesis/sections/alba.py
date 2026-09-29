@@ -15,7 +15,8 @@ from gaanim import (
 )
 
 from tesis.app import thesis_image
-from tesis.components import chip, enter, hairline, page
+from tesis.components import chip, enter, hairline, note
+from tesis.components import page as page_column
 from tesis.diagram import link
 from tesis.kit import (
     LEFT_EDGE,
@@ -291,7 +292,7 @@ def api(scene: Scene) -> None:
         padding=("16px", "26px"),
         width="fill",
     )
-    page(scene, body=[heading_row, table, closing], gap="22px", top="190px")
+    page_column(scene, body=[heading_row, table, closing], gap="22px", top="190px")
     scene.play(enter(heading_row, each=0.1))
     plays: list[Playable] = []
     for row in call_rows:
@@ -599,27 +600,22 @@ def report(scene: Scene) -> None:
     )
     scene.stop("reporte-fragmento")
 
+    L = scene.layout
     steps = ["Python procesa", "resultados.json", "plantilla Typst", "PDF + Excel"]
-    chain: list[Drawable] = []
-    x = LEFT_EDGE
+    chain_items: list[Drawable] = []
     for i, step in enumerate(steps):
-        chip = pill(
-            scene,
-            step,
-            x,
-            -1.75,
-            size=0.19,
-            color=BRICK_DEEP if i == 3 else INK,
-            background=BRICK_SOFT if i == 3 else PAPER_DEEP,
-            anchor=Anchor.LEFT,
-        )
-        chain.append(chip)
-        right = chip.bounds().right
-        if i < len(steps) - 1:
-            chain.append(
-                link(scene, (right + 0.1, -1.75), (right + 0.5, -1.75), color=MUTED)
+        last = i == len(steps) - 1
+        chain_items.append(
+            chip(
+                scene,
+                text=step,
+                color=BRICK_DEEP if last else INK,
+                background=BRICK_SOFT if last else PAPER_DEEP,
             )
-        x = right + 0.63
+        )
+        if not last:
+            chain_items.append(scene.geometry.arrow(0, 0, 0.4, 0).fill(MUTED).no_stroke())
+    chain = L.row(*chain_items, gap="16px", align="center", width="fill")
     sections = [
         "Datos de diseño",
         "Requisitos mínimos",
@@ -628,42 +624,22 @@ def report(scene: Scene) -> None:
         "Sismo moderado",
         "Información del modelo",
     ]
-    sec_label = label(
-        scene, "Secciones del reporte", LEFT_EDGE, -2.28, color=MUTED, size=0.13
-    )
-    chips: list[Drawable] = []
-    x = LEFT_EDGE
-    for name in sections:
-        chips.append(
-            pill(
-                scene,
-                name,
-                x,
-                -2.72,
-                size=0.18,
-                font="Lato",
-                color=INK,
-                background=CARD,
-                border=RULE,
-                anchor=Anchor.LEFT,
-            )
-        )
-        x = chips[-1].bounds().right + 0.18
-    scene.play(
-        stagger(
+    section_chips = L.column(
+        note(scene, text="Secciones del reporte"),
+        L.row(
             *[
-                c.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.3)
-                for c in chain
+                chip(scene, text=name, background=CARD, border=RULE, font="Lato")
+                for name in sections
             ],
-            each=0.08,
-        )
+            gap="16px",
+            width="fill",
+        ),
+        gap="14px",
+        width="fill",
     )
-    scene.play(
-        [
-            sec_label.animate.fade_in().duration(0.3),
-            stagger(*[c.animate.fade_in().duration(0.25) for c in chips], each=0.06),
-        ]
-    )
+    page_column(scene, body=[chain, section_chips], top="700px", gap="44px")
+    scene.play(enter(chain, each=0.08, duration=0.3))
+    scene.play(enter(section_chips, each=0.06, duration=0.25))
     source(scene, "Tesis · Figuras 48 y 49, pp. 116–117; Tabla 48, p. 124")
     scene.stop("reporte-estructura")
 

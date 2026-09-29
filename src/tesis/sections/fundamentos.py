@@ -9,6 +9,7 @@ from typing import Literal
 
 from gaanim import (
     Anchor,
+    Box,
     Direction,
     Drawable,
     Scene,
@@ -43,6 +44,7 @@ from tesis.data.thesis import (
     SHEAR_CAPACITY,
     SHEAR_DEMAND,
 )
+from tesis.components import enter, hairline, page
 from tesis.kit import (
     LEFT_EDGE,
     dimension,
@@ -443,6 +445,73 @@ def _mini_wall(
     return [panel_, *courses, *cols, top, base]
 
 
+def _check_drawing(
+    scene: Scene, i: int, cx: float, dy: float
+) -> tuple[list[Drawable], list[Drawable], list[Drawable]]:
+    """Dibujo de la verificación ``i`` centrado en ``cx``; ``dy`` desplaza todo en vertical.
+
+    Devuelve las piezas del dibujo, los elementos añadidos (flechas y rótulos) y, de
+    estos, los que crecen como flecha.
+    """
+    if i == 0:
+        drawing = _mini_wall(scene, cx, 1.1 + dy, 2.6, 1.5)
+        arrow = (
+            scene.geometry.arrow(
+                cx, 2.3 + dy, cx, 1.88 + dy, head_length=0.14, head_width=0.2, body_width=0.04
+            )
+            .fill(INK)
+            .no_stroke()
+        )
+        loads = [
+            scene.geometry.arrow(
+                cx + dx, 2.2 + dy, cx + dx, 1.88 + dy, head_length=0.1, head_width=0.12, body_width=0.025
+            )
+            .fill(INK_SOFT)
+            .no_stroke()
+            for dx in (-0.9, -0.45, 0.45, 0.9)
+        ]
+        p_lab = t(scene, "$P_m$", cx + 1.1, 2.1 + dy, font=MONO, size=0.24, color=INK, anchor=Anchor.LEFT)
+        return drawing, [arrow, *loads, p_lab], [arrow, *loads]
+    if i == 1:
+        drawing = _mini_wall(scene, cx, 1.1 + dy, 2.6, 1.5)
+        arrow = (
+            scene.geometry.arrow(
+                cx - 2.1, 1.75 + dy, cx - 1.32, 1.75 + dy, head_length=0.16, head_width=0.16, body_width=0.035
+            )
+            .fill(STEEL)
+            .no_stroke()
+        )
+        cracks = [
+            scene.geometry.dashed_line(
+                cx - 0.95, 0.45 + dy, cx + 0.95, 1.6 + dy, dash_length=0.08, gap_length=0.05
+            ).stroke(STEEL, 0.02),
+            scene.geometry.dashed_line(
+                cx + 0.95, 0.45 + dy, cx - 0.95, 1.6 + dy, dash_length=0.08, gap_length=0.05
+            )
+            .stroke(STEEL, 0.02)
+            .opacity(0.35),
+        ]
+        v_lab = t(
+            scene, "$V_e$", cx - 2.1, 1.88 + dy, font=MONO, size=0.24, color=STEEL, anchor=Anchor.BOTTOM_LEFT
+        )
+        return drawing, [arrow, v_lab, *cracks], [arrow]
+    plan = draw_plan(
+        scene, (cx, 1.35 + dy), 3.4, grid=False, drawn_thickness=0.055,
+        color_y="#C9CED6", slab_fill="#F1EDE6",
+    )
+    arrow = (
+        scene.geometry.arrow(
+            cx - 2.15, 1.35 + dy, cx - 1.8, 1.35 + dy, head_length=0.14, head_width=0.16, body_width=0.035
+        )
+        .fill(BRICK)
+        .no_stroke()
+    )
+    e_lab = t(
+        scene, "$V_E$", cx - 2.15, 1.5 + dy, font=MONO, size=0.24, color=BRICK, anchor=Anchor.BOTTOM_LEFT
+    )
+    return [plan.slab, plan.void, *plan.all_walls], [arrow, e_lab], [arrow]
+
+
 def strength_checks(scene: Scene) -> None:
     header(scene, KICKER, "Tres verificaciones de resistencia, por muro y por piso")
     w, gap = 4.6, 0.25
@@ -482,187 +551,68 @@ def strength_checks(scene: Scene) -> None:
             "share": f"demanda / capacidad = {demand / capacity:.2f}",
         },
     ]
-    for i, spec in enumerate(cards):
-        x0 = LEFT_EDGE + i * (w + gap)
-        cx = x0 + w / 2
-        frame = panel(scene, x0, 2.4, w, 5.7, fill=CARD, anchor=Anchor.TOP_LEFT)
-        drawing: list[Drawable] = []
-        loads: list[Drawable] = []
-        if i < 2:
-            drawing = _mini_wall(scene, cx, 1.1, 2.6, 1.5)
-            if i == 0:
-                arrow = (
-                    scene.geometry.arrow(
-                        cx,
-                        2.3,
-                        cx,
-                        1.88,
-                        head_length=0.14,
-                        head_width=0.2,
-                        body_width=0.04,
-                    )
-                    .fill(INK)
-                    .no_stroke()
-                )
-                loads = [
-                    scene.geometry.arrow(
-                        cx + dx,
-                        2.2,
-                        cx + dx,
-                        1.88,
-                        head_length=0.1,
-                        head_width=0.12,
-                        body_width=0.025,
-                    )
-                    .fill(INK_SOFT)
-                    .no_stroke()
-                    for dx in (-0.9, -0.45, 0.45, 0.9)
-                ]
-                p_lab = t(
-                    scene,
-                    "$P_m$",
-                    cx + 1.1,
-                    2.1,
-                    font=MONO,
-                    size=0.24,
+    L = scene.layout
+    slots = [L.box(width="fill", height="235px").item(shrink=0) for _ in cards]
+    boxes: list[Box] = []
+    for spec, slot in zip(cards, slots, strict=True):
+        eq1 = scene.text.equation(spec["eq"][0], size=0.3)
+        eq2 = scene.text.equation(spec["eq"][1], size=0.22, color=INK_SOFT)
+        boxes.append(
+            L.column(
+                slot,
+                L.box(
+                    spec["tag"].upper(),
+                    font_size="18px",
+                    weight=900,
+                    color=spec["color"],
+                    letter_spacing=0.03,
+                ),
+                L.box(
+                    spec["question"].replace("\n", " "),
+                    font_size="27px",
+                    weight=700,
                     color=INK,
-                    anchor=Anchor.LEFT,
-                )
-                extras = [arrow, *loads, p_lab]
-            else:
-                arrow = (
-                    scene.geometry.arrow(
-                        cx - 2.1,
-                        1.75,
-                        cx - 1.32,
-                        1.75,
-                        head_length=0.16,
-                        head_width=0.16,
-                        body_width=0.035,
-                    )
-                    .fill(STEEL)
-                    .no_stroke()
-                )
-                cracks = [
-                    scene.geometry.dashed_line(
-                        cx - 0.95,
-                        0.45,
-                        cx + 0.95,
-                        1.6,
-                        dash_length=0.08,
-                        gap_length=0.05,
-                    ).stroke(STEEL, 0.02),
-                    scene.geometry.dashed_line(
-                        cx + 0.95,
-                        0.45,
-                        cx - 0.95,
-                        1.6,
-                        dash_length=0.08,
-                        gap_length=0.05,
-                    )
-                    .stroke(STEEL, 0.02)
-                    .opacity(0.35),
-                ]
-                v_lab = t(
-                    scene,
-                    "$V_e$",
-                    cx - 2.1,
-                    1.88,
-                    font=MONO,
-                    size=0.24,
-                    color=STEEL,
-                    anchor=Anchor.BOTTOM_LEFT,
-                )
-                extras = [arrow, v_lab, *cracks]
-        else:
-            plan = draw_plan(
-                scene,
-                (cx, 1.35),
-                3.4,
-                grid=False,
-                drawn_thickness=0.055,
-                color_y="#C9CED6",
-                slab_fill="#F1EDE6",
-            )
-            arrow = (
-                scene.geometry.arrow(
-                    cx - 2.15,
-                    1.35,
-                    cx - 1.8,
-                    1.35,
-                    head_length=0.14,
-                    head_width=0.16,
-                    body_width=0.035,
-                )
-                .fill(BRICK)
-                .no_stroke()
-            )
-            drawing = [plan.slab, plan.void, *plan.all_walls]
-            extras = [
-                arrow,
-                t(
-                    scene,
-                    "$V_E$",
-                    cx - 2.15,
-                    1.5,
-                    font=MONO,
-                    size=0.24,
-                    color=BRICK,
-                    anchor=Anchor.BOTTOM_LEFT,
+                    height="68px",
+                ).item(shrink=0),
+                L.box(eq1, width="fill", height="70px", justify="center", align="start").item(shrink=0),
+                L.box(eq2, width="fill", height="44px", justify="center", align="start").item(shrink=0),
+                hairline(scene),
+                L.box(spec["case"], font=MONO, font_size="18px", color=MUTED),
+                L.row(
+                    L.box(spec["value"], font_size="30px", weight=900, color=INK).item(grow=1),
+                    L.box("✓ Cumple", font_size="19px", weight=900, color=PASS),
+                    align="center",
+                    width="fill",
                 ),
-            ]
-        tag = label(scene, spec["tag"], x0 + 0.3, 0.2, color=spec["color"], size=0.15)
-        question = t(
-            scene, spec["question"], x0 + 0.3, -0.05, size=0.24, weight=700, color=INK
+                scene.text(spec["share"], size=0.17, color=INK_SOFT),
+                gap="14px",
+                padding=("28px", "34px"),
+                background=CARD,
+                border=RULE,
+                border_width="2px",
+                width="fill",
+                height="fill",
+            ).item(grow=1)
         )
-        eq1 = scene.text.equation(spec["eq"][0], size=0.3).move_to(
-            x0 + 0.3, -0.85, Anchor.TOP_LEFT
-        )
-        eq2 = scene.text.equation(spec["eq"][1], size=0.22, color=INK_SOFT).move_to(
-            x0 + 0.3, -1.45, Anchor.TOP_LEFT
-        )
-        divider = scene.geometry.line(x0 + 0.3, -2.0, x0 + w - 0.3, -2.0).stroke(
-            RULE, 0.01
-        )
-        case = t(
-            scene, spec["case"], x0 + 0.3, -2.12, font=MONO, size=0.15, color=MUTED
-        )
-        value = t(
-            scene, spec["value"], x0 + 0.3, -2.42, size=0.26, weight=900, color=INK
-        )
-        share = t(scene, spec["share"], x0 + 0.3, -2.8, size=0.17, color=INK_SOFT)
-        chip = status(scene, True, x0 + w - 0.3, -2.62, anchor=Anchor.RIGHT, size=0.15)
+    row = L.row(*boxes, gap="32px", align="stretch", width="fill", height="fill")
+    page(scene, body=[row], top="190px", bottom="110px")
+    for i, (spec, box, slot) in enumerate(zip(cards, boxes, slots, strict=True)):
+        # El dibujo se coloca en coordenadas sobre el hueco que reservó el layout.
+        area = slot.bounds()
+        cx, cy = (area.left + area.right) / 2, (area.top + area.bottom) / 2
+        drawing, extras, arrows = _check_drawing(scene, i, cx, cy - 1.375)
         scene.play(
-            stagger(
-                frame.animate.fade_in().duration(0.3),
-                stagger(
-                    *[d.animate.fade_in().duration(0.3) for d in drawing], each=0.01
-                ),
+            [
+                stagger(*[d.animate.fade_in().duration(0.3) for d in drawing], each=0.01),
                 stagger(
                     *[
-                        (
-                            e.animate.grow_arrow()
-                            if any(e is a for a in (arrow, *loads))
-                            else e.animate.fade_in()
-                        ).duration(0.35)
+                        (e.animate.grow_arrow() if e in arrows else e.animate.fade_in()).duration(0.35)
                         for e in extras
                     ],
                     each=0.08,
                 ),
-                tag.animate.fade_in().duration(0.3),
-                question.animate.fade_in_from(Direction.UP, 0.06).duration(0.4),
-                eq1.animate.write().duration(0.6),
-                eq2.animate.fade_in().duration(0.4),
-                divider.animate.create().duration(0.3),
-                stagger(
-                    case.animate.fade_in().duration(0.3),
-                    value.animate.fade_in().duration(0.3),
-                    share.animate.fade_in().duration(0.3),
-                    chip.animate.fade_in().duration(0.3),
-                    each=0.08,
-                ),
-                each=0.12,
-            )
+                enter(box, direction=Direction.UP, distance=0.06, duration=0.3, each=0.05),
+            ]
         )
         scene.stop(f"verificacion-{i + 1}")
     source(
