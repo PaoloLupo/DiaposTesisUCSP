@@ -694,3 +694,28 @@ def module_card(
         width="648px",
         height="72px",
     ).item(shrink=0)
+
+
+@component
+def readout_card(
+    scene: Scene,
+    *,
+    tag: str,
+    value: str,
+    detail: str,
+    detail_color: Color = INK_SOFT,
+    width: str = "732px",
+) -> Box:
+    """Lectura de un caso: rótulo en versalitas, valor destacado y una línea de detalle."""
+    L = scene.layout
+    return L.column(
+        note(scene, text=tag, size="16px"),
+        L.box(value, font_size="30px", weight=900, color=INK),
+        L.box(detail, font_size="22px", color=detail_color),
+        gap="8px",
+        padding=("24px", "30px"),
+        background=CARD,
+        border=RULE,
+        border_width="2px",
+        width=width,
+    )

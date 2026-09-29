@@ -43,7 +43,15 @@ from tesis.data.thesis import (
     SHEAR_CAPACITY,
     SHEAR_DEMAND,
 )
-from tesis.components import enter, hairline, header, page, panel, source, takeaway_at
+from tesis.components import (
+    enter,
+    hairline,
+    header,
+    page,
+    readout_card,
+    source,
+    takeaway_at,
+)
 from tesis.kit import LEFT_EDGE, dimension, label, status, t
 from tesis.theme import (
     BRICK,
@@ -872,35 +880,15 @@ def drift(scene: Scene) -> None:
         ]
     )
     worst = max(DRIFTS["Y"]["MCT"])
-    case = panel(scene, x_text, -1.2, 6.1, 1.15, fill=CARD, anchor=Anchor.TOP_LEFT)
-    case_tag = label(
-        scene, "En el caso (MCT)", x_text + 0.25, -1.4, color=MUTED, size=0.13
-    )
-    case_value = t(
+    case = readout_card(
         scene,
-        f"máxima θ = {worst:.5f}  (Y-Y, piso 3)",
-        x_text + 0.25,
-        -1.68,
-        size=0.25,
-        weight=900,
-        color=INK,
-    )
-    case_share = t(
-        scene,
-        f"{worst / DRIFT_LIMIT * 100:.0f} % del límite de albañilería",
-        x_text + 0.25,
-        -2.0,
-        size=0.18,
-        color=PASS,
-    )
+        tag="En el caso (MCT)",
+        value=f"máxima θ = {worst:.5f}  (Y-Y, piso 3)",
+        detail=f"{worst / DRIFT_LIMIT * 100:.0f} % del límite de albañilería",
+        detail_color=PASS,
+    ).move_to(x_text, -1.2, Anchor.TOP_LEFT)
     scene.play(
-        stagger(
-            case.animate.fade_in().duration(0.3),
-            case_tag.animate.fade_in().duration(0.3),
-            case_value.animate.fade_in().duration(0.3),
-            case_share.animate.fade_in().duration(0.3),
-            each=0.08,
-        )
+        enter(case, direction=Direction.UP, distance=0.05, each=0.08, duration=0.3)
     )
     source(
         scene,
