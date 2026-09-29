@@ -380,14 +380,87 @@ def arrow_gutter(
 
 @component
 def chip(
-    scene: Scene, *, text: str, color: Color = INK, background: Color = PAPER_DEEP
+    scene: Scene,
+    *,
+    text: str,
+    color: Color = INK,
+    background: Color = PAPER_DEEP,
+    border: Color | None = None,
+    font: str = MONO,
+    width: str | None = None,
 ) -> Box:
     """Etiqueta compacta de esquinas rectas, en tipografía técnica."""
+    props: dict[str, str] = {"border": border, "border_width": "2px"} if border else {}
+    if width:
+        props["width"] = width
     return scene.layout.box(
         text,
-        font=MONO,
+        font=font,
         font_size="24px",
         color=color,
         background=background,
         padding=("10px", "18px"),
+        **props,
     )
+
+
+LABEL_WIDTH = "470px"
+
+
+@component
+def compare_table(
+    scene: Scene,
+    *,
+    columns: list[tuple[str, str, Color, Color]],
+    rows: list[tuple[str, list[tuple[str, bool, Color]]]],
+) -> Box:
+    """Tabla de comparación: una columna por modelo bajo su encabezado de color.
+
+    ``columns`` da ``(nombre, subtítulo, color, fondo)``; ``rows`` da el aspecto y, por
+    columna, ``(texto, resaltado, color)``. Los rótulos y las celdas comparten anchos,
+    así las filas quedan alineadas sin coordenadas.
+    """
+    L = scene.layout
+    head = L.row(
+        L.box(width=LABEL_WIDTH).item(shrink=0),
+        *[
+            L.column(
+                L.box(name, font=DISPLAY, font_size="40px", weight=700, color=color),
+                L.box(sub, font_size="22px", color=INK_SOFT),
+                gap="4px",
+                align="center",
+                padding=("22px", "10px"),
+                background=soft,
+                width="fill",
+            ).item(grow=1)
+            for name, sub, color, soft in columns
+        ],
+        gap="12px",
+        width="fill",
+    )
+    body = [
+        L.column(
+            L.row(
+                L.box(aspect, font_size="26px", weight=700, color=INK, width=LABEL_WIDTH).item(shrink=0),
+                *[
+                    L.box(
+                        text,
+                        font_size="26px",
+                        weight=900 if bold else 400,
+                        color=color,
+                        align="center",
+                        width="fill",
+                    ).item(grow=1)
+                    for text, bold, color in cells
+                ],
+                gap="12px",
+                align="center",
+                width="fill",
+            ),
+            hairline(scene, color="#E6E0D5"),
+            gap="12px",
+            width="fill",
+        )
+        for aspect, cells in rows
+    ]
+    return L.column(head, *body, gap="12px", width="fill")

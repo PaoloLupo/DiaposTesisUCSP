@@ -32,6 +32,7 @@ from tesis.data.thesis import (
     crack_failures,
     relative,
 )
+from tesis.components import chip, compare_table, enter, page
 from tesis.kit import LEFT_EDGE, header, label, panel, pill, source, t
 from tesis.theme import (
     BRICK,
@@ -70,118 +71,60 @@ MATRIX = [
 
 def models(scene: Scene) -> None:
     header(scene, KICKER, "Tres modelos del mismo edificio: qué cambia entre ellos")
-    cols = {"MCT": -0.55, "MSTA": 2.55, "MSTO": 5.65}
     names = {
-        "MCT": "completo\ntridimensional",
-        "MSTA": "simplificado\nactualizado",
-        "MSTO": "simplificado\noriginal",
+        "MCT": "completo tridimensional",
+        "MSTA": "simplificado actualizado",
+        "MSTO": "simplificado original",
     }
-    heads: list[Drawable] = []
-    for model, x in cols.items():
-        heads.append(panel(scene, x, 2.05, 2.9, 1.0, fill=SOFT[model], border=None))
-        heads.append(
-            t(
-                scene,
-                model,
-                x,
-                2.22,
-                font=DISPLAY,
-                size=0.34,
-                weight=700,
-                color=MODEL_COLORS[model],
-                anchor=Anchor.CENTER,
-            )
-        )
-        heads.append(
-            t(
-                scene,
-                names[model].replace("\n", " "),
-                x,
-                1.84,
-                size=0.16,
-                color=INK_SOFT,
-                anchor=Anchor.CENTER,
-            )
-        )
-    scene.play(stagger(*[h.animate.fade_in().duration(0.3) for h in heads], each=0.05))
-    rows: list[Drawable] = []
-    for i, (aspect, values) in enumerate(MATRIX):
-        y = 1.12 - i * 0.5
-        rows.append(
-            t(
-                scene,
+    models_ = list(names)
+    table = compare_table(
+        scene,
+        columns=[(m, names[m], MODEL_COLORS[m], SOFT[m]) for m in models_],
+        rows=[
+            (
                 aspect,
-                LEFT_EDGE,
-                y,
-                size=0.21,
-                weight=700,
-                color=INK,
-                anchor=Anchor.LEFT,
+                [
+                    (
+                        values[j],
+                        values[j] != values[0],
+                        MODEL_COLORS[m] if values[j] != values[0] else INK_SOFT,
+                    )
+                    for j, m in enumerate(models_)
+                ],
             )
-        )
-        for j, (model, x) in enumerate(cols.items()):
-            differs = values[j] != values[0]
-            rows.append(
-                t(
-                    scene,
-                    values[j],
-                    x,
-                    y,
-                    size=0.21,
-                    weight=900 if differs else 400,
-                    color=MODEL_COLORS[model] if differs else INK_SOFT,
-                    anchor=Anchor.CENTER,
-                )
+            for aspect, values in MATRIX
+        ],
+    )
+    L = scene.layout
+    logic = L.column(
+        *[
+            L.row(
+                chip(scene, text=pair, color=color, background=CARD, border=color, font=DISPLAY, width="250px"),
+                L.box(text, font_size="26px", color=INK),
+                gap="24px",
+                align="center",
             )
-        rows.append(
-            scene.geometry.line(LEFT_EDGE, y - 0.25, 7.3, y - 0.25).stroke(
-                "#E6E0D5", 0.008
-            )
-        )
-    scene.play(stagger(*[r.animate.fade_in().duration(0.25) for r in rows], each=0.012))
+            for pair, text, color in [
+                (
+                    "MCT ↔ MSTA",
+                    "misma norma: la diferencia viene de la idealización y del procesamiento",
+                    BRICK,
+                ),
+                (
+                    "MSTA ↔ MSTO",
+                    "misma idealización: la diferencia viene de la norma (E.030 y E.070)",
+                    STEEL,
+                ),
+            ]
+        ],
+        gap="16px",
+        width="fill",
+    )
+    page(scene, body=[table, logic], gap="36px", top="185px", justify="start")
+    scene.play(enter(table, each=0.03, duration=0.25))
     scene.stop("modelos-matriz")
 
-    logic = [
-        (
-            "MCT ↔ MSTA",
-            "misma norma: la diferencia viene de la idealización y del procesamiento",
-            BRICK,
-        ),
-        (
-            "MSTA ↔ MSTO",
-            "misma idealización: la diferencia viene de la norma (E.030 y E.070)",
-            STEEL,
-        ),
-    ]
-    items: list[Drawable] = []
-    for i, (pair, text, color) in enumerate(logic):
-        y = -2.55 - i * 0.48
-        items.append(
-            pill(
-                scene,
-                pair,
-                LEFT_EDGE,
-                y,
-                size=0.18,
-                color=color,
-                background=CARD,
-                border=color,
-                anchor=Anchor.LEFT,
-                weight=700,
-            )
-        )
-        items.append(
-            t(scene, text, LEFT_EDGE + 2.0, y, size=0.23, color=INK, anchor=Anchor.LEFT)
-        )
-    scene.play(
-        stagger(
-            *[
-                x.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.35)
-                for x in items
-            ],
-            each=0.1,
-        )
-    )
+    scene.play(enter(logic, each=0.1))
     source(
         scene,
         "Tesis · §8.1 Diferencias encontradas entre los modelos analizados, p. 126 · la propuesta E.070 (2019) "

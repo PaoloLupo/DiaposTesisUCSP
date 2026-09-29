@@ -15,6 +15,7 @@ from gaanim import (
 )
 
 from tesis.app import thesis_image
+from tesis.components import chip, enter, hairline, page
 from tesis.diagram import link
 from tesis.kit import (
     LEFT_EDGE,
@@ -242,69 +243,65 @@ API_ROWS = [
 
 def api(scene: Scene) -> None:
     header(scene, KICKER, "Alba lee el modelo directamente mediante la API de ETABS")
-    left_col, mid, right_col = -6.2, -0.35, 0.35
-    alba = pill(
-        scene,
-        "Alba · Python + comtypes",
-        -3.4,
-        2.35,
-        font="Lato",
-        weight=900,
-        size=0.2,
-        color=BRICK_DEEP,
-        background=BRICK_SOFT,
+    L = scene.layout
+    cat_w, call_w, arrow_w = "230px", "640px", "150px"
+    alba = chip(
+        scene, text="Alba · Python + comtypes", color=BRICK_DEEP, background=BRICK_SOFT, font="Lato"
     )
-    etabs = pill(
-        scene,
-        "ETABS · SapModel",
-        3.6,
-        2.35,
-        font="Lato",
-        weight=900,
-        size=0.2,
-        color=STEEL,
-        background=STEEL_SOFT,
+    etabs = chip(scene, text="ETABS · SapModel", color=STEEL, background=STEEL_SOFT, font="Lato")
+    heading_row = L.row(
+        L.box(width=cat_w).item(shrink=0),
+        L.column(alba, width=call_w, align="end").item(shrink=0),
+        L.box(width=arrow_w).item(shrink=0),
+        etabs,
+        gap="20px",
+        align="center",
+        width="fill",
     )
-    scene.play(
-        [alba.animate.fade_in().duration(0.3), etabs.animate.fade_in().duration(0.3)]
-    )
-    rules = [
-        scene.geometry.line(LEFT_EDGE, y - 0.28, 7.3, y - 0.28).stroke("#E9E4DA", 0.008)
-        for y in (1.72 - i * 0.56 for i in range(len(API_ROWS) - 1))
-    ]
     # Cada fila es una consulta: el método se teclea, la flecha va a ETABS y
-    # aparece lo que devuelve. Las filas se solapan como consultas seguidas.
-    rows: list[Playable] = []
-    for i, (cat, method, answer) in enumerate(API_ROWS):
-        y = 1.72 - i * 0.56
-        category = label(
-            scene, cat, LEFT_EDGE, y, color=MUTED, size=0.12, anchor=Anchor.LEFT
+    # aparece lo que devuelve.
+    call_rows = []
+    for cat, method, answer in API_ROWS:
+        call_rows.append(
+            L.column(
+                L.row(
+                    L.box(cat.upper(), font_size="17px", weight=900, color=MUTED, letter_spacing=0.03, width=cat_w).item(shrink=0),
+                    L.box(
+                        method, font=MONO, font_size="22px", color=INK, width=call_w,
+                        align="end",
+                    ).item(shrink=0),
+                    scene.geometry.arrow(0, 0, 1.0, 0).fill(BRICK).no_stroke(),
+                    L.box(answer, font_size="26px", color=INK_SOFT),
+                    gap="20px",
+                    align="center",
+                    width="fill",
+                ),
+                hairline(scene, color="#E9E4DA"),
+                gap="12px",
+                width="fill",
+            )
         )
-        call = t(
-            scene,
-            method,
-            mid - 0.15,
-            y,
-            font=MONO,
-            size=0.17,
-            color=INK,
-            anchor=Anchor.RIGHT,
-        )
-        arrow = link(scene, (mid, y), (right_col + 0.1, y), color=BRICK)
-        reply = t(
-            scene,
-            answer,
-            right_col + 0.3,
-            y,
-            size=0.21,
-            color=INK_SOFT,
-            anchor=Anchor.LEFT,
-        )
-        rows.append(
+    table = L.column(*call_rows, gap="12px", width="fill")
+    closing = L.box(
+        "Antes de leer: ¿hay una instancia abierta y el modelo está analizado? Si falta algo, "
+        "la consola lo advierte y no se calcula.",
+        font_size="26px",
+        color=INK,
+        background=PAPER_DEEP,
+        padding=("16px", "26px"),
+        width="fill",
+    )
+    page(scene, body=[heading_row, table, closing], gap="22px", top="190px")
+    scene.play(enter(heading_row, each=0.1))
+    plays: list[Playable] = []
+    for row in call_rows:
+        line = row.children[0]
+        category, call, arrow, reply = line.children
+        plays.append(
             sequence(
                 parallel(
                     category.animate.fade_in().duration(0.2),
-                    call.animate.typewriter(cps=60, cursor="▍", keep_cursor=False),
+                    call.children[0].animate.typewriter(cps=60, cursor="▍", keep_cursor=False),
                 ),
                 parallel(
                     arrow.animate.grow_arrow().duration(0.25),
@@ -312,36 +309,14 @@ def api(scene: Scene) -> None:
                 ),
             )
         )
-    _ = left_col
+    rules = [row.children[1] for row in call_rows]
     scene.play(
         [
             stagger(*[r.animate.fade_in().duration(0.3) for r in rules], each=0.04),
-            stagger(*rows, each=0.35),
+            stagger(*plays, each=0.35),
         ]
     )
-    note = panel(
-        scene,
-        LEFT_EDGE,
-        -2.75,
-        14.6,
-        0.62,
-        fill=PAPER_DEEP,
-        border=None,
-        anchor=Anchor.LEFT,
-    )
-    note_t = t(
-        scene,
-        "Antes de leer: ¿hay una instancia abierta y el modelo está analizado? Si falta algo, "
-        "la consola lo advierte y no se calcula.",
-        LEFT_EDGE + 0.25,
-        -2.75,
-        size=0.2,
-        color=INK,
-        anchor=Anchor.LEFT,
-    )
-    scene.play(
-        [note.animate.fade_in().duration(0.3), note_t.animate.fade_in().duration(0.4)]
-    )
+    scene.play(enter(closing))
     source(
         scene,
         "Tesis · Tabla 47, p. 120 · métodos tal como se listan en la tesis",
