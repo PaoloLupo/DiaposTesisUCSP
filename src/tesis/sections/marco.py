@@ -15,25 +15,32 @@ from gaanim import (
 )
 
 from tesis.building import density, wall_area_sum
+from tesis.components import (
+    arrow_gutter,
+    chip,
+    column_list,
+    enter,
+    note,
+    page,
+    role_column,
+)
+from tesis.components import takeaway as takeaway_box
 from tesis.data.thesis import DENSITY_MIN, SHEAR_CAPACITY, SHEAR_DEMAND
 from tesis.diagram import decision, io, link, process, terminal
 from tesis.kit import (
-    LEFT_EDGE,
     header,
-    heading,
     label,
     panel,
     pill,
     source,
-    status,
     t,
-    takeaway,
 )
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
     BRICK_SOFT,
     CARD,
+    DISPLAY,
     FAIL,
     INK,
     INK_SOFT,
@@ -55,104 +62,60 @@ def scope(scene: Scene) -> None:
         KICKER,
         "Se automatiza lo repetitivo; decide el ingeniero",
     )
-    crit_label = label(
-        scene, "Un proceso es clave si…", LEFT_EDGE, 2.42, color=MUTED, size=0.14
+    L = scene.layout
+    criteria = L.column(
+        note(scene, text="Un proceso es clave si…"),
+        # Los criterios completan el rótulo, en gris para no competir con la tabla.
+        L.box(
+            "se repite en cada iteración, maneja muchos datos iguales, expone a errores "
+            "de transcripción, aplica un criterio normativo explícito y alimenta la "
+            "revisión del ingeniero.",
+            font_size="28px",
+            color=INK_SOFT,
+            width="90%",
+        ),
+        gap="14px",
+        width="fill",
     )
-    # Los criterios se leen como una frase que completa el rótulo, en dos líneas
-    # equilibradas y en gris, para no competir con la tabla de abajo.
-    criteria = t(
+    engineer = role_column(
         scene,
-        "se repite en cada iteración, maneja muchos datos iguales, expone a errores de "
-        "transcripción,\naplica un criterio normativo explícito y alimenta la revisión "
-        "del ingeniero.",
-        LEFT_EDGE,
-        2.12,
-        size=0.23,
-        color=INK_SOFT,
+        title="Ingeniero estructural",
+        color=STEEL,
+        rows=[
+            ("Estructura", "define la distribución de muros"),
+            ("Modela y analiza", "construye el modelo en ETABS"),
+            ("Interpreta", "lee diagnósticos y resultados"),
+            ("Decide", "modifica muros, espesores o materiales"),
+        ],
     )
-    scene.play(
-        [
-            crit_label.animate.fade_in().duration(0.3),
-            criteria.animate.fade_in_from(Direction.UP, 0.06).duration(0.5),
-        ]
+    alba = role_column(
+        scene,
+        title="Marco de trabajo · Alba",
+        color=BRICK,
+        rows=[
+            ("Extracción", "lee y valida datos del modelo por API"),
+            ("Verificación", "ejecuta los módulos E.070 y E.030"),
+            ("Retroalimentación", "señala muro, piso, dirección y valores"),
+            ("Reporte", "documenta la iteración en PDF"),
+        ],
     )
+    # Estructura → Extracción y Retroalimentación → Interpreta.
+    gutter = arrow_gutter(
+        scene, slots=[("modelo", True), None, ("diagnóstico", False), None]
+    )
+    table = L.row(engineer, gutter, alba, gap="24px", width="fill")
+    closing = takeaway_box(
+        scene,
+        text="El marco no genera la estructuración ni modifica el modelo: asiste la evaluación",
+    )
+    page(scene, body=[criteria, table, closing], gap="44px", top="200px")
+    scene.play(enter(criteria))
     scene.stop("criterios-procesos-clave")
 
-    columns = [
-        (
-            LEFT_EDGE,
-            "Ingeniero estructural",
-            STEEL,
-            [
-                ("Estructura", "define la distribución de muros"),
-                ("Modela y analiza", "construye el modelo en ETABS"),
-                ("Interpreta", "lee diagnósticos y resultados"),
-                ("Decide", "modifica muros, espesores o materiales"),
-            ],
-        ),
-        (
-            1.0,
-            "Marco de trabajo · Alba",
-            BRICK,
-            [
-                ("Extracción", "lee y valida datos del modelo por API"),
-                ("Verificación", "ejecuta los módulos E.070 y E.030"),
-                ("Retroalimentación", "señala muro, piso, dirección y valores"),
-                ("Reporte", "documenta la iteración en PDF"),
-            ],
-        ),
-    ]
-    for x0, name, color, items in columns:
-        w = 6.3
-        head_items = heading(scene, name, x0, 0.45, w, color=color)
-        rows: list[Drawable] = []
-        for i, (head, body) in enumerate(items):
-            yy = -0.05 - i * 0.66
-            rows.append(t(scene, head, x0, yy, size=0.22, weight=900, color=INK))
-            rows.append(t(scene, body, x0 + 2.4, yy, size=0.21, color=INK_SOFT))
-        scene.play(
-            stagger(
-                *[h.animate.fade_in().duration(0.3) for h in head_items],
-                stagger(*[r.animate.fade_in().duration(0.25) for r in rows], each=0.04),
-                each=0.1,
-            )
-        )
-    # Cada flecha a la altura de las filas que conecta: Estructura → Extracción y
-    # Retroalimentación → Interpreta.
-    row_mid = [-0.05 - i * 0.66 - 0.14 for i in range(4)]
-    to_alba = link(scene, (-0.85, row_mid[0]), (0.85, row_mid[0]), color=MUTED)
-    to_eng = link(scene, (0.85, row_mid[2]), (-0.85, row_mid[2]), color=MUTED)
-    lab1 = t(
-        scene,
-        "modelo",
-        0,
-        row_mid[0] + 0.08,
-        size=0.15,
-        color=MUTED,
-        anchor=Anchor.BOTTOM,
-    )
-    lab2 = t(
-        scene,
-        "diagnóstico",
-        0,
-        row_mid[2] + 0.08,
-        size=0.15,
-        color=MUTED,
-        anchor=Anchor.BOTTOM,
-    )
-    scene.play(
-        [
-            to_alba.animate.grow_arrow().duration(0.4),
-            to_eng.animate.grow_arrow().duration(0.4),
-            lab1.animate.fade_in().duration(0.3),
-            lab2.animate.fade_in().duration(0.3),
-        ]
-    )
-    takeaway(
-        scene,
-        "El marco no genera la estructuración ni modifica el modelo: asiste la evaluación",
-        y=-3.1,
-    )
+    scene.play(enter(engineer, each=0.05, duration=0.3))
+    scene.play(enter(alba, each=0.05, duration=0.3))
+    scene.play(enter(gutter, each=0.15, duration=0.4))
+    scene.play(enter(closing))
     source(
         scene,
         "Tesis · §6.1 Procesos clave para la automatización, p. 98; §6.1.3 Evaluación de cumplimiento, p. 100",
@@ -552,145 +515,110 @@ def density_module(scene: Scene) -> None:
 
 def traceability(scene: Scene) -> None:
     header(scene, KICKER, "Cada resultado conserva su origen: modelo, piso y dirección")
-    inputs = [
-        (
-            "Desde ETABS · API",
-            BRICK,
-            [
-                "Geometría de muros y niveles",
-                "Materiales y secciones",
-                "Resultados: P, V, M y desplazamientos",
-                "Etiquetas Pier, casos y combinaciones",
-            ],
-        ),
-        (
-            "Declarado por el usuario",
-            STEEL,
-            [
-                "Datos del proyecto",
-                "Z, U, S y factores de irregularidad",
-                "f'm, f'c · N y $A_p$",
-                "Nombres de combinaciones a usar",
-            ],
-        ),
-    ]
-    items: list[Drawable] = []
-    for i, (name, color, rows) in enumerate(inputs):
-        y0 = 2.4 - i * 2.35
-        items.extend(
-            heading(scene, name, LEFT_EDGE, y0 - 0.42, 4.85, color=color, size=0.21)
-        )
-        for j, row in enumerate(rows):
-            items.append(
-                t(scene, row, LEFT_EDGE, y0 - 0.62 - j * 0.36, size=0.2, color=INK)
-            )
-    core = scene.geometry.circle(0.85).fill(BRICK).no_stroke().move_to(-0.95, 0.05)
-    core_t = t(
+    L = scene.layout
+    api = column_list(
         scene,
+        title="Desde ETABS · API",
+        color=BRICK,
+        size="22px",
+        gap="12px",
+        items=[
+            "Geometría de muros y niveles",
+            "Materiales y secciones",
+            "Resultados: P, V, M y desplazamientos",
+            "Etiquetas Pier, casos y combinaciones",
+        ],
+    )
+    declared = column_list(
+        scene,
+        title="Declarado por el usuario",
+        color=STEEL,
+        size="22px",
+        gap="12px",
+        items=[
+            "Datos del proyecto",
+            "Z, U, S y factores de irregularidad",
+            "f'm, f'c · N y A_p",
+            "Nombres de combinaciones a usar",
+        ],
+    )
+    inputs = L.column(api, declared, gap="24px", width="fill").item(grow=1)
+    core = L.box(
         "Alba",
-        -0.95,
-        0.05,
-        font="Aleo",
-        size=0.4,
+        font=DISPLAY,
+        font_size="48px",
         weight=700,
         color="#FFFFFF",
-        anchor=Anchor.CENTER,
+        background=BRICK,
+        width="190px",
+        height="190px",
+        radius="full",
+        align="center",
+        justify="center",
+    ).item(shrink=0)
+    arrow_in = scene.geometry.arrow(0, 0, 0.7, 0).fill(MUTED).no_stroke()
+    arrow_out = scene.geometry.arrow(0, 0, 0.7, 0).fill(MUTED).no_stroke()
+    hub = L.row(arrow_in, core, arrow_out, gap="14px", align="center").item(shrink=0)
+    outputs = column_list(
+        scene,
+        title="Salidas · interfaz y reporte PDF",
+        color=INK,
+        size="22px",
+        gap="14px",
+        items=[
+            f"{i + 1:02d}  {row}"
+            for i, row in enumerate(
+                [
+                    "Resumen del proyecto y parámetros",
+                    "Densidad provista vs. requerida",
+                    "Esfuerzo axial por muro y nivel",
+                    "Fisuración y resistencia global",
+                    "Derivas: tabla y gráfico por dirección",
+                    "Fecha, combinaciones y diagnósticos",
+                ]
+            )
+        ],
     )
-    arrows = [
-        link(scene, (-2.4, 1.3), (-1.65, 0.45), color=MUTED),
-        link(scene, (-2.4, -1.2), (-1.65, -0.35), color=MUTED),
-        link(scene, (-0.08, 0.05), (0.9, 0.05), color=MUTED),
-    ]
-    outputs = [
-        "Resumen del proyecto y parámetros",
-        "Densidad provista vs. requerida",
-        "Esfuerzo axial por muro y nivel",
-        "Fisuración y resistencia global",
-        "Derivas: tabla y gráfico por dirección",
-        "Fecha, combinaciones y diagnósticos",
-    ]
-    out_head = heading(
-        scene, "Salidas · interfaz y reporte PDF", 1.05, 1.98, 6.25, size=0.21
+    flow = L.row(inputs, hub, outputs, gap="36px", align="center", width="fill").item(
+        grow=1
     )
-    out_rows = [
-        t(scene, f"{i + 1:02d}  {row}", 1.05, 1.7 - i * 0.55, size=0.21, color=INK)
-        for i, row in enumerate(outputs)
-    ]
-    scene.play(stagger(*[x.animate.fade_in().duration(0.25) for x in items], each=0.03))
-    scene.play(
-        stagger(
-            arrows[0].animate.grow_arrow().duration(0.3),
-            arrows[1].animate.grow_arrow().duration(0.3),
-            core.animate.grow_from_center().duration(0.4),
-            core_t.animate.fade_in().duration(0.3),
-            arrows[2].animate.grow_arrow().duration(0.3),
-            each=0.12,
-        )
-    )
-    scene.play(
-        stagger(
-            *[h.animate.fade_in().duration(0.3) for h in out_head],
-            stagger(
-                *[
-                    r.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.25)
-                    for r in out_rows
-                ],
-                each=0.06,
+
+    demand, capacity = SHEAR_DEMAND["X"]["MCT"][0], SHEAR_CAPACITY["X"]["MCT"][0]
+    ok = capacity >= demand
+    record = L.column(
+        note(scene, text="Un registro trazable del caso"),
+        L.row(
+            chip(scene, text="MCT", color=BRICK_DEEP, background=BRICK_SOFT),
+            chip(scene, text="Piso 1"),
+            chip(scene, text="X-X"),
+            chip(scene, text="Resistencia global"),
+            chip(scene, text=f"V_E = {demand:.3f}"),
+            chip(scene, text=f"ΣV_m = {capacity:.3f} tonf"),
+            L.box(
+                "✓ Cumple" if ok else "✕ No cumple",
+                font_size="26px",
+                weight=900,
+                color=PASS if ok else FAIL,
             ),
-            each=0.1,
-        )
+            gap="14px",
+            align="center",
+        ),
+        gap="14px",
+        width="fill",
     )
+    closing = takeaway_box(
+        scene,
+        text="Del reporte se puede volver al modelo, al piso y a la dirección de cada valor",
+    )
+    page(scene, body=[flow, record, closing], gap="30px", top="180px")
+    scene.play(enter(api, each=0.04, duration=0.25))
+    scene.play(enter(declared, each=0.04, duration=0.25))
+    scene.play(enter(hub, each=0.15, duration=0.4))
+    scene.play(enter(outputs, each=0.06, duration=0.25))
     scene.stop("entradas-salidas")
 
-    record_label = label(
-        scene, "Un registro trazable del caso", LEFT_EDGE, -2.28, color=MUTED, size=0.13
-    )
-    demand, capacity = SHEAR_DEMAND["X"]["MCT"][0], SHEAR_CAPACITY["X"]["MCT"][0]
-    parts = [
-        ("MCT", BRICK_DEEP, BRICK_SOFT),
-        ("Piso 1", INK, PAPER_DEEP),
-        ("X-X", INK, PAPER_DEEP),
-        ("Resistencia global", INK, PAPER_DEEP),
-        (f"$V_E$ = {demand:.3f}", INK, PAPER_DEEP),
-        (f"$sum V_m$ = {capacity:.3f} tonf", INK, PAPER_DEEP),
-    ]
-    chips: list[Drawable] = []
-    x = LEFT_EDGE
-    for text, color, bg in parts:
-        chips.append(
-            pill(
-                scene,
-                text,
-                x,
-                -2.75,
-                size=0.17,
-                color=color,
-                background=bg,
-                anchor=Anchor.LEFT,
-            )
-        )
-        x = chips[-1].bounds().right + 0.18
-    chip = status(
-        scene, capacity >= demand, x - 0.05, -2.75, anchor=Anchor.LEFT, size=0.17
-    )
-    scene.play(
-        [
-            record_label.animate.fade_in().duration(0.3),
-            stagger(
-                *[
-                    c.animate.fade_in_from(Direction.UP, 0.08).duration(0.3)
-                    for c in chips
-                ],
-                chip.animate.fade_in().duration(0.3),
-                each=0.1,
-            ),
-        ]
-    )
-    takeaway(
-        scene,
-        "Del reporte se puede volver al modelo, al piso y a la dirección de cada valor",
-        y=-3.3,
-    )
+    scene.play(enter(record, each=0.06, duration=0.3))
+    scene.play(enter(closing))
     source(
         scene,
         "Tesis · §6.3 Especificación de entradas y salidas, p. 111 · registro: Tablas 53 y 54, pp. 133–134",

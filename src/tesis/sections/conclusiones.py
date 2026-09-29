@@ -137,11 +137,16 @@ def findings(scene: Scene) -> None:
     )
     page(
         scene,
-        body=[scene.layout.row(*cards, gap="32px", align="stretch", width="fill"), quote],
+        body=[
+            scene.layout.row(*cards, gap="32px", align="stretch", width="fill"),
+            quote,
+        ],
         gap="56px",
     )
     for card in cards:
-        scene.play(enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08))
+        scene.play(
+            enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08)
+        )
     scene.play(enter(quote, direction=Direction.UP, duration=0.5, each=0.1))
     source(
         scene,
@@ -174,7 +179,9 @@ def outlook(scene: Scene) -> None:
     )
     page(
         scene,
-        body=[scene.layout.row(limits, future, gap="60px", align="start", width="fill")],
+        body=[
+            scene.layout.row(limits, future, gap="60px", align="start", width="fill")
+        ],
         top="230px",
     )
     scene.play(enter(limits, each=0.06, duration=0.3))

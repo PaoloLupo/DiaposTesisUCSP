@@ -18,7 +18,7 @@ name = "gaanim"
 version = "0.7.2"
 source = { path = "C:/Tools/gaanim/gaanim-0.7.2-py3-none-any.whl" }
 wheels = [
-    { filename = "gaanim-0.7.2-py3-none-any.whl", hash = "sha256:9e962bfb61a0af410e4cd0f1ad3c2bd4520d65588ce0a6d49052073819e899fd" },
+    { filename = "gaanim-0.7.2-py3-none-any.whl", hash = "sha256:4e76c29799341ec6e4b1d3b958201657d1b23ceda61a02765f4a24a68d05b9c4" },
 ]
 
 [package.metadata]

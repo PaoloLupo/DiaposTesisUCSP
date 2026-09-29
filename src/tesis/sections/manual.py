@@ -383,7 +383,7 @@ def criteria(scene: Scene) -> None:
         image_card(
             scene,
             picture=scene.media.image(
-                thesis_image(image), width=3.1, height=2.25, fit="contain"
+                thesis_image(image), width=2.9, height=2.25, fit="contain"
             ),
             value=big,
             unit=unit,
@@ -392,14 +392,18 @@ def criteria(scene: Scene) -> None:
         )
         for image, big, unit, body, color in cards
     ]
-    row = scene.layout.row(*built, gap="32px", align="stretch", width="fill", height="fill")
+    row = scene.layout.row(
+        *built, gap="32px", align="stretch", width="fill", height="fill"
+    )
     closing = takeaway_box(
         scene,
         text="Alba lee el modelo tal como fue construido: el criterio del ingeniero sigue siendo clave",
     )
     page(scene, body=[row, closing], gap="40px")
     for card in built:
-        scene.play(enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08))
+        scene.play(
+            enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08)
+        )
     scene.play(enter(closing))
     source(
         scene,

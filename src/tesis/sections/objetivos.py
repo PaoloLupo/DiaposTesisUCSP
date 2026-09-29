@@ -287,7 +287,11 @@ def specific(scene: Scene) -> None:
     header(scene, KICKER, "Cuatro objetivos específicos, cuatro productos")
     cards = [
         objective_card(
-            scene, number=i + 1, verb=verb, text=body.replace("\n", " "), product=product
+            scene,
+            number=i + 1,
+            verb=verb,
+            text=body.replace("\n", " "),
+            product=product,
         )
         for i, (verb, body, product) in enumerate(SPECIFIC)
     ]
@@ -304,7 +308,10 @@ def specific(scene: Scene) -> None:
     )
     page(
         scene,
-        body=[scene.layout.row(*cards, gap="32px", align="stretch", width="fill"), flow],
+        body=[
+            scene.layout.row(*cards, gap="32px", align="stretch", width="fill"),
+            flow,
+        ],
         gap="48px",
     )
     for card in cards:
