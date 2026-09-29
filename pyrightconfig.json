@@ -2,7 +2,8 @@
   "include": ["src", "main.py"],
   "venvPath": ".",
   "venv": ".venv",
- "pythonVersion": "3.14",
+  "pythonVersion": "3.14",
+  "reportUnusedCallResult": "none",
   "executionEnvironments": [
     {
       "root": ".",
