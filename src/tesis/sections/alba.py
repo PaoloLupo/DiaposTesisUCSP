@@ -16,6 +16,7 @@ from gaanim import (
 
 from tesis.app import thesis_image
 from tesis.components import (
+    module_card,
     chip,
     enter,
     hairline,
@@ -61,52 +62,25 @@ def architecture(scene: Scene) -> None:
         scene, KICKER, "Alba organiza el marco en seis módulos, del modelo al reporte"
     )
     x0, w, h, gap, top = -2.55, 5.4, 0.6, 0.16, 2.3
-    ys = [top - h / 2 - i * (h + gap) for i in range(len(MODULES))]
-    boxes: list[Drawable] = []
-    for i, ((name, tech), y) in enumerate(zip(MODULES, ys, strict=True)):
-        core = i >= 2
-        box = panel(
-            scene,
-            x0,
-            y,
-            w,
-            h,
-            fill=BRICK_SOFT if i == 4 else CARD,
-            border=BRICK if i == 4 else RULE,
-            anchor=Anchor.LEFT,
+    cards = [
+        module_card(
+            scene, number=i + 1, name=name, tag=tech, core=i >= 2, highlight=i == 4
         )
-        num = t(
-            scene,
-            f"{i + 1}",
-            x0 + 0.25,
-            y,
-            font=DISPLAY,
-            size=0.28,
-            weight=700,
-            color=BRICK if core else STEEL,
-            anchor=Anchor.LEFT,
-        )
-        text = t(
-            scene,
-            name,
-            x0 + 0.65,
-            y,
-            size=0.22,
-            weight=700,
-            color=INK,
-            anchor=Anchor.LEFT,
-        )
-        tag = t(
-            scene,
-            tech,
-            x0 + w - 0.2,
-            y,
-            font=MONO,
-            size=0.14,
-            color=MUTED,
-            anchor=Anchor.RIGHT,
-        )
-        boxes.append(scene.geometry.group([box, num, text, tag]))
+        for i, (name, tech) in enumerate(MODULES)
+    ]
+    scene.layout.column(
+        *cards,
+        gap=f"{gap * 120:.1f}px",
+        within="safe",
+        width="fill",
+        height="fill",
+        justify="start",
+        padding=(f"{(4.5 - top) * 120 - 60:.1f}px", "558px", "0px", "594px"),
+    )
+    # Los módulos los coloca el layout; el resto del diagrama (llaves, flechas,
+    # externos) se ancla a sus posiciones medidas.
+    ys = [(c.bounds().top + c.bounds().bottom) / 2 for c in cards]
+    boxes: list[Drawable] = list(cards)
     arrows = [
         link(
             scene, (x0 + 1.2, ys[i] - h / 2), (x0 + 1.2, ys[i + 1] + h / 2), color=MUTED

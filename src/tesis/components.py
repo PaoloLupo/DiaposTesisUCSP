@@ -26,6 +26,7 @@ from tesis.theme import (
     KICKER,
     TITLE,
     BRICK_DEEP,
+    BRICK_SOFT,
     CARD,
     DISPLAY,
     INK,
@@ -659,3 +660,37 @@ def panel(
 ) -> Box:
     """Recuadro de esquinas rectas con filete fino, colocado por coordenadas."""
     return panel_box(scene, w=w, h=h, fill=fill, border=border).move_to(x, y, anchor)
+
+
+@component
+def module_card(
+    scene: Scene,
+    *,
+    number: int,
+    name: str,
+    tag: str,
+    core: bool = True,
+    highlight: bool = False,
+) -> Box:
+    """Módulo de la arquitectura: número, nombre y tecnología en tipografía técnica."""
+    L = scene.layout
+    return L.row(
+        L.box(
+            f"{number}",
+            font=DISPLAY,
+            font_size="34px",
+            weight=700,
+            color=BRICK if core else STEEL,
+            width="40px",
+        ).item(shrink=0),
+        L.box(name, font_size="26px", weight=700, color=INK).item(grow=1),
+        L.box(tag, font=MONO, font_size="17px", color=MUTED),
+        gap="14px",
+        align="center",
+        padding=("0px", "24px"),
+        background=BRICK_SOFT if highlight else CARD,
+        border=BRICK if highlight else RULE,
+        border_width="2px",
+        width="648px",
+        height="72px",
+    ).item(shrink=0)
