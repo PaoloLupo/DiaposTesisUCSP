@@ -4,6 +4,9 @@ set shell := ["powershell.exe", "-NoLogo", "-Command"]
 play:
     gaanim .
 
+export:
+    gaanim export . -o exports/DiaposTesisUCSP.gaanim
+
 # Reinstala el wheel local de Gaanim aunque conserve el mismo número de versión.
 reinstall:
     uv lock --upgrade-package gaanim
