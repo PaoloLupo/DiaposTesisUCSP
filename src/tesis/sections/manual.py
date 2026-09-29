@@ -22,6 +22,9 @@ from tesis.data.thesis import (
     MESH_STEP,
     NO_CONFINEMENT_DRIFT,
 )
+from tesis.components import enter, image_card, page
+from tesis.components import note as caption_note
+from tesis.components import takeaway as takeaway_box
 from tesis.kit import LEFT_EDGE, dimension, header, label, panel, source, t, takeaway
 from tesis.theme import (
     BRICK,
@@ -89,20 +92,23 @@ def case_study(scene: Scene) -> None:
         ("Concreto", f"f'c = {CASE['fc']:.0f} kgf/cm² · muros X2"),
         ("Sismo", "Zona 4 · Z = 0.45 · S = 1.0"),
     ]
-    items: list[Drawable] = []
-    for i, (name, value) in enumerate(rows):
-        y = 2.2 - i * 0.56
-        items.append(label(scene, name, 3.05, y, color=MUTED, size=0.13))
-        items.append(t(scene, value, 3.05, y - 0.2, size=0.22, color=INK))
-    scene.play(
-        stagger(
-            *[
-                x.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.3)
-                for x in items
-            ],
-            each=0.04,
-        )
+    L = scene.layout
+    sheet = L.column(
+        *[
+            L.column(
+                caption_note(scene, text=name, size="17px"),
+                L.box(value, font_size="26px", color=INK),
+                gap="4px",
+            )
+            for name, value in rows
+        ],
+        gap="17px",
+        within="safe",
+        width="fill",
+        height="fill",
+        padding=("200px", "24px", "110px", "1266px"),
     )
+    scene.play(enter(sheet, each=0.04, duration=0.3))
     scene.stop("caso-datos")
 
     x2 = plan.instances("X2")
@@ -373,42 +379,28 @@ def criteria(scene: Scene) -> None:
             STEEL,
         ),
     ]
-    w, gap = 3.45, 0.27
-    for i, (image, big, unit, body, color) in enumerate(cards):
-        x0 = LEFT_EDGE + i * (w + gap)
-        cx = x0 + w / 2
-        frame = panel(scene, x0, 2.45, w, 4.6, fill=CARD, anchor=Anchor.TOP_LEFT)
-        picture = scene.media.image(
-            thesis_image(image), width=w - 0.3, height=2.25, fit="contain"
-        )
-        picture.move_to(cx, 1.15)
-        value = t(
+    built = [
+        image_card(
             scene,
-            big,
-            x0 + 0.25,
-            -0.15,
-            font=DISPLAY,
-            size=0.52,
-            weight=700,
+            picture=scene.media.image(
+                thesis_image(image), width=3.1, height=2.25, fit="contain"
+            ),
+            value=big,
+            unit=unit,
+            body=body.replace("\n", " "),
             color=color,
         )
-        unit_t = label(scene, unit, x0 + 0.27, -0.8, color=color, size=0.14)
-        body_t = t(scene, body, x0 + 0.25, -1.08, size=0.2, color=INK_SOFT)
-        scene.play(
-            stagger(
-                frame.animate.fade_in().duration(0.3),
-                picture.animate.fade_in().duration(0.4),
-                value.animate.fade_in_from(Direction.UP, 0.08).duration(0.4),
-                unit_t.animate.fade_in().duration(0.3),
-                body_t.animate.fade_in().duration(0.3),
-                each=0.1,
-            )
-        )
-    takeaway(
+        for image, big, unit, body, color in cards
+    ]
+    row = scene.layout.row(*built, gap="32px", align="stretch", width="fill", height="fill")
+    closing = takeaway_box(
         scene,
-        "Alba lee el modelo tal como fue construido: el criterio del ingeniero sigue siendo clave",
-        y=-2.75,
+        text="Alba lee el modelo tal como fue construido: el criterio del ingeniero sigue siendo clave",
     )
+    page(scene, body=[row, closing], gap="40px")
+    for card in built:
+        scene.play(enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08))
+    scene.play(enter(closing))
     source(
         scene,
         "Tesis · Tablas 8, 14, 16 y 19, pp. 35, 42, 44 y 49; Figura 34, p. 66 · capturas de ETABS de la tesis",

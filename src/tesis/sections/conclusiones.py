@@ -1,9 +1,7 @@
 """Bloque 8 · Conclusiones: objetivos, hallazgos, alcance y cierre."""
 
 from gaanim import (
-    Anchor,
     Direction,
-    Drawable,
     Scene,
     Section,
     SectionStep,
@@ -12,6 +10,14 @@ from gaanim import (
 )
 
 from tesis.building import draw_plan, grow_walls
+from tesis.components import (
+    column_list,
+    enter,
+    numbered_row,
+    page,
+    stat_card,
+    takeaway,
+)
 from tesis.data.thesis import (
     DRIFTS,
     SEISMIC_FORCES,
@@ -21,25 +27,17 @@ from tesis.data.thesis import (
 )
 from tesis.kit import (
     LEFT_EDGE,
-    RIGHT_EDGE,
-    dash,
     header,
-    heading,
-    label,
-    panel,
     source,
     t,
 )
 from tesis.theme import (
     BRICK,
-    CARD,
     DISPLAY,
     FAIL,
     INK,
     INK_SOFT,
     MUTED,
-    PASS,
-    RULE,
     STEEL,
 )
 
@@ -71,62 +69,21 @@ OBJECTIVES = [
 
 def objectives(scene: Scene) -> None:
     header(scene, KICKER, "Los cuatro objetivos se cumplieron en el caso de estudio")
-    rows: list[list[Drawable]] = []
-    for i, (verb, text) in enumerate(OBJECTIVES):
-        y = 2.2 - i * 1.02
-        rows.append(
-            [
-                t(
-                    scene,
-                    f"{i + 1}",
-                    LEFT_EDGE,
-                    y + 0.02,
-                    font=DISPLAY,
-                    size=0.5,
-                    weight=700,
-                    color=BRICK,
-                ),
-                t(scene, verb, LEFT_EDGE + 0.6, y, size=0.27, weight=900, color=INK),
-                t(scene, text, LEFT_EDGE + 3.0, y, size=0.23, color=INK_SOFT),
-                scene.geometry.checkmark(0.26)
-                .stroke(PASS, 0.05)
-                .no_fill()
-                .move_to(6.95, y - 0.25),
-                scene.geometry.line(LEFT_EDGE, y - 0.78, 7.3, y - 0.78).stroke(
-                    "#E6E0D5", 0.01
-                ),
-            ]
-        )
-    for row in rows:
-        scene.play(
-            stagger(
-                *[
-                    x.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35)
-                    for x in row
-                ],
-                each=0.07,
-            )
-        )
-    # La hipótesis cierra la lámina bajo un filete, sin recuadro de color.
-    band = scene.geometry.line(LEFT_EDGE, -1.98, RIGHT_EDGE, -1.98).stroke(RULE, 0.014)
-    tag = label(scene, "Hipótesis", LEFT_EDGE, -2.2, color=PASS, size=0.14)
-    text = t(
+    rows = [
+        numbered_row(scene, number=i + 1, name=verb, text=text.replace("\n", " "))
+        for i, (verb, text) in enumerate(OBJECTIVES)
+    ]
+    hypothesis = takeaway(
         scene,
-        "El marco integrado a ETABS por API sistematiza la extracción, el procesamiento, la "
-        "verificación y la documentación.",
-        LEFT_EDGE,
-        -2.45,
-        size=0.23,
-        weight=700,
-        color=INK,
+        tag="Hipótesis",
+        text="El marco integrado a ETABS por API sistematiza la extracción, el "
+        "procesamiento, la verificación y la documentación.",
+        display=False,
     )
-    scene.play(
-        [
-            band.animate.create().duration(0.4),
-            tag.animate.fade_in().duration(0.3),
-            text.animate.fade_in_from(Direction.UP, 0.06).duration(0.5),
-        ]
-    )
+    page(scene, body=[*rows, hypothesis], top="220px", gap="24px")
+    for row in rows:
+        scene.play(enter(row))
+    scene.play(enter(hypothesis, direction=Direction.UP, each=0.15))
     source(
         scene,
         "Tesis · Conclusiones, p. 135 · se sostiene para el caso estudiado (muestra no probabilística)",
@@ -169,54 +126,23 @@ def findings(scene: Scene) -> None:
             FAIL,
         ),
     ]
-    w, gap = 3.45, 0.27
-    for i, (big, head, body, color) in enumerate(tiles):
-        x0 = LEFT_EDGE + i * (w + gap)
-        frame = panel(scene, x0, 2.35, w, 3.3, fill=CARD, anchor=Anchor.TOP_LEFT)
-        bar = (
-            scene.geometry.rect(w - 0.5, 0.05)
-            .fill(color)
-            .no_stroke()
-            .move_to(x0 + w / 2, 2.05)
-        )
-        value = t(
-            scene,
-            big,
-            x0 + 0.25,
-            1.75,
-            font=DISPLAY,
-            size=0.62,
-            weight=700,
-            color=color,
-        )
-        head_t = t(scene, head, x0 + 0.25, 0.8, size=0.23, weight=900, color=INK)
-        body_t = t(scene, body, x0 + 0.25, 0.05, size=0.2, color=INK_SOFT)
-        scene.play(
-            stagger(
-                frame.animate.fade_in().duration(0.3),
-                bar.animate.create().duration(0.3),
-                value.animate.fade_in_from(Direction.UP, 0.08).duration(0.4),
-                head_t.animate.fade_in().duration(0.3),
-                body_t.animate.fade_in().duration(0.3),
-                each=0.08,
-            )
-        )
-    # Cita final con el mismo tratamiento que los takeaways: filete fino encima.
-    quote = scene.geometry.line(LEFT_EDGE, -1.4, RIGHT_EDGE, -1.4).stroke(RULE, 0.014)
-    quote_t = t(
+    cards = [
+        stat_card(scene, value=big, title=head, detail=body, color=color)
+        for big, head, body, color in tiles
+    ]
+    quote = takeaway(
         scene,
-        "El criterio del ingeniero sigue siendo el factor determinante: Alba es una herramienta\n"
-        "de apoyo, de código libre, para extraer, verificar y documentar.",
-        LEFT_EDGE,
-        -1.72,
-        font=DISPLAY,
-        size=0.27,
-        weight=700,
-        color=INK,
+        text="El criterio del ingeniero sigue siendo el factor determinante: Alba es una "
+        "herramienta de apoyo, de código libre, para extraer, verificar y documentar.",
     )
-    scene.play(
-        [quote.animate.create().duration(0.5), quote_t.animate.fade_in().duration(0.5)]
+    page(
+        scene,
+        body=[scene.layout.row(*cards, gap="32px", align="stretch", width="fill"), quote],
+        gap="56px",
     )
+    for card in cards:
+        scene.play(enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08))
+    scene.play(enter(quote, direction=Direction.UP, duration=0.5, each=0.1))
     source(
         scene,
         "Tesis · Tablas 50, 51 y 52, pp. 129–131; Tabla 36, p. 87; Conclusiones, p. 135",
@@ -242,33 +168,19 @@ FUTURE = [
 
 def outlook(scene: Scene) -> None:
     header(scene, KICKER, "Alcance actual y líneas de continuidad")
-    for x0, title, items, color in [
-        (LEFT_EDGE, "Limitaciones", LIMITS, STEEL),
-        (0.25, "Recomendaciones y trabajo futuro", FUTURE, BRICK),
-    ]:
-        w = 7.05
-        head = heading(scene, title, x0, 1.95, w, color=color, size=0.26)
-        rows: list[Drawable] = []
-        for i, item in enumerate(items):
-            y = 1.25 - i * 0.82
-            rows.append(dash(scene, x0 + 0.08, y, color=color))
-            rows.append(
-                t(scene, item, x0 + 0.4, y, size=0.25, color=INK, anchor=Anchor.LEFT)
-            )
-        scene.play(
-            stagger(
-                *[h.animate.fade_in().duration(0.3) for h in head],
-                stagger(
-                    *[
-                        r.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.3)
-                        for r in rows
-                    ],
-                    each=0.06,
-                ),
-                each=0.1,
-            )
-        )
-        scene.stop(f"alcance-{'limites' if color is STEEL else 'futuro'}")
+    limits = column_list(scene, title="Limitaciones", items=LIMITS, color=STEEL)
+    future = column_list(
+        scene, title="Recomendaciones y trabajo futuro", items=FUTURE, color=BRICK
+    )
+    page(
+        scene,
+        body=[scene.layout.row(limits, future, gap="60px", align="start", width="fill")],
+        top="230px",
+    )
+    scene.play(enter(limits, each=0.06, duration=0.3))
+    scene.stop("alcance-limites")
+    scene.play(enter(future, each=0.06, duration=0.3))
+    scene.stop("alcance-futuro")
     source(
         scene,
         "Tesis · Tabla 49, p. 125; §8.2.4, p. 132; Recomendaciones, p. 137",

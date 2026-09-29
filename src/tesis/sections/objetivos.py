@@ -2,8 +2,8 @@
 
 from gaanim import (
     Anchor,
+    Box,
     Direction,
-    Drawable,
     Easing,
     Playable,
     Scene,
@@ -16,12 +16,21 @@ from gaanim import (
     stagger,
 )
 
-from tesis.kit import LEFT_EDGE, RIGHT_EDGE, header, label, panel, source, t, takeaway
+from tesis.components import (
+    enter,
+    fact,
+    hairline,
+    note,
+    objective_card,
+    page,
+    step,
+    takeaway,
+)
+from tesis.kit import LEFT_EDGE, RIGHT_EDGE, header, label, source, t
 from tesis.theme import (
     BODY,
     BRICK,
     BRICK_DEEP,
-    CARD,
     DISPLAY,
     INK,
     INK_SOFT,
@@ -29,7 +38,6 @@ from tesis.theme import (
     MUTED,
     RULE,
     STEEL,
-    STEEL_SOFT,
 )
 
 KICKER = "02 · Objetivos y método"
@@ -277,73 +285,33 @@ SPECIFIC = [
 
 def specific(scene: Scene) -> None:
     header(scene, KICKER, "Cuatro objetivos específicos, cuatro productos")
-    w, gap = 3.45, 0.27
-    items: list[list[Drawable]] = []
-    for i, (verb, body, product) in enumerate(SPECIFIC):
-        x0 = LEFT_EDGE + i * (w + gap)
-        card = panel(scene, x0, 2.35, w, 4.15, fill=CARD, anchor=Anchor.TOP_LEFT)
-        number = t(
+    cards = [
+        objective_card(
+            scene, number=i + 1, verb=verb, text=body.replace("\n", " "), product=product
+        )
+        for i, (verb, body, product) in enumerate(SPECIFIC)
+    ]
+    flow = scene.layout.column(
+        hairline(scene, thickness="3px"),
+        note(
             scene,
-            f"{i + 1}",
-            x0 + 0.3,
-            2.15,
-            font=DISPLAY,
-            size=0.9,
-            weight=700,
-            color=BRICK,
-        )
-        verb_t = t(scene, verb, x0 + 0.3, 0.95, size=0.36, weight=900, color=INK)
-        body_t = t(scene, body, x0 + 0.3, 0.4, size=0.235, color=INK_SOFT)
-        # El producto de cada objetivo como rótulo técnico, sin etiqueta de color.
-        tag = t(
-            scene,
-            product,
-            x0 + 0.3,
-            -1.45,
-            font=MONO,
-            size=0.16,
-            color=BRICK_DEEP,
-            anchor=Anchor.LEFT,
-        )
-        items.append([card, number, verb_t, body_t, tag])
-    for group in items:
-        scene.play(
-            stagger(
-                *[
-                    g.animate.fade_in_from(Direction.UP, 0.08).duration(0.4)
-                    for g in group
-                ],
-                each=0.06,
-            )
-        )
-    flow = (
-        scene.geometry.arrow(
-            LEFT_EDGE + 0.3,
-            -2.2,
-            7.0,
-            -2.2,
-            head_length=0.16,
-            head_width=0.14,
-            body_width=0.02,
-        )
-        .fill(RULE)
-        .no_stroke()
+            text="del diagnóstico del proceso manual a la evaluación con un caso real",
+            size="22px",
+            upper=False,
+        ),
+        gap="16px",
+        width="fill",
     )
-    flow_label = t(
+    page(
         scene,
-        "del diagnóstico del proceso manual a la evaluación con un caso real",
-        0,
-        -2.35,
-        size=0.18,
-        color=MUTED,
-        anchor=Anchor.TOP,
+        body=[scene.layout.row(*cards, gap="32px", align="stretch", width="fill"), flow],
+        gap="48px",
     )
-    scene.play(
-        [
-            flow.animate.grow_arrow().duration(0.8),
-            flow_label.animate.fade_in().duration(0.5),
-        ]
-    )
+    for card in cards:
+        scene.play(
+            enter(card, direction=Direction.UP, distance=0.08, duration=0.4, each=0.06)
+        )
+    scene.play(enter(flow, duration=0.5, each=0.3))
     source(scene, "Tesis · §1.3.2 Objetivos específicos, p. 4")
     scene.stop("objetivos-especificos")
 
@@ -352,122 +320,61 @@ def method(scene: Scene) -> None:
     header(
         scene, KICKER, "Investigación aplicada, cuantitativa, sobre un caso de estudio"
     )
-    facts = [
-        ("Nivel", "Aplicativo"),
-        ("Enfoque", "Cuantitativo"),
-        ("Diseño", "Caso de estudio"),
-        ("Muestra", "No probabilística"),
-    ]
-    tiles: list[Drawable] = []
-    for i, (name, value) in enumerate(facts):
-        x0 = LEFT_EDGE + i * 3.72
-        tiles.append(scene.geometry.line(x0, 2.58, x0 + 3.4, 2.58).stroke(RULE, 0.014))
-        tiles.append(label(scene, name, x0, 2.38, color=MUTED, size=0.14))
-        tiles.append(
-            t(
-                scene,
-                value,
-                x0,
-                2.08,
-                font=DISPLAY,
-                size=0.36,
-                weight=700,
-                color=INK,
-            )
-        )
-    scene.play(stagger(*[x.animate.fade_in().duration(0.35) for x in tiles], each=0.05))
-    note = t(
-        scene,
+    L = scene.layout
+    facts = L.row(
+        fact(scene, name="Nivel", value="Aplicativo"),
+        fact(scene, name="Enfoque", value="Cuantitativo"),
+        fact(scene, name="Diseño", value="Caso de estudio"),
+        fact(scene, name="Muestra", value="No probabilística"),
+        gap="48px",
+        width="fill",
+    )
+    case = L.box(
         "Un edificio de albañilería confinada de 4 pisos (San Bartolomé, 2006) "
         "para probar el método manual y el marco automatizado.",
-        LEFT_EDGE,
-        1.25,
-        size=0.2,
+        font_size="24px",
         color=INK_SOFT,
     )
-    scene.play(note.animate.fade_in().duration(0.4))
-
     stages = [
-        ("Revisión normativa", "E.030 · E.070 y\nbibliografía"),
-        ("Diagramas de flujo", "especificación\nde cada verificación"),
-        ("Programa propio", "Python + API\nde ETABS"),
-        ("Comparación", "descriptiva entre\nmodelos del caso"),
+        ("Revisión normativa", "E.030 · E.070 y bibliografía"),
+        ("Diagramas de flujo", "especificación de cada verificación"),
+        ("Programa propio", "Python + API de ETABS"),
+        ("Comparación", "descriptiva entre modelos del caso"),
     ]
-    step_items: list[Drawable] = []
-    for i, (name, body) in enumerate(stages):
-        cx = LEFT_EDGE + 1.6 + i * 3.72
-        circle = (
-            scene.geometry.circle(0.3)
-            .fill(STEEL_SOFT)
-            .stroke(STEEL, 0.02)
-            .move_to(cx, 0.05)
-        )
-        num = t(
-            scene,
-            str(i + 1),
-            cx,
-            0.05,
-            font=DISPLAY,
-            size=0.3,
-            weight=700,
-            color=STEEL,
-            anchor=Anchor.CENTER,
-        )
-        name_t = t(
-            scene, name, cx, -0.45, size=0.24, weight=900, color=INK, anchor=Anchor.TOP
-        )
-        body_t = t(scene, body, cx, -0.82, size=0.19, color=INK_SOFT, anchor=Anchor.TOP)
-        step_items.append(scene.geometry.group([circle, num, name_t, body_t]))
-        if i:
-            step_items.append(
-                scene.geometry.line(cx - 3.72 + 0.42, 0.05, cx - 0.42, 0.05).stroke(
-                    STEEL, 0.02
-                )
-            )
-    scene.play(
-        stagger(
-            *[
-                s.animate.fade_in_from(Direction.LEFT, 0.1).duration(0.4)
-                for s in step_items
-            ],
-            each=0.12,
-        )
+    steps = L.row(
+        *[
+            step(scene, number=i + 1, name=name, text=body, last=i == len(stages) - 1)
+            for i, (name, body) in enumerate(stages)
+        ],
+        gap="24px",
+        align="start",
+        width="fill",
     )
-
     tools = ["ETABS v22", "Python", "Typst", "Excel", "Norma E.030", "Norma E.070"]
-    tool_label = label(scene, "Instrumentos", LEFT_EDGE, -2.05, color=MUTED, size=0.14)
     # Instrumentos en una línea, separados por puntos medios.
-    chips: list[Drawable] = []
-    x = LEFT_EDGE + 1.75
+    chips: list[Box] = []
     for i, name in enumerate(tools):
-        chips.append(
-            t(scene, name, x, -2.1, font=MONO, size=0.19, color=INK, anchor=Anchor.LEFT)
-        )
-        x = chips[-1].bounds().right
-        if i < len(tools) - 1:
-            chips.append(
-                t(
-                    scene,
-                    "·",
-                    x + 0.2,
-                    -2.1,
-                    size=0.19,
-                    color=MUTED,
-                    anchor=Anchor.CENTER,
-                )
-            )
-            x += 0.4
-    scene.play(
-        [
-            tool_label.animate.fade_in().duration(0.3),
-            stagger(*[c.animate.fade_in().duration(0.25) for c in chips], each=0.06),
-        ]
+        if i:
+            chips.append(L.box("·", font_size="23px", color=MUTED))
+        chips.append(L.box(name, font=MONO, font_size="23px", color=INK))
+    instruments = L.row(
+        note(scene, text="Instrumentos"), *chips, gap="24px", align="center"
     )
-    takeaway(
+    conclusion = takeaway(
         scene,
-        "Comparación descriptiva: se cuantifican diferencias, no se generaliza a toda la población",
-        y=-2.95,
+        text="Comparación descriptiva: se cuantifican diferencias, no se generaliza a toda la población",
     )
+    page(
+        scene,
+        body=[facts, case, steps, instruments, conclusion],
+        top="215px",
+        gap="44px",
+    )
+    scene.play(enter(facts, direction=Direction.UP, duration=0.35, each=0.05))
+    scene.play(case.animate.fade_in().duration(0.4))
+    scene.play(enter(steps, distance=0.1, duration=0.4, each=0.12))
+    scene.play(enter(instruments, direction=Direction.UP, duration=0.25, each=0.06))
+    scene.play(enter(conclusion, direction=Direction.UP, duration=0.5, each=0.1))
     source(
         scene,
         "Tesis · §1.6 Metodología de la investigación y §1.6.3 Población y muestra, p. 5",
