@@ -1,7 +1,6 @@
 """Bloque 2 · Objetivos, hipótesis y método de la investigación."""
 
 from gaanim import (
-    Anchor,
     Box,
     Direction,
     Easing,
@@ -28,7 +27,6 @@ from tesis.components import (
     step,
     takeaway,
 )
-from tesis.kit import LEFT_EDGE, RIGHT_EDGE, label, t
 from tesis.theme import (
     BODY,
     BRICK,
@@ -38,7 +36,6 @@ from tesis.theme import (
     INK_SOFT,
     MONO,
     MUTED,
-    RULE,
     STEEL,
 )
 
@@ -56,18 +53,18 @@ CHAIN = (
 
 def purpose(scene: Scene) -> None:
     header(scene, KICKER, "Un marco de trabajo entre ETABS y la verificación E.070")
+    L = scene.layout
 
-    tag = label(scene, "Objetivo general", LEFT_EDGE, 2.35, color=BRICK)
+    # Objetivo general: el texto se acomoda al ancho de su columna.
     objective = scene.text(
         "Desarrollar ",
         part("marco", "un marco de trabajo"),
-        " para la\nautomatización del diseño de la distribución\n"
-        "de muros en planta para edificios de\n"
-        "albañilería confinada conforme a ",
+        " para la automatización del diseño de la distribución de muros en planta "
+        "para edificios de albañilería confinada conforme a ",
         part("norma", "la norma E.070"),
-        ",\ny su aplicación mediante\n",
+        ", y su aplicación mediante ",
         part("alba", "un programa de desarrollo propio"),
-        "\ncapaz de interactuar con ",
+        " capaz de interactuar con ",
         part("etabs", "el software comercial ETABS"),
         ".",
         style=BODY,
@@ -75,10 +72,95 @@ def purpose(scene: Scene) -> None:
         size=0.36,
         weight=400,
         color=INK,
-    ).move_to(LEFT_EDGE, 2.0, Anchor.TOP_LEFT)
+    )
+    goal_tag = note(scene, text="Objetivo general", color=BRICK, size="18px")
+    goal = L.column(goal_tag, objective, gap="22px", width="fill").item(grow=3)
+
+    # Hipótesis: el método de diseño (manual → automatizado) incide en el
+    # cumplimiento normativo. Aparece en la segunda parada.
+    relation = scene.geometry.arrow(0, 0, 0.6, 0).fill(STEEL).no_stroke()
+    shift = scene.geometry.arrow(0, 0, 0.4, 0).fill(INK_SOFT).no_stroke()
+    hyp_tag = note(scene, text="Hipótesis", color=STEEL, size="18px")
+    hyp_text = L.box(
+        "Un marco automatizado, integrado a ETABS mediante su API, permitirá "
+        "sistematizar la extracción y el procesamiento de datos del modelo de "
+        "elementos finitos, así como ejecutar y documentar las verificaciones normativas.",
+        font_size="27px",
+        color=INK,
+    )
+    independent = L.column(
+        note(scene, text="Variable independiente", size="13px"),
+        L.box("Método de diseño", font_size="27px", weight=700, color=INK),
+        gap="10px",
+    ).item(grow=1)
+    dependent = L.column(
+        note(scene, text="Variable dependiente", size="13px"),
+        L.box("Cumplimiento normativo", font_size="27px", weight=700, color=INK),
+        gap="10px",
+    ).item(grow=1)
+    variables = L.row(
+        independent,
+        L.column(relation, padding=("46px", "0px", "0px", "0px")),
+        dependent,
+        gap="22px",
+        align="start",
+        width="fill",
+    )
+    levels = L.row(
+        L.box("manual", font_size="23px", color=INK_SOFT),
+        shift,
+        L.box("automatizado", font_size="23px", weight=700, color=STEEL),
+        gap="16px",
+        align="center",
+    )
+    hypothesis = L.column(
+        hyp_tag,
+        hyp_text,
+        hairline(scene),
+        variables,
+        levels,
+        gap="24px",
+        width="fill",
+    ).item(grow=2)
+
+    # Cadena del objetivo: un eslabón por columna; un paquete de datos la recorre.
+    ticks: list[Box] = []
+    segments: list[Box] = []
+    titles: list[Box] = []
+    subs: list[Box] = []
+    cells: list[Box] = []
+    for i, (name, sub, _key) in enumerate(CHAIN):
+        proposal = name in ("Marco", "Alba")
+        tick = L.box(width="2px", height="22px", background=INK_SOFT).item(shrink=0)
+        ticks.append(tick)
+        line: list[Box] = [tick]
+        if i < len(CHAIN) - 1:
+            segment = hairline(scene, color=INK_SOFT, thickness="2px")
+            segments.append(segment)
+            line.append(segment)
+        title = L.box(
+            name, font_size="31px", weight=900, color=BRICK_DEEP if proposal else INK
+        )
+        caption = L.box(sub, font_size="19px", color=INK_SOFT)
+        titles.append(title)
+        subs.append(caption)
+        cells.append(
+            L.column(
+                L.row(*line, align="center", gap="0px", width="fill"),
+                title,
+                caption,
+                gap="10px",
+                width="fill",
+            ).item(grow=1)
+        )
+    chain = L.row(*cells, width="1020px", gap="0px")
+
+    top = L.row(goal, hypothesis, gap="56px", align="start", width="fill").item(grow=1)
+    page(scene, body=[top, chain], top="190px", bottom="190px", gap="30px")
+
     scene.play(
         stagger(
-            tag.animate.fade_in().duration(0.3),
+            goal_tag.animate.fade_in().duration(0.3),
             objective.animate.reveal(
                 style="slide_up", by="line", stagger=0.09
             ).duration(1.0),
@@ -86,18 +168,11 @@ def purpose(scene: Scene) -> None:
         )
     )
 
-    # Un paquete de datos recorre la cadena; al llegar a cada eslabón aparece su
-    # nombre y se enciende en el objetivo la frase que lo anuncia.
-    line_y = -1.55
-    xs = [LEFT_EDGE + i * 2.55 for i in range(len(CHAIN))]
-    ticks = [
-        scene.geometry.line(x, line_y + 0.1, x, line_y - 0.1).stroke(INK_SOFT, 0.02)
-        for x in xs
-    ]
-    segments = [
-        scene.geometry.line(a, line_y, b, line_y).stroke(INK_SOFT, 0.016)
-        for a, b in zip(xs, xs[1:])
-    ]
+    # Al llegar a cada eslabón aparece su nombre y se enciende en el objetivo la
+    # frase que lo anuncia.
+    bounds = [tk.bounds() for tk in ticks]
+    xs = [(bd.left + bd.right) / 2 for bd in bounds]
+    line_y = (bounds[0].top + bounds[0].bottom) / 2
     packet = (
         scene.geometry.rect(0.14, 0.14)
         .fill(BRICK)
@@ -106,18 +181,7 @@ def purpose(scene: Scene) -> None:
         .z_index(5)
     )
     hops: list[Playable] = [packet.animate.fade_in().duration(0.15)]
-    for i, ((name, sub, key), x) in enumerate(zip(CHAIN, xs, strict=True)):
-        proposal = name in ("Marco", "Alba")
-        title = t(
-            scene,
-            name,
-            x,
-            line_y - 0.22,
-            size=0.26,
-            weight=900,
-            color=BRICK_DEEP if proposal else INK,
-        )
-        note = t(scene, sub, x, line_y - 0.58, size=0.16, color=INK_SOFT)
+    for i, ((_name, _sub, key), x) in enumerate(zip(CHAIN, xs, strict=True)):
         if i:
             hops.append(
                 parallel(
@@ -125,16 +189,16 @@ def purpose(scene: Scene) -> None:
                     .duration(0.5)
                     .easing(Easing.LINEAR),
                     segments[i - 1]
-                    .animate.create()
+                    .animate.grow_from_edge(Direction.LEFT)
                     .duration(0.5)
                     .easing(Easing.LINEAR),
                 )
             )
         hops.append(
             parallel(
-                ticks[i].animate.create().duration(0.2),
-                title.animate.fade_in_from(Direction.UP, 0.06).duration(0.3),
-                note.animate.fade_in().duration(0.3).delay(0.1),
+                ticks[i].animate.fade_in().duration(0.2),
+                titles[i].animate.fade_in_from(Direction.UP, 0.06).duration(0.3),
+                subs[i].animate.fade_in().duration(0.3).delay(0.1),
                 objective[key].animate.fill(BRICK).duration(0.35),
             )
         )
@@ -142,117 +206,9 @@ def purpose(scene: Scene) -> None:
     scene.play(sequence(*hops))
     scene.stop("objetivo-general")
 
-    # Hipótesis: el método de verificación (manual → automatizado) incide en el
-    # cumplimiento normativo.
-    hx, dep_x = 2.5, 5.15
-    h_tag = label(scene, "Hipótesis", hx, 2.35, color=STEEL)
-    hypothesis = t(
-        scene,
-        "Un marco automatizado, integrado a ETABS\n"
-        "mediante su API, permitirá sistematizar\n"
-        "la extracción y el procesamiento de datos\n"
-        "del modelo de elementos finitos, así como\n"
-        "ejecutar y documentar las verificaciones\n"
-        "normativas.",
-        hx,
-        2.0,
-        size=0.23,
-        color=INK,
-    )
-    rule = scene.geometry.line(hx, 0.1, RIGHT_EDGE, 0.1).stroke(RULE, 0.012)
-    independent = [
-        label(scene, "Variable independiente", hx, -0.15, color=MUTED, size=0.12),
-        t(
-            scene,
-            "Método de\ndiseño",
-            hx,
-            -0.42,
-            size=0.22,
-            weight=700,
-            color=INK,
-        ),
-    ]
-    dependent = [
-        label(scene, "Variable dependiente", dep_x, -0.15, color=MUTED, size=0.12),
-        t(
-            scene,
-            "Cumplimiento\nnormativo",
-            dep_x,
-            -0.42,
-            size=0.22,
-            weight=700,
-            color=INK,
-        ),
-    ]
-    relation = (
-        scene.geometry.arrow(
-            4.2, -0.68, 4.9, -0.68, head_length=0.14, head_width=0.14, body_width=0.024
-        )
-        .fill(STEEL)
-        .no_stroke()
-    )
-    levels_y = -1.3
-    manual = t(
-        scene, "manual", hx, levels_y, size=0.19, color=INK_SOFT, anchor=Anchor.LEFT
-    )
-    manual_w = manual.bounds().width
-    shift = (
-        scene.geometry.arrow(
-            hx + manual_w + 0.14,
-            levels_y,
-            hx + manual_w + 0.6,
-            levels_y,
-            head_length=0.1,
-            head_width=0.1,
-            body_width=0.016,
-        )
-        .fill(INK_SOFT)
-        .no_stroke()
-    )
-    automated = t(
-        scene,
-        "automatizado",
-        hx + manual_w + 0.72,
-        levels_y,
-        size=0.19,
-        weight=700,
-        color=STEEL,
-        anchor=Anchor.LEFT,
-    )
     scene.play(
-        stagger(
-            h_tag.animate.fade_in().duration(0.3),
-            hypothesis.animate.reveal(
-                style="slide_up", by="line", stagger=0.07
-            ).duration(0.8),
-            rule.animate.create().duration(0.5),
-            each=0.15,
-        )
-    )
-    # Se lee como una relación causal: la variable independiente, sus dos valores
-    # y la flecha hacia la dependiente.
-    scene.play(
-        sequence(
-            parallel(
-                *[
-                    v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35)
-                    for v in independent
-                ]
-            ),
-            parallel(
-                manual.animate.fade_in().duration(0.25),
-                shift.animate.grow_arrow().duration(0.35).delay(0.15),
-                automated.animate.fade_in_from(Direction.LEFT, 0.08)
-                .duration(0.35)
-                .delay(0.4),
-            ),
-            relation.animate.grow_arrow().duration(0.45),
-            parallel(
-                *[
-                    v.animate.fade_in_from(Direction.UP, 0.06).duration(0.35)
-                    for v in dependent
-                ]
-            ),
+        enter(
+            hypothesis, direction=Direction.UP, distance=0.06, duration=0.4, each=0.12
         )
     )
     source(
