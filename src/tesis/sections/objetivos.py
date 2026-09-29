@@ -50,7 +50,7 @@ CHAIN = (
     ("ETABS", "modelo analizado", "etabs"),
     ("Marco", "procesos y flujos", "marco"),
     ("Alba", "programa propio", "alba"),
-    ("Reporte", "memoria trazable", "verificacion"),
+    ("Reporte", "memoria trazable", "norma"),
 )
 
 
@@ -61,13 +61,14 @@ def purpose(scene: Scene) -> None:
     objective = scene.text(
         "Desarrollar ",
         part("marco", "un marco de trabajo"),
-        " para la\nautomatización de la ",
-        part("verificacion", "verificación normativa"),
-        "\nde la distribución de muros en planta de\n"
-        "edificios de albañilería confinada (E.070),\naplicado en ",
-        part("alba", "un programa propio"),
-        " que\ninteractúa con ",
-        part("etabs", "el software ETABS"),
+        " para la\nautomatización del diseño de la distribución\n"
+        "de muros en planta para edificios de\n"
+        "albañilería confinada conforme a ",
+        part("norma", "la norma E.070"),
+        ",\ny su aplicación mediante\n",
+        part("alba", "un programa de desarrollo propio"),
+        "\ncapaz de interactuar con ",
+        part("etabs", "el software comercial ETABS"),
         ".",
         style=BODY,
         font=DISPLAY,
@@ -163,7 +164,7 @@ def purpose(scene: Scene) -> None:
         label(scene, "Variable independiente", hx, -0.15, color=MUTED, size=0.12),
         t(
             scene,
-            "Método de\nverificación",
+            "Método de\ndiseño",
             hx,
             -0.42,
             size=0.22,
@@ -269,7 +270,7 @@ SPECIFIC = [
     ),
     (
         "Desarrollar",
-        "un marco de trabajo para\nautomatizar la verificación,\na partir de actividades\ncríticas y repetitivas,\ncon diagramas de flujo.",
+        "un marco de trabajo para\nautomatizar el diseño de la\ndistribución en planta, a partir\nde actividades críticas y\nrepetitivas, con diagramas de flujo.",
         "Diagramas · cap. 6",
     ),
     (
