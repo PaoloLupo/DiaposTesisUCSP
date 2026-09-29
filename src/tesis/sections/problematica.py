@@ -1218,7 +1218,7 @@ def _packets(
 
 
 def manual_transfer(scene: Scene) -> None:
-    header(scene, KICKER, "ETABS no verifica la E.070: se hace un proceso manual")
+    header(scene, KICKER, "ETABS no verifica la norma E.070: se hace un proceso manual")
 
     # 1 · La lista de normas de diseño de muros no incluye la E.070.
     dialog = _window(
