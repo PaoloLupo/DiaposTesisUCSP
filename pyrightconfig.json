@@ -4,6 +4,7 @@
   "venv": ".venv",
   "pythonVersion": "3.14",
   "reportUnusedCallResult": "none",
+  "reportImplicitStringConcatenation": "none",
   "executionEnvironments": [
     {
       "root": ".",

@@ -28,23 +28,21 @@ from tesis.data.materiales_inei import (
 from tesis.data.sudamerica import COUNTRIES, Ring
 from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
 from tesis.data.thesis import CRACKING_FLOOR1
+from tesis.components import header, source, takeaway_at
 from tesis.kit import (
     dash,
-    header,
     label,
     numeral,
-    source,
     t,
-    takeaway,
 )
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
     BRICK_SOFT,
     CARD,
+    DISPLAY,
     FAIL,
     FAIL_SOFT,
-    DISPLAY,
     INK,
     INK_SOFT,
     MONO,
@@ -711,7 +709,7 @@ def plates(scene: Scene) -> None:
         .duration(1.1)
         .easing(Easing.ease_in_out(EasingCurve.CUBIC))
     )
-    takeaway(
+    takeaway_at(
         scene,
         "Toda la costa está frente al borde de placas: el sismo es una certeza",
     )
@@ -1019,7 +1017,7 @@ def seismic(scene: Scene) -> None:
             x_label.animate.opacity(1).duration(0.3),
         ]
     )
-    takeaway(
+    takeaway_at(
         scene,
         "La E.070 exige densidad mínima de muros en ambas direcciones y buena conexión",
     )
@@ -1795,7 +1793,7 @@ def manual_transfer(scene: Scene) -> None:
             ]
         )
         scene.wait(0.6)  # tiempo para leer si X1 ya cumple
-    takeaway(
+    takeaway_at(
         scene,
         "¿Cómo sistematizar la verificación de la norma E.070 a partir de un modelo de ETABS?",
     )

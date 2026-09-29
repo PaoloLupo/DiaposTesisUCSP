@@ -19,7 +19,6 @@ from gaanim import (
     computed,
     parallel,
     part,
-    sequence,
     stagger,
 )
 
@@ -44,18 +43,8 @@ from tesis.data.thesis import (
     SHEAR_CAPACITY,
     SHEAR_DEMAND,
 )
-from tesis.components import enter, hairline, page
-from tesis.kit import (
-    LEFT_EDGE,
-    dimension,
-    header,
-    label,
-    panel,
-    source,
-    status,
-    t,
-    takeaway,
-)
+from tesis.components import enter, hairline, header, page, panel, source, takeaway_at
+from tesis.kit import LEFT_EDGE, dimension, label, status, t
 from tesis.theme import (
     BRICK,
     BRICK_SOFT,
@@ -382,7 +371,7 @@ def density_check(scene: Scene) -> None:
         scene.stop(f"densidad-{direction.lower()}")
 
     scene.play([w.animate.opacity(1).duration(0.4) for w in plan.all_walls])
-    takeaway(
+    takeaway_at(
         scene,
         "Cumple en ambas direcciones; Y queda más cerca del mínimo",
         y=-3.22,
@@ -457,57 +446,119 @@ def _check_drawing(
         drawing = _mini_wall(scene, cx, 1.1 + dy, 2.6, 1.5)
         arrow = (
             scene.geometry.arrow(
-                cx, 2.3 + dy, cx, 1.88 + dy, head_length=0.14, head_width=0.2, body_width=0.04
+                cx,
+                2.3 + dy,
+                cx,
+                1.88 + dy,
+                head_length=0.14,
+                head_width=0.2,
+                body_width=0.04,
             )
             .fill(INK)
             .no_stroke()
         )
         loads = [
             scene.geometry.arrow(
-                cx + dx, 2.2 + dy, cx + dx, 1.88 + dy, head_length=0.1, head_width=0.12, body_width=0.025
+                cx + dx,
+                2.2 + dy,
+                cx + dx,
+                1.88 + dy,
+                head_length=0.1,
+                head_width=0.12,
+                body_width=0.025,
             )
             .fill(INK_SOFT)
             .no_stroke()
             for dx in (-0.9, -0.45, 0.45, 0.9)
         ]
-        p_lab = t(scene, "$P_m$", cx + 1.1, 2.1 + dy, font=MONO, size=0.24, color=INK, anchor=Anchor.LEFT)
+        p_lab = t(
+            scene,
+            "$P_m$",
+            cx + 1.1,
+            2.1 + dy,
+            font=MONO,
+            size=0.24,
+            color=INK,
+            anchor=Anchor.LEFT,
+        )
         return drawing, [arrow, *loads, p_lab], [arrow, *loads]
     if i == 1:
         drawing = _mini_wall(scene, cx, 1.1 + dy, 2.6, 1.5)
         arrow = (
             scene.geometry.arrow(
-                cx - 2.1, 1.75 + dy, cx - 1.32, 1.75 + dy, head_length=0.16, head_width=0.16, body_width=0.035
+                cx - 2.1,
+                1.75 + dy,
+                cx - 1.32,
+                1.75 + dy,
+                head_length=0.16,
+                head_width=0.16,
+                body_width=0.035,
             )
             .fill(STEEL)
             .no_stroke()
         )
         cracks = [
             scene.geometry.dashed_line(
-                cx - 0.95, 0.45 + dy, cx + 0.95, 1.6 + dy, dash_length=0.08, gap_length=0.05
+                cx - 0.95,
+                0.45 + dy,
+                cx + 0.95,
+                1.6 + dy,
+                dash_length=0.08,
+                gap_length=0.05,
             ).stroke(STEEL, 0.02),
             scene.geometry.dashed_line(
-                cx + 0.95, 0.45 + dy, cx - 0.95, 1.6 + dy, dash_length=0.08, gap_length=0.05
+                cx + 0.95,
+                0.45 + dy,
+                cx - 0.95,
+                1.6 + dy,
+                dash_length=0.08,
+                gap_length=0.05,
             )
             .stroke(STEEL, 0.02)
             .opacity(0.35),
         ]
         v_lab = t(
-            scene, "$V_e$", cx - 2.1, 1.88 + dy, font=MONO, size=0.24, color=STEEL, anchor=Anchor.BOTTOM_LEFT
+            scene,
+            "$V_e$",
+            cx - 2.1,
+            1.88 + dy,
+            font=MONO,
+            size=0.24,
+            color=STEEL,
+            anchor=Anchor.BOTTOM_LEFT,
         )
         return drawing, [arrow, v_lab, *cracks], [arrow]
     plan = draw_plan(
-        scene, (cx, 1.35 + dy), 3.4, grid=False, drawn_thickness=0.055,
-        color_y="#C9CED6", slab_fill="#F1EDE6",
+        scene,
+        (cx, 1.35 + dy),
+        3.4,
+        grid=False,
+        drawn_thickness=0.055,
+        color_y="#C9CED6",
+        slab_fill="#F1EDE6",
     )
     arrow = (
         scene.geometry.arrow(
-            cx - 2.15, 1.35 + dy, cx - 1.8, 1.35 + dy, head_length=0.14, head_width=0.16, body_width=0.035
+            cx - 2.15,
+            1.35 + dy,
+            cx - 1.8,
+            1.35 + dy,
+            head_length=0.14,
+            head_width=0.16,
+            body_width=0.035,
         )
         .fill(BRICK)
         .no_stroke()
     )
     e_lab = t(
-        scene, "$V_E$", cx - 2.15, 1.5 + dy, font=MONO, size=0.24, color=BRICK, anchor=Anchor.BOTTOM_LEFT
+        scene,
+        "$V_E$",
+        cx - 2.15,
+        1.5 + dy,
+        font=MONO,
+        size=0.24,
+        color=BRICK,
+        anchor=Anchor.BOTTOM_LEFT,
     )
     return [plan.slab, plan.void, *plan.all_walls], [arrow, e_lab], [arrow]
 
@@ -574,12 +625,18 @@ def strength_checks(scene: Scene) -> None:
                     color=INK,
                     height="68px",
                 ).item(shrink=0),
-                L.box(eq1, width="fill", height="70px", justify="center", align="start").item(shrink=0),
-                L.box(eq2, width="fill", height="44px", justify="center", align="start").item(shrink=0),
+                L.box(
+                    eq1, width="fill", height="70px", justify="center", align="start"
+                ).item(shrink=0),
+                L.box(
+                    eq2, width="fill", height="44px", justify="center", align="start"
+                ).item(shrink=0),
                 hairline(scene),
                 L.box(spec["case"], font=MONO, font_size="18px", color=MUTED),
                 L.row(
-                    L.box(spec["value"], font_size="30px", weight=900, color=INK).item(grow=1),
+                    L.box(spec["value"], font_size="30px", weight=900, color=INK).item(
+                        grow=1
+                    ),
                     L.box("✓ Cumple", font_size="19px", weight=900, color=PASS),
                     align="center",
                     width="fill",
@@ -603,15 +660,23 @@ def strength_checks(scene: Scene) -> None:
         drawing, extras, arrows = _check_drawing(scene, i, cx, cy - 1.375)
         scene.play(
             [
-                stagger(*[d.animate.fade_in().duration(0.3) for d in drawing], each=0.01),
+                stagger(
+                    *[d.animate.fade_in().duration(0.3) for d in drawing], each=0.01
+                ),
                 stagger(
                     *[
-                        (e.animate.grow_arrow() if e in arrows else e.animate.fade_in()).duration(0.35)
+                        (
+                            e.animate.grow_arrow()
+                            if e in arrows
+                            else e.animate.fade_in()
+                        ).duration(0.35)
                         for e in extras
                     ],
                     each=0.08,
                 ),
-                enter(box, direction=Direction.UP, distance=0.06, duration=0.3, each=0.05),
+                enter(
+                    box, direction=Direction.UP, distance=0.06, duration=0.3, each=0.05
+                ),
             ]
         )
         scene.stop(f"verificacion-{i + 1}")

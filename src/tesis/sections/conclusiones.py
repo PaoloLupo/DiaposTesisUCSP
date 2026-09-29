@@ -13,8 +13,10 @@ from tesis.building import draw_plan, grow_walls
 from tesis.components import (
     column_list,
     enter,
+    header,
     numbered_row,
     page,
+    source,
     stat_card,
     takeaway,
 )
@@ -25,12 +27,7 @@ from tesis.data.thesis import (
     crack_failures,
     relative,
 )
-from tesis.kit import (
-    LEFT_EDGE,
-    header,
-    source,
-    t,
-)
+from tesis.kit import LEFT_EDGE, t
 from tesis.theme import (
     BRICK,
     DISPLAY,

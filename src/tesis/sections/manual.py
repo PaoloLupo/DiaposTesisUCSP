@@ -22,10 +22,10 @@ from tesis.data.thesis import (
     MESH_STEP,
     NO_CONFINEMENT_DRIFT,
 )
-from tesis.components import enter, image_card, page
+from tesis.components import enter, header, image_card, page, panel, source, takeaway_at
 from tesis.components import note as caption_note
 from tesis.components import takeaway as takeaway_box
-from tesis.kit import LEFT_EDGE, dimension, header, label, panel, source, t, takeaway
+from tesis.kit import dimension, label, t
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -335,7 +335,7 @@ def idealizations(scene: Scene) -> None:
         scene.stop(f"idealizacion-{'mct' if color is BRICK else 'mst'}")
     divider = scene.geometry.line(0, 2.4, 0, -2.6).stroke(RULE, 0.012)
     scene.play(divider.animate.create().duration(0.4))
-    takeaway(
+    takeaway_at(
         scene,
         "La idealización y la asignación de cargas cambian las fuerzas que llegan a cada muro",
         y=-3.15,
@@ -567,7 +567,7 @@ def manual_cycle(scene: Scene) -> None:
             each=0.12,
         )
     )
-    takeaway(
+    takeaway_at(
         scene,
         "Cada iteración repite la exportación, el filtrado y la transcripción de datos",
         y=-3.2,

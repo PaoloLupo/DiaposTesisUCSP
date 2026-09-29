@@ -8,10 +8,23 @@ Unidades de diseño: el fotograma mide 1080 px de alto = 9 unidades de escena, e
 decir 120 px por unidad.
 """
 
-from gaanim import Box, Color, Direction, Drawable, Scene, component
+from gaanim import (
+    Anchor,
+    Box,
+    Color,
+    Direction,
+    Drawable,
+    Easing,
+    Scene,
+    component,
+    stagger,
+)
 
 from tesis.theme import (
     BRICK,
+    CAPTION,
+    KICKER,
+    TITLE,
     BRICK_DEEP,
     CARD,
     DISPLAY,
@@ -266,7 +279,9 @@ def enter(
     each: float = 0.07,
 ):
     """Revela una caja pieza por pieza, en cascada, del fondo al frente."""
-    return box.reveal(direction=direction, distance=distance, duration=duration, each=each)
+    return box.reveal(
+        direction=direction, distance=distance, duration=duration, each=each
+    )
 
 
 @component
@@ -441,7 +456,9 @@ def compare_table(
     body = [
         L.column(
             L.row(
-                L.box(aspect, font_size="26px", weight=700, color=INK, width=LABEL_WIDTH).item(shrink=0),
+                L.box(
+                    aspect, font_size="26px", weight=700, color=INK, width=LABEL_WIDTH
+                ).item(shrink=0),
                 *[
                     L.box(
                         text,
@@ -464,3 +481,181 @@ def compare_table(
         for aspect, cells in rows
     ]
     return L.column(head, *body, gap="12px", width="fill")
+
+
+PX = 120.0  # px de diseño por unidad de escena
+SAFE_TOP = 60.0  # el área segura empieza a 60 px del borde del fotograma
+
+
+def _px(units: float) -> str:
+    return f"{units * PX:.1f}px"
+
+
+@component
+def header_block(scene: Scene, *, kicker: str, title: str) -> Box:
+    """Kicker en versalitas terracota y título-afirmación en Aleo, en la esquina superior."""
+    L = scene.layout
+    return L.column(
+        scene.text(kicker.upper(), style=KICKER),
+        scene.text(title, style=TITLE, wrap=False),
+        gap="5px",
+        within="safe",
+        width="fill",
+        height="fill",
+        justify="start",
+        padding=("2px", SIDE, "0px", SIDE),
+    )
+
+
+def header(scene: Scene, kicker: str, title: str) -> Box:
+    """Coloca el encabezado y lo anima: el título sube palabra por palabra."""
+    block = header_block(scene, kicker=kicker, title=title)
+    kick, head = block.children
+    scene.play(
+        stagger(
+            kick.animate.fade_in_from(Direction.RIGHT, 0.12)
+            .duration(0.5)
+            .easing(Easing.SMOOTH_SPRING),
+            head.animate.reveal(style="slide_up", by="word", stagger=0.045).duration(
+                0.9
+            ),
+            each=0.12,
+        )
+    )
+    return block
+
+
+@component
+def source_block(scene: Scene, *, reference: str) -> Box:
+    """Fuente de la diapositiva, sobre el riel de avance (a y = -3.72)."""
+    return scene.layout.column(
+        scene.text(reference, style=CAPTION, wrap=False),
+        within="safe",
+        width="fill",
+        height="fill",
+        justify="start",
+        padding=(f"{(4.5 + 3.72) * PX - SAFE_TOP - 3:.1f}px", SIDE, "0px", SIDE),
+    )
+
+
+def source(scene: Scene, reference: str) -> Box:
+    block = source_block(scene, reference=reference)
+    scene.play(block.animate.fade_in().duration(0.3))
+    return block
+
+
+@component
+def takeaway_block(scene: Scene, *, text: str, y: float, color: Color = INK) -> Box:
+    """Frase final en Aleo bajo un filete; ``y`` es el centro vertical de la frase."""
+    L = scene.layout
+    rule_y = y + 0.36
+    return L.column(
+        hairline(scene, thickness="2px"),
+        scene.text(text, font=DISPLAY, size=0.3, weight=700, color=color),
+        gap="18px",
+        within="safe",
+        width="fill",
+        height="fill",
+        justify="start",
+        padding=(f"{(4.5 - rule_y) * PX - SAFE_TOP - 1:.1f}px", SIDE, "0px", SIDE),
+    )
+
+
+def takeaway_at(
+    scene: Scene, content: str, y: float = -3.05, *, color: Color = INK
+) -> Box:
+    """Mensaje final de la diapositiva: filete fino encima y frase en Aleo."""
+    block = takeaway_block(scene, text=content, y=y, color=color)
+    rule, text = block.children
+    scene.play(
+        [
+            rule.animate.grow_from_edge(Direction.LEFT).duration(0.5),
+            text.animate.reveal(style="slide_up", by="word", stagger=0.03).duration(
+                0.7
+            ),
+        ]
+    )
+    return block
+
+
+@component
+def pill_box(
+    scene: Scene,
+    *,
+    text: str,
+    color: Color,
+    background: Color,
+    border: Color | None,
+    size: float,
+    font: str,
+    weight: int | None,
+    pad: tuple[float, float],
+) -> Box:
+    return scene.layout.box(
+        text,
+        font=font,
+        font_size=_px(size),
+        weight=weight,
+        color=color,
+        background=background,
+        border=border if border is not None else background,
+        border_width="2px",
+        padding=(_px(pad[1]), _px(pad[0])),
+    )
+
+
+def pill(
+    scene: Scene,
+    content: str,
+    x: float,
+    y: float,
+    *,
+    color: Color = INK_SOFT,
+    background: Color = CARD,
+    border: Color | None = None,
+    size: float = 0.19,
+    font: str = MONO,
+    weight: int | None = None,
+    pad: tuple[float, float] = (0.16, 0.07),
+    anchor: Anchor = Anchor.CENTER,
+) -> Box:
+    """Etiqueta compacta de esquinas rectas; se ubica por su centro o una esquina."""
+    return pill_box(
+        scene,
+        text=content,
+        color=color,
+        background=background,
+        border=border,
+        size=size,
+        font=font,
+        weight=weight,
+        pad=pad,
+    ).move_to(x, y, anchor)
+
+
+@component
+def panel_box(
+    scene: Scene, *, w: float, h: float, fill: Color, border: Color | None
+) -> Box:
+    return scene.layout.box(
+        width=_px(w),
+        height=_px(h),
+        background=fill,
+        border=border,
+        border_width="2px" if border is not None else "0px",
+    )
+
+
+def panel(
+    scene: Scene,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    *,
+    fill: Color = CARD,
+    border: Color | None = RULE,
+    anchor: Anchor = Anchor.CENTER,
+) -> Box:
+    """Recuadro de esquinas rectas con filete fino, colocado por coordenadas."""
+    return panel_box(scene, w=w, h=h, fill=fill, border=border).move_to(x, y, anchor)

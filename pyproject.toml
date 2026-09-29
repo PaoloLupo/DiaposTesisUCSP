@@ -14,6 +14,7 @@ venv = ".venv"
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
 reportUnusedCallResult = false
+reportImplicitStringConcatenation = false
 
 [tool.uv.sources]
 gaanim = { path = "C:/Tools/gaanim/gaanim-0.7.2-py3-none-any.whl" }

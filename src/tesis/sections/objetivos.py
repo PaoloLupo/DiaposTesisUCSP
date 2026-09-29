@@ -20,13 +20,15 @@ from tesis.components import (
     enter,
     fact,
     hairline,
+    header,
     note,
     objective_card,
     page,
+    source,
     step,
     takeaway,
 )
-from tesis.kit import LEFT_EDGE, RIGHT_EDGE, header, label, source, t
+from tesis.kit import LEFT_EDGE, RIGHT_EDGE, label, t
 from tesis.theme import (
     BODY,
     BRICK,

@@ -20,21 +20,18 @@ from tesis.components import (
     chip,
     column_list,
     enter,
+    header,
     note,
     page,
+    panel,
+    pill,
     role_column,
+    source,
 )
 from tesis.components import takeaway as takeaway_box
 from tesis.data.thesis import DENSITY_MIN, SHEAR_CAPACITY, SHEAR_DEMAND
 from tesis.diagram import decision, io, link, process, terminal
-from tesis.kit import (
-    header,
-    label,
-    panel,
-    pill,
-    source,
-    t,
-)
+from tesis.kit import label, t
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -124,9 +121,7 @@ def scope(scene: Scene) -> None:
 
 
 def general_flow(scene: Scene) -> None:
-    header(
-        scene, KICKER, "El flujo general separa datos inconsistentes de incumplimientos"
-    )
+    header(scene, KICKER, "El flujo separa datos inconsistentes de incumplimientos")
     y1, y2, y3 = 1.3, -1.05, -2.72
     loop_zone = panel(
         scene,

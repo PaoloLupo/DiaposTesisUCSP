@@ -10,7 +10,6 @@ resultados`` o ``--from resultados`` también lo incluyen.
 
 from gaanim import (
     Anchor,
-    Direction,
     Drawable,
     Easing,
     NavigationEntry,

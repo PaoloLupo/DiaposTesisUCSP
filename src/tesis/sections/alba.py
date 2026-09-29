@@ -15,20 +15,19 @@ from gaanim import (
 )
 
 from tesis.app import thesis_image
-from tesis.components import chip, enter, hairline, note
+from tesis.components import (
+    chip,
+    enter,
+    hairline,
+    header,
+    note,
+    panel,
+    source,
+    takeaway_at,
+)
 from tesis.components import page as page_column
 from tesis.diagram import link
-from tesis.kit import (
-    LEFT_EDGE,
-    RIGHT_EDGE,
-    header,
-    label,
-    panel,
-    pill,
-    source,
-    t,
-    takeaway,
-)
+from tesis.kit import LEFT_EDGE, RIGHT_EDGE, t
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -205,7 +204,7 @@ def architecture(scene: Scene) -> None:
     ]
     scene.play(sequence(*[token.animate.move_to(x, y).duration(0.4) for x, y in path]))
     scene.play(token.animate.fade_out().duration(0.2))
-    takeaway(
+    takeaway_at(
         scene,
         "Cada diagrama de flujo del capítulo 6 es una rutina del módulo 5",
         y=-2.95,
@@ -247,9 +246,15 @@ def api(scene: Scene) -> None:
     L = scene.layout
     cat_w, call_w, arrow_w = "230px", "640px", "150px"
     alba = chip(
-        scene, text="Alba · Python + comtypes", color=BRICK_DEEP, background=BRICK_SOFT, font="Lato"
+        scene,
+        text="Alba · Python + comtypes",
+        color=BRICK_DEEP,
+        background=BRICK_SOFT,
+        font="Lato",
     )
-    etabs = chip(scene, text="ETABS · SapModel", color=STEEL, background=STEEL_SOFT, font="Lato")
+    etabs = chip(
+        scene, text="ETABS · SapModel", color=STEEL, background=STEEL_SOFT, font="Lato"
+    )
     heading_row = L.row(
         L.box(width=cat_w).item(shrink=0),
         L.column(alba, width=call_w, align="end").item(shrink=0),
@@ -266,9 +271,20 @@ def api(scene: Scene) -> None:
         call_rows.append(
             L.column(
                 L.row(
-                    L.box(cat.upper(), font_size="17px", weight=900, color=MUTED, letter_spacing=0.03, width=cat_w).item(shrink=0),
                     L.box(
-                        method, font=MONO, font_size="22px", color=INK, width=call_w,
+                        cat.upper(),
+                        font_size="17px",
+                        weight=900,
+                        color=MUTED,
+                        letter_spacing=0.03,
+                        width=cat_w,
+                    ).item(shrink=0),
+                    L.box(
+                        method,
+                        font=MONO,
+                        font_size="22px",
+                        color=INK,
+                        width=call_w,
                         align="end",
                     ).item(shrink=0),
                     scene.geometry.arrow(0, 0, 1.0, 0).fill(BRICK).no_stroke(),
@@ -302,7 +318,9 @@ def api(scene: Scene) -> None:
             sequence(
                 parallel(
                     category.animate.fade_in().duration(0.2),
-                    call.children[0].animate.typewriter(cps=60, cursor="▍", keep_cursor=False),
+                    call.children[0].animate.typewriter(
+                        cps=60, cursor="▍", keep_cursor=False
+                    ),
                 ),
                 parallel(
                     arrow.animate.grow_arrow().duration(0.25),
@@ -614,7 +632,9 @@ def report(scene: Scene) -> None:
             )
         )
         if not last:
-            chain_items.append(scene.geometry.arrow(0, 0, 0.4, 0).fill(MUTED).no_stroke())
+            chain_items.append(
+                scene.geometry.arrow(0, 0, 0.4, 0).fill(MUTED).no_stroke()
+            )
     chain = L.row(*chain_items, gap="16px", align="center", width="fill")
     sections = [
         "Datos de diseño",

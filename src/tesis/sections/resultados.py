@@ -32,8 +32,8 @@ from tesis.data.thesis import (
     crack_failures,
     relative,
 )
-from tesis.components import chip, compare_table, enter, page
-from tesis.kit import LEFT_EDGE, header, label, panel, pill, source, t
+from tesis.components import chip, compare_table, enter, header, page, pill, source
+from tesis.kit import LEFT_EDGE, label, t
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -99,7 +99,15 @@ def models(scene: Scene) -> None:
     logic = L.column(
         *[
             L.row(
-                chip(scene, text=pair, color=color, background=CARD, border=color, font=DISPLAY, width="250px"),
+                chip(
+                    scene,
+                    text=pair,
+                    color=color,
+                    background=CARD,
+                    border=color,
+                    font=DISPLAY,
+                    width="250px",
+                ),
                 L.box(text, font_size="26px", color=INK),
                 gap="24px",
                 align="center",
@@ -682,9 +690,7 @@ PASS_WALL = "#86AE97"
 
 
 def cracking(scene: Scene) -> None:
-    header(
-        scene, KICKER, "Fisuración en el piso 1: el diagnóstico cambia con el modelo"
-    )
+    header(scene, KICKER, "Fisuración en el piso 1: el diagnóstico depende del modelo")
     for model, cx in (("MCT", -3.75), ("MSTA", 3.75)):
         plan = draw_plan(
             scene,
