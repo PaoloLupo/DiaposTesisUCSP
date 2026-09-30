@@ -41,9 +41,9 @@ Los tiempos incluyen la explicación oral; las pausas (`scene.stop`) esperan al 
 | 04 Proceso manual | Caso de estudio · áreas vs barras · criterios de modelamiento · ciclo manual | 3:30 | 13:15 |
 | 05 Marco de trabajo | Qué se automatiza · flujo general · módulo de densidad · trazabilidad | 3:45 | 17:00 |
 | 06 Alba | Arquitectura · API de ETABS · interfaz · reporte | 3:00 | 20:00 |
-| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia · fisuración | 6:00 | 26:00 |
-| 08 Conclusiones | Objetivos · hallazgos · alcance y futuro · cierre | 2:45 | 28:45 |
-| Divisores | 8 × ~6 s | 0:50 | ≈ 29:35 |
+| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia | 4:45 | 24:45 |
+| 08 Conclusiones | Objetivos · hallazgos · alcance y futuro · cierre | 2:45 | 27:30 |
+| Divisores | 8 × ~6 s | 0:50 | ≈ 28:20 |
 
 Si hace falta recortar, las diapositivas que menos afectan el argumento son
 *Proceso manual · criterios de modelamiento*, *Alba · API de ETABS* y *Resultados · cortante*:
@@ -62,7 +62,7 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
   bloque y la línea inferior, la fuente en la tesis.
 - **Un mismo edificio en toda la exposición:** la planta de San Bartolomé (2006) se dibuja como
   geometría (`tesis.building`) con los muros y etiquetas Pier del modelo de ETABS. Se reutiliza
-  en la portada, la densidad, el caso de estudio, la resistencia global, el mapa de fisuración
+  en la portada, la densidad, el caso de estudio, la resistencia global
   y el cierre.
 
 ## Dónde editar

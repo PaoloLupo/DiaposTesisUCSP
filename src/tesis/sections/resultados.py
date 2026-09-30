@@ -7,7 +7,6 @@ calculan con la misma base que las notas de las tablas del capítulo 8.
 from gaanim import (
     Anchor,
     Axis,
-    Color,
     CoordinateSpace,
     Direction,
     Drawable,
@@ -18,9 +17,7 @@ from gaanim import (
     stagger,
 )
 
-from tesis.building import DEPTH, WALLS, WIDTH, Plan, draw_plan
 from tesis.data.thesis import (
-    CRACKING_FLOOR1,
     DRIFT_LIMIT,
     DRIFTS,
     FLOORS,
@@ -29,7 +26,6 @@ from tesis.data.thesis import (
     SEISMIC_WEIGHT,
     SHEAR_CAPACITY,
     SHEAR_DEMAND,
-    crack_failures,
     relative,
 )
 from tesis.components import chip, compare_table, enter, header, page, pill, source
@@ -42,15 +38,12 @@ from tesis.theme import (
     CONCRETE_SOFT,
     DISPLAY,
     FAIL,
-    FAIL_SOFT,
     INK,
     INK_SOFT,
     MODEL_COLORS,
     MONO,
     MUTED,
     PAPER_DEEP,
-    PASS,
-    PASS_SOFT,
     STEEL,
     STEEL_SOFT,
 )
@@ -686,173 +679,6 @@ def resistance(scene: Scene) -> None:
     scene.stop("resistencia-diagnostico")
 
 
-PASS_WALL = "#86AE97"
-
-
-def cracking(scene: Scene) -> None:
-    header(scene, KICKER, "Fisuración en el piso 1: el diagnóstico depende del modelo")
-    for model, cx in (("MCT", -3.75), ("MSTA", 3.75)):
-        plan = draw_plan(
-            scene,
-            (cx, 0.2),
-            6.5,
-            grid=False,
-            labels=False,
-            drawn_thickness=0.1,
-            color_x="#C9C3B8",
-            color_y="#C9C3B8",
-        )
-        data = CRACKING_FLOOR1[model]
-        fails = crack_failures(model)
-        head = t(
-            scene,
-            model,
-            cx - 3.25,
-            2.62,
-            font=DISPLAY,
-            size=0.36,
-            weight=700,
-            color=MODEL_COLORS[model],
-        )
-        head_w = head.bounds().width
-        sub = t(
-            scene,
-            "modelo completo · Alba"
-            if model == "MCT"
-            else "pórticos planos · hojas de cálculo",
-            cx - 3.25 + head_w + 0.25,
-            2.48,
-            size=0.18,
-            color=INK_SOFT,
-        )
-        count = t(
-            scene,
-            f"{len(fails)} de {len(data)}",
-            cx - 3.25,
-            -1.95,
-            font=DISPLAY,
-            size=0.5,
-            weight=700,
-            color=FAIL if fails else PASS,
-        )
-        count_l = t(
-            scene,
-            "muros no cumplen $V_e <= 0.55 V_m$",
-            cx - 3.25,
-            -2.6,
-            size=0.2,
-            color=INK_SOFT,
-        )
-        scene.play(
-            stagger(
-                head.animate.fade_in().duration(0.3),
-                sub.animate.fade_in().duration(0.3),
-                plan.slab.animate.fade_in().duration(0.4),
-                plan.void.animate.fade_in().duration(0.3),
-                stagger(
-                    *[w.animate.fade_in().duration(0.2) for w in plan.all_walls],
-                    each=0.01,
-                ),
-                each=0.12,
-            )
-        )
-        recolor = []
-        tags: list[Drawable] = []
-        for pier, (ve, cap) in data.items():
-            ok = ve <= cap
-            recolor.append(
-                plan.walls[pier].animate.fill(PASS_WALL if ok else FAIL).duration(0.4)
-            )
-            if not ok:
-                x, y, anchor = _tag_position(plan, pier)
-                tags.append(
-                    pill(
-                        scene,
-                        f"{ve / cap:.2f}",
-                        x,
-                        y,
-                        size=0.13,
-                        color=Color.from_hex("#FFFFFF"),
-                        background=FAIL,
-                        anchor=anchor,
-                    )
-                )
-        # El diagnóstico barre la planta de izquierda a derecha, como una inspección.
-        scene.play(stagger(*recolor, total=0.9, origin=plan.to_scene(0, DEPTH / 2)))
-        scene.play(
-            [
-                *[g.animate.fade_in().duration(0.3) for g in tags],
-                count.animate.fade_in().duration(0.4),
-                count_l.animate.fade_in().duration(0.4),
-            ]
-        )
-        scene.stop(f"fisuracion-{model.lower()}")
-    legend = [
-        pill(
-            scene,
-            "X2: concreto, no aplica",
-            0.3,
-            -3.15,
-            size=0.16,
-            font="Lato",
-            color=INK_SOFT,
-            background=PAPER_DEEP,
-            anchor=Anchor.LEFT,
-        ),
-        pill(
-            scene,
-            "cumple",
-            3.0,
-            -3.15,
-            size=0.16,
-            font="Lato",
-            weight=700,
-            color=PASS,
-            background=PASS_SOFT,
-            anchor=Anchor.LEFT,
-        ),
-        pill(
-            scene,
-            "no cumple · $V_e slash 0.55 V_m$",
-            4.3,
-            -3.15,
-            size=0.16,
-            font="Lato",
-            weight=700,
-            color=FAIL,
-            background=FAIL_SOFT,
-            anchor=Anchor.LEFT,
-        ),
-    ]
-    scene.play([x.animate.fade_in().duration(0.3) for x in legend])
-    source(
-        scene,
-        "Tesis · Tablas 35 (MCT) y 36 (MSTA), pp. 86–87, sismo moderado, piso 1 · mismo edificio y misma norma",
-    )
-    scene.stop("fisuracion-comparacion")
-
-
-def _tag_position(plan: Plan, pier: str) -> tuple[float, float, Anchor]:
-    """Etiqueta del cociente junto al muro, sin tapar muros vecinos."""
-    base = next(w for w in WALLS if w.name == pier.split("_")[0])
-    mirrored = pier.endswith("_2")
-    if base.direction == "X":
-        x = (base.start + base.end) / 2
-        x = WIDTH - x if mirrored else x
-        sx, sy = plan.to_scene(x, base.fixed)
-        # Bordes: etiqueta por fuera de la planta; muros interiores: por debajo.
-        return (
-            (sx, sy + 0.16, Anchor.BOTTOM)
-            if base.fixed > 7.9
-            else (sx, sy - 0.16, Anchor.TOP)
-        )
-    x = WIDTH - base.fixed if mirrored else base.fixed
-    sx, sy = plan.to_scene(x, (base.start + base.end) / 2)
-    if x < 0.1:
-        return sx - 0.14, sy, Anchor.RIGHT
-    return sx + 0.14, sy, Anchor.LEFT
-
-
 SECTION = Section(
     "resultados",
     [
@@ -912,17 +738,6 @@ SECTION = Section(
                 "151.213 / 146.756 = 1.030, que la hoja de cálculo marca como 'No cumple · replantear'. "
                 "MCT obtiene 203.032 tonf (38 % más) porque el metrado automático da una P_g más "
                 "representativa y la losa redistribuye cargas. El diagnóstico depende del modelo."
-            ),
-        ),
-        SectionStep(
-            name="Resultados · fisuración",
-            build=cracking,
-            transition=Transition.cross_fade(0.45),
-            notes=(
-                "1.25 min. Control de fisuración con sismo moderado en el piso 1 (Tabla 35 (p. 86) y "
-                "Tabla 36 (p. 87)). MCT: los 24 muros de albañilería cumplen. MSTA: 7 de 24 no cumplen "
-                "(X1, X5, X7, sus simétricos X1′ y X5′, e Y1′, Y2′). Es el mismo edificio y la misma "
-                "norma: cambia la idealización. X2 es de concreto y no se evalúa con este criterio."
             ),
         ),
     ],
