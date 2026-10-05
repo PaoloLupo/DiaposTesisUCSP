@@ -48,7 +48,6 @@ from tesis.components import (
     phase_heading,
     pill,
     source,
-    takeaway_at,
 )
 from tesis.components import note as caption_note
 from tesis.data.planta import STORIES
@@ -77,6 +76,7 @@ from tesis.data.thesis import (
     MODEL_CHECKS,
     WEIGHT_BY_FLOOR,
 )
+from tesis.diagram import link
 from tesis.etabs_model import (
     FRAME,
     OVERLAY,
@@ -87,7 +87,7 @@ from tesis.etabs_model import (
     build_model,
     wall_lines,
 )
-from tesis.kit import dimension, label, t
+from tesis.kit import RIGHT_EDGE, dimension, label, t
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -96,11 +96,13 @@ from tesis.theme import (
     CONCRETE,
     CONCRETE_SOFT,
     DISPLAY,
+    FAIL,
     INK,
     INK_SOFT,
     MONO,
     MUTED,
     PAPER_DEEP,
+    PASS,
     RULE,
     STEEL,
     STEEL_SOFT,
@@ -111,7 +113,7 @@ KICKER = "04 · Proceso manual"
 
 
 def case_study(scene: Scene) -> None:
-    header(scene, KICKER, "Caso de estudio: vivienda de cuatro pisos en Lima")
+    header(scene, KICKER, "Caso de estudio: el edificio de San Bartolomé (2006)")
     plan = draw_plan(scene, (-2.4, 0.17), 8.1, labels=True, drawn_thickness=0.09)
     ox, oy = plan.origin
     s = plan.scale
@@ -145,6 +147,7 @@ def case_study(scene: Scene) -> None:
         )
     )
     rows = [
+        ("Referencia", "Á. San Bartolomé · ejemplo E.070 · PUCP"),
         ("Ubicación", "Lima · suelo de cascajo (S1)"),
         ("Uso", "Vivienda · U = 1.0"),
         ("Altura", f"{CASE['pisos']} pisos · {CASE['altura']:.2f} m de piso a techo"),
@@ -167,7 +170,7 @@ def case_study(scene: Scene) -> None:
             )
             for name, value in rows
         ],
-        gap="27px",
+        gap="21px",
         within="safe",
         width="fill",
         height="fill",
@@ -2101,148 +2104,315 @@ def criteria(scene: Scene) -> None:
     scene.stop("criterios-modelamiento")
 
 
-CHECKS = [
-    "Espesor efectivo",
-    "Esfuerzo axial por gravedad",
-    "Densidad de muros",
-    "Control de fisuración",
-    "Resistencia al corte global",
-    "Distorsiones de entrepiso",
-    "Refuerzo horizontal",
-    "Agrietamiento diagonal",
-]
+def _cycle_icon(scene: Scene, kind: str, x: float, y: float, color: Color) -> Drawable:
+    """Pictograma de un paso del ciclo, centrado en (x, y), de unos 0.5 de lado."""
+    g = scene.geometry
+    stroke = 0.03
+    if kind == "modelo":
+        # Edificio en alambre: cara frontal con pisos, cara trasera desplazada.
+        w, h, dx, dy = 0.34, 0.46, 0.14, 0.11
+        x0, y0 = x - dx / 2, y - dy / 2
+        front = [
+            (x0 - w / 2, y0 - h / 2),
+            (x0 + w / 2, y0 - h / 2),
+            (x0 + w / 2, y0 + h / 2),
+            (x0 - w / 2, y0 + h / 2),
+        ]
+        parts = [
+            g.polygon([(px + dx, py + dy) for px, py in front])
+            .no_fill()
+            .stroke(color, stroke * 0.6),
+            g.polygon(front).fill(CARD).stroke(color, stroke),
+        ]
+        parts += [
+            g.line(px, py, px + dx, py + dy).stroke(color, stroke * 0.6)
+            for px, py in front[1:]
+        ]
+        parts += [
+            g.line(
+                x0 - w / 2, y0 - h / 2 + h * k / 3, x0 + w / 2, y0 - h / 2 + h * k / 3
+            ).stroke(color, stroke)
+            for k in (1, 2)
+        ]
+        return g.group(parts)
+    if kind == "tablas":
+        # Tabla con encabezado lleno.
+        w, h = 0.54, 0.42
+        parts = [
+            g.rect(w, h).no_fill().stroke(color, stroke).move_to(x, y),
+            g.rect(w, h / 4).fill(color).no_stroke().move_to(x, y + h * 3 / 8),
+        ]
+        parts += [
+            g.line(
+                x - w / 2, y + h / 4 - h * k / 4, x + w / 2, y + h / 4 - h * k / 4
+            ).stroke(color, stroke * 0.7)
+            for k in (1, 2)
+        ]
+        return g.group(parts)
+    if kind == "hoja":
+        # Hoja de cálculo: cuadrícula de 3 × 3 sobre una copia desplazada.
+        w = 0.42
+        parts = [
+            g.rect(w, w)
+            .fill(BRICK_SOFT)
+            .stroke(color, stroke * 0.7)
+            .move_to(x + 0.08, y + 0.08),
+            g.rect(w, w).fill(CARD).stroke(color, stroke).move_to(x - 0.04, y - 0.04),
+        ]
+        for k in (1, 2):
+            off = -w / 2 + w * k / 3
+            parts.append(
+                g.line(
+                    x - 0.04 + off, y - 0.04 - w / 2, x - 0.04 + off, y - 0.04 + w / 2
+                ).stroke(color, stroke * 0.7)
+            )
+            parts.append(
+                g.line(
+                    x - 0.04 - w / 2, y - 0.04 + off, x - 0.04 + w / 2, y - 0.04 + off
+                ).stroke(color, stroke * 0.7)
+            )
+        return g.group(parts)
+    return g.checkmark(0.42).stroke(color, 0.06).no_fill().move_to(x, y)
 
 
 def manual_cycle(scene: Scene) -> None:
     header(
         scene, KICKER, "El proceso manual es un ciclo: cada cambio obliga a repetirlo"
     )
-    cx, cy, r = -3.2, -0.3, 2.05
+    cx, cy, r, node = -2.9, -0.6, 1.95, 0.5
+    # (rótulo, ángulo, ícono, transcripción a mano). El flujo va en sentido horario.
     stages = [
-        ("Modelo y análisis\nen ETABS", 180),
-        ("Exportar y filtrar\ntablas", 90),
-        ("Copiar a hojas\nde cálculo", 0),
-        ("Verificar\nE.070 · E.030", 270),
+        ("Modelo y análisis\nen ETABS", 180, "modelo", False),
+        ("Exportar y filtrar tablas", 90, "tablas", True),
+        ("Copiar a hojas\nde cálculo", 0, "hoja", True),
+        ("Verificar E.070 · E.030", 270, "verificar", False),
     ]
-    ring = scene.geometry.circle(r).no_fill().stroke(RULE, 0.03).move_to(cx, cy)
+
+    def at(degrees: float, radius: float = r) -> tuple[float, float]:
+        a = math.radians(degrees)
+        return cx + radius * math.cos(a), cy + radius * math.sin(a)
+
     nodes: list[Drawable] = []
-    for text, angle in stages:
-        a = math.radians(angle)
-        x, y = cx + r * math.cos(a), cy + r * math.sin(a)
-        box = panel(scene, x, y, 2.25, 0.82, fill=CARD, border=RULE)
-        caption = t(
-            scene, text, x, y, size=0.19, weight=700, color=INK, anchor=Anchor.CENTER
-        )
-        nodes.append(scene.geometry.group([box, caption]).z_index(5))
-    heads = []
-    for angle in (135, 45, 315, 225):
-        a = math.radians(angle)
-        x, y = cx + r * math.cos(a), cy + r * math.sin(a)
-        heads.append(
-            scene.geometry.regular_polygon(3, 0.13)
-            .fill(BRICK)
-            .no_stroke()
+    captions: list[Drawable] = []
+    for text, angle, icon, manual in stages:
+        x, y = at(angle)
+        color = BRICK if manual else INK_SOFT
+        disc = (
+            scene.geometry.circle(node)
+            .fill(BRICK_SOFT if manual else CARD)
+            .stroke(BRICK if manual else RULE, 0.025)
             .move_to(x, y)
-            .rotate_to(a)
-            .z_index(3)
         )
-    # El marcador reposa sobre el arco, entre nodos, para no tapar sus textos.
-    rest = math.radians(158)
-    angle = scene.viz.parameter(rest)
-    token = scene.geometry.circle(0.11).fill(BRICK).no_stroke().z_index(2)
+        nodes.append(
+            scene.geometry.group([disc, _cycle_icon(scene, icon, x, y, color)]).z_index(
+                5
+            )
+        )
+        # El rótulo va hacia fuera del anillo.
+        anchor, dx, dy = {
+            180: (Anchor.RIGHT, -node - 0.15, 0.0),
+            90: (Anchor.BOTTOM, 0.0, node + 0.1),
+            0: (Anchor.LEFT, node + 0.15, 0.0),
+            270: (Anchor.TOP, 0.0, -node - 0.1),
+        }[angle]
+        captions.append(
+            t(
+                scene,
+                text,
+                x + dx,
+                y + dy,
+                size=0.2,
+                weight=700,
+                color=BRICK_DEEP if manual else INK,
+                anchor=anchor,
+            )
+        )
+    # Arcos con punta entre nodos; el que vuelve al modelo es la rama «no cumple».
+    gap = math.degrees((node + 0.12) / r)
+    arcs: list[Drawable] = []
+    for (_, a0, _, _), (_, a1, _, _) in zip(
+        stages, stages[1:] + stages[:1], strict=True
+    ):
+        end = a1 if a1 < a0 else a1 - 360
+        start, stop = a0 - gap, end + gap
+        points = [at(start + (stop - start) * k / 12) for k in range(13)]
+        arcs.append(link(scene, *points, color=FAIL if a0 == 270 else MUTED))
+    retry = t(
+        scene,
+        "no cumple:\nse cambian muros",
+        *at(225, r + 0.3),
+        size=0.19,
+        weight=700,
+        color=FAIL,
+        anchor=Anchor.TOP_RIGHT,
+    )
+
+    # Marcador sobre el anillo, por debajo de los nodos.
+    angle = scene.viz.parameter(math.pi)
+    token = scene.geometry.circle(0.12).fill(BRICK).no_stroke().z_index(2)
     token.move_to(
         computed(lambda v: cx + r * math.cos(v), inputs=[angle]),
         computed(lambda v: cy + r * math.sin(v), inputs=[angle]),
     )
     center_label = t(
-        scene, "iteración", cx, cy + 0.35, size=0.18, color=MUTED, anchor=Anchor.CENTER
+        scene, "iteración", cx, cy + 0.42, size=0.2, color=MUTED, anchor=Anchor.CENTER
     )
     counter = scene.viz.rolling_number(
-        1, font_family=DISPLAY, weight=700, font_size=0.75, color=BRICK
+        1, font_family=DISPLAY, weight=700, font_size=0.9, color=BRICK
     )
     counter.move_to(cx, cy - 0.25, Anchor.CENTER)
+
+    # Registro a la derecha: una fila por vuelta, un punto por paso.
+    lx, dot_gap, top = 2.1, 0.62, 1.3
+    log_title = label(scene, "Iteraciones", lx, 2.2, color=MUTED, size=0.15)
+    step_names = ["ETABS", "exportar", "copiar", "verificar"]
+    heads = [
+        t(
+            scene,
+            name,
+            lx + 0.75 + i * dot_gap,
+            top + 0.38,
+            size=0.13,
+            color=MUTED,
+            anchor=Anchor.CENTER,
+        )
+        for i, name in enumerate(step_names)
+    ]
+    rows: list[tuple[Drawable, Drawable, list[Drawable], list[Drawable]]] = []
+    for lap in range(3):
+        y = top - lap * 0.85
+        number = t(
+            scene,
+            f"{lap + 1}",
+            lx,
+            y,
+            font=DISPLAY,
+            size=0.32,
+            weight=700,
+            color=BRICK,
+            anchor=Anchor.LEFT,
+        )
+        track = scene.geometry.line(lx + 0.75, y, lx + 0.75 + 3 * dot_gap, y).stroke(
+            RULE, 0.02
+        )
+        hollow = [
+            scene.geometry.circle(0.13)
+            .fill(CARD)
+            .stroke(RULE, 0.02)
+            .move_to(lx + 0.75 + i * dot_gap, y)
+            for i in range(4)
+        ]
+        solid = [
+            scene.geometry.circle(0.13)
+            .fill(BRICK if stages[i][3] else INK_SOFT)
+            .no_stroke()
+            .move_to(lx + 0.75 + i * dot_gap, y)
+            for i in range(4)
+        ]
+        rows.append((number, track, hollow, solid))
+    results = [
+        t(
+            scene,
+            "✓ cumple" if lap == 2 else "✕ no cumple",
+            lx + 0.75 + 3 * dot_gap + 0.45,
+            top - lap * 0.85,
+            size=0.21,
+            weight=700,
+            color=PASS if lap == 2 else FAIL,
+            anchor=Anchor.LEFT,
+        )
+        for lap in range(3)
+    ]
+
     scene.play(
         stagger(
-            ring.animate.create().duration(0.8),
-            stagger(*[n.animate.fade_in().duration(0.35) for n in nodes], each=0.15),
-            stagger(*[h.animate.fade_in().duration(0.2) for h in heads], each=0.05),
+            stagger(*[a.animate.create().duration(0.4) for a in arcs], each=0.12),
+            stagger(*[n.animate.fade_in().duration(0.35) for n in nodes], each=0.12),
+            stagger(*[c.animate.fade_in().duration(0.3) for c in captions], each=0.08),
             center_label.animate.fade_in().duration(0.3),
             counter.visual.animate.fade_in().duration(0.3),
             token.animate.fade_in().duration(0.2),
-            each=0.2,
+            each=0.25,
         )
     )
     scene.stop("ciclo-manual")
 
-    title = label(
-        scene, "Verificaciones en la hoja de cálculo", 1.4, 2.4, color=MUTED, size=0.14
-    )
-    checks: list[Drawable] = []
-    for i, name in enumerate(CHECKS):
-        y = 1.95 - i * 0.44
-        checks.append(
-            t(
-                scene,
-                f"{i + 1:02d}",
-                1.4,
-                y,
-                font=MONO,
-                size=0.16,
-                color=BRICK,
-                anchor=Anchor.LEFT,
-            )
-        )
-        checks.append(t(scene, name, 1.95, y, size=0.23, color=INK, anchor=Anchor.LEFT))
     scene.play(
         [
-            title.animate.fade_in().duration(0.3),
-            stagger(
-                *[
-                    c.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.25)
-                    for c in checks
-                ],
-                each=0.03,
-            ),
+            log_title.animate.fade_in().duration(0.3),
+            *[hd.animate.fade_in().duration(0.3) for hd in heads],
         ]
     )
-    # Dos vueltas del ciclo: cada una repite exportación, filtrado, copia y verificación.
-    for lap in (2, 3):
+    lap_time = 2.4
+    for lap, (number, track, hollow, solid) in enumerate(rows):
+        start = math.pi - 2 * math.pi * lap
+        passes = [
+            node_.animate.indicate().duration(0.35).delay(lap_time * i / 4)
+            for i, node_ in enumerate(nodes)
+        ]
+        fills = [
+            dot.animate.fade_in().duration(0.2).delay(lap_time * i / 4)
+            for i, dot in enumerate(solid)
+        ]
         scene.play(
             [
-                angle.animate.set(rest - 2 * math.pi * (lap - 1)).duration(2.2),
-                counter.count_to(lap, duration=0.4).delay(1.9),
+                number.animate.fade_in().duration(0.2),
+                track.animate.create().duration(0.3),
+                *[dot.animate.fade_in().duration(0.2) for dot in hollow],
+                *([counter.count_to(lap + 1, duration=0.3)] if lap else []),
+                angle.animate.set(start - 2 * math.pi)
+                .duration(lap_time)
+                .easing(Easing.LINEAR),
+                *passes,
+                *fills,
+                results[lap].animate.fade_in().duration(0.3).delay(lap_time * 0.8),
+                *(
+                    [retry.animate.fade_in().duration(0.4).delay(lap_time * 0.8)]
+                    if lap == 0
+                    else []
+                ),
             ]
         )
+
     exit_y = cy - r
+    exit_x = 2.1
     exit_arrow = (
         scene.geometry.connector(
-            (cx + 1.15, exit_y),
-            (1.35, exit_y),
-            head_length=0.14,
-            head_width=0.14,
-            body_width=0.028,
+            (cx + node + 0.08, exit_y),
+            (exit_x - 0.1, exit_y),
+            head_length=0.16,
+            head_width=0.16,
+            body_width=0.03,
         )
-        .fill(INK_SOFT)
+        .fill(PASS)
         .no_stroke()
     )
     exit_label = t(
         scene,
-        "¿todo cumple? sí",
-        -0.35,
-        exit_y + 0.1,
-        size=0.17,
-        color=INK_SOFT,
+        "todo cumple",
+        (cx + node + exit_x) / 2 + 0.6,
+        exit_y + 0.12,
+        size=0.19,
+        weight=700,
+        color=PASS,
         anchor=Anchor.BOTTOM,
     )
     memory = panel(
-        scene, 1.4, exit_y, 5.9, 0.75, fill=PAPER_DEEP, border=None, anchor=Anchor.LEFT
+        scene,
+        exit_x,
+        exit_y,
+        RIGHT_EDGE - exit_x,
+        0.9,
+        fill=PAPER_DEEP,
+        border=None,
+        anchor=Anchor.LEFT,
     )
     memory_t = t(
         scene,
-        "Revisión de formato y memoria de cálculo en Word",
-        1.65,
+        "Memoria de cálculo en Word",
+        exit_x + 0.3,
         exit_y,
-        size=0.22,
+        size=0.23,
         weight=700,
         color=INK,
         anchor=Anchor.LEFT,
@@ -2255,11 +2425,6 @@ def manual_cycle(scene: Scene) -> None:
             memory_t.animate.fade_in().duration(0.3),
             each=0.12,
         )
-    )
-    takeaway_at(
-        scene,
-        "Cada iteración repite la exportación, el filtrado y la transcripción de datos",
-        y=-3.2,
     )
     source(
         scene,
@@ -2353,8 +2518,10 @@ SECTION = Section(
             notes=(
                 "45 s. Figura 41 (p. 80): modelo → exportar y filtrar tablas → copiar a hojas → "
                 "verificar. Si algo no cumple, se busca el origen, se modifica el modelo y se repite "
-                "todo. Ocho verificaciones en la hoja de cálculo. El contador de iteraciones es "
-                "ilustrativo: la tesis no registró cuántas iteraciones tomó el caso."
+                "todo. Decir de palabra las ocho verificaciones de la hoja: espesor efectivo, "
+                "esfuerzo axial, densidad, fisuración, corte global, derivas, refuerzo horizontal y "
+                "agrietamiento diagonal. En terracota, los dos pasos de transcripción a mano. El "
+                "contador es ilustrativo: la tesis no registró cuántas iteraciones tomó el caso."
             ),
         ),
     ],

@@ -359,6 +359,27 @@ def enter(
 
 
 @component
+def finding_card(
+    scene: Scene, *, picture: Drawable, value: str, text: str, color: Color = BRICK
+) -> Box:
+    """Hallazgo: un pictograma, la cifra o palabra clave en Aleo y una frase corta."""
+    L = scene.layout
+    return L.box(
+        L.box(picture, width="fill", height="260px", align="center", justify="center"),
+        L.box(width="fill", height="5px", background=color),
+        L.box(value, font=DISPLAY, font_size="64px", weight=700, color=color),
+        L.box(text, font_size="27px", weight=700, color=INK).item(grow=1),
+        padding=("32px", "30px"),
+        gap="22px",
+        background=CARD,
+        border=RULE,
+        border_width="2px",
+        width="fill",
+        height="fill",
+    ).item(grow=1)
+
+
+@component
 def comparison_card(
     scene: Scene,
     *,
@@ -411,7 +432,12 @@ HEADING_HEIGHT = "84px"
 
 @component
 def role_column(
-    scene: Scene, *, title: str, rows: list[tuple[str, str]], color: Color = BRICK
+    scene: Scene,
+    *,
+    title: str,
+    rows: list[tuple[str, str]],
+    color: Color = BRICK,
+    row_height: str = ROW_HEIGHT,
 ) -> Box:
     """Rol con su nombre sobre un filete de color y filas «acción — descripción».
 
@@ -427,7 +453,7 @@ def role_column(
             L.box(text, font_size="28px", color=INK_SOFT),
             align="center",
             width="fill",
-            height=ROW_HEIGHT,
+            height=row_height,
         )
         for head, text in rows
     ]
@@ -451,7 +477,11 @@ def role_column(
 
 @component
 def arrow_gutter(
-    scene: Scene, *, slots: list[tuple[str, bool] | None], width: str = "220px"
+    scene: Scene,
+    *,
+    slots: list[tuple[str, bool] | None],
+    width: str = "220px",
+    row_height: str = ROW_HEIGHT,
 ) -> Box:
     """Columna entre dos ``role_column``: una flecha rotulada por fila indicada.
 
@@ -461,7 +491,7 @@ def arrow_gutter(
     cells: list[Box] = []
     for slot in slots:
         if slot is None:
-            cells.append(L.box(width="fill", height=ROW_HEIGHT))
+            cells.append(L.box(width="fill", height=row_height))
             continue
         text, rightwards = slot
         x0, x1 = (0.0, 1.5) if rightwards else (1.5, 0.0)
@@ -474,7 +504,7 @@ def arrow_gutter(
                 align="center",
                 justify="center",
                 width="fill",
-                height=ROW_HEIGHT,
+                height=row_height,
             )
         )
     return L.column(
@@ -761,6 +791,7 @@ def module_card(
     tag: str,
     core: bool = True,
     highlight: bool = False,
+    height: str = "72px",
 ) -> Box:
     """Módulo de la arquitectura: número, nombre y tecnología en tipografía técnica."""
     L = scene.layout
@@ -782,7 +813,7 @@ def module_card(
         border=BRICK if highlight else RULE,
         border_width="2px",
         width="648px",
-        height="72px",
+        height=height,
     ).item(shrink=0)
 
 

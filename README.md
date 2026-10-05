@@ -2,8 +2,8 @@
 
 Sustentación animada en Gaanim de la tesis *Marco de trabajo para la automatización del
 diseño de la distribución de muros en planta para edificios de albañilería confinada*
-(UCSP). Pensada para **30 minutos**: 8 bloques, 32 diapositivas de contenido, 8 divisores
-de agenda y una portada (41 segmentos, 93 pausas).
+(UCSP). Pensada para **30 minutos**: 8 bloques, 34 diapositivas de contenido, 8 divisores
+de agenda y una portada (43 segmentos, 95 pausas).
 
 ## Ejecutar
 
@@ -37,13 +37,13 @@ Los tiempos incluyen la explicación oral; las pausas (`scene.stop`) esperan al 
 | Portada | Título y planta del caso dibujándose | 0:45 | 0:45 |
 | 01 Problemática | Material de las viviendas (INEI 2025) · muro confinado y sismo · traslado manual y pregunta | 3:00 | 3:45 |
 | 02 Objetivos y método | Objetivo general e hipótesis · objetivos específicos · metodología | 2:00 | 5:45 |
-| 03 Fundamentos | Densidad con la planta real · tres verificaciones de resistencia · deriva | 4:00 | 9:45 |
-| 04 Proceso manual | Caso de estudio · modelo completo en ETABS · pórticos planos · criterios de modelamiento · ciclo manual | 5:30 | 15:15 |
-| 05 Marco de trabajo | Qué se automatiza · flujo general · módulo de densidad y diagramas de los otros tres · trazabilidad | 4:00 | 19:15 |
-| 06 Alba | Arquitectura · API de ETABS · interfaz · reporte | 3:00 | 22:15 |
-| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia | 4:45 | 27:00 |
-| 08 Conclusiones | Objetivos · hallazgos · alcance y futuro · cierre | 2:45 | 29:45 |
-| Divisores | 8 × ~6 s | 0:50 | ≈ 30:35 |
+| 03 Fundamentos | Densidad con la planta real · tres verificaciones de resistencia · deriva · estado del arte | 4:45 | 10:30 |
+| 04 Proceso manual | Caso de estudio · modelo completo en ETABS · pórticos planos · criterios de modelamiento · ciclo manual | 5:30 | 16:00 |
+| 05 Marco de trabajo | Qué se automatiza · flujo general · módulo de densidad y diagramas de los otros tres · trazabilidad | 4:00 | 20:00 |
+| 06 Alba | Arquitectura · API de ETABS · interfaz · reporte · partes del reporte | 3:15 | 23:15 |
+| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia | 4:45 | 28:00 |
+| 08 Conclusiones | Objetivos · hallazgos · recomendaciones · cierre | 2:45 | 30:45 |
+| Divisores | 8 × ~6 s | 0:50 | ≈ 31:35 |
 
 Si hace falta recortar, las diapositivas que menos afectan el argumento son
 *Proceso manual · criterios de modelamiento*, *Alba · API de ETABS* y *Resultados · cortante*:
@@ -79,6 +79,7 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
 | Muros, longitudes y densidad del caso | `src/tesis/data/planta.py` |
 | Cifras transcritas de la tesis | `src/tesis/data/thesis.py` |
 | Datos INEI 2025 | `src/tesis/data/materiales_inei.py` |
+| Páginas del reporte de Alba (recortes del anexo) | `tools/render_report.py` → `assets/reporte/` |
 | Divisores y riel de avance | `src/tesis/section_index.py` |
 | Contenido de cada bloque | `src/tesis/sections/<bloque>.py` |
 

@@ -3,6 +3,7 @@
 import re
 
 from gaanim import (
+    Anchor,
     Bounds,
     Box,
     Color,
@@ -30,6 +31,7 @@ from tesis.components import (
     note,
     objective_card,
     page,
+    panel,
     source,
     stage,
 )
@@ -37,6 +39,7 @@ from tesis.data.thesis import CASE, MODELS
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
+    CARD,
     DISPLAY,
     INK,
     INK_SOFT,
@@ -44,6 +47,7 @@ from tesis.theme import (
     MONO,
     MUTED,
     PASS,
+    RULE,
     STEEL,
 )
 
@@ -189,12 +193,8 @@ def purpose(scene: Scene) -> None:
     }
     glue = L.box("con", font=DISPLAY, font_size="36px", color=INK_SOFT)
     captions = {
-        "cause": L.box("mediante su API, sobre el modelo de elementos finitos", **CAPTION),
-        "effect": L.box(
-            "ejecutadas y documentadas, a partir de los datos\n"
-            "extraídos y procesados de forma sistemática",
-            **CAPTION,
-        ),
+        "cause": L.box("mediante su API", **CAPTION),
+        "effect": L.box("ejecutadas y documentadas de forma sistemática", **CAPTION),
     }
     cause = _side(
         scene,
@@ -220,7 +220,9 @@ def purpose(scene: Scene) -> None:
         width=HYP_GUTTER,
         padding=("22px", "0px", "0px", "0px"),
     ).item(shrink=0)
-    chain = L.row(cause, verb, effect, align="start", width="fill")
+    chain = L.row(
+        cause, verb, effect, align="start", width="fill", padding=("0px", "30px")
+    )
 
     # El ámbito cierra la hipótesis; debajo del filete, cada variable bajo su lado.
     shift = scene.geometry.arrow(0, 0, 0.26, 0).fill(MUTED).no_stroke()
@@ -242,25 +244,63 @@ def purpose(scene: Scene) -> None:
         width="fill",
     )
     gap_box = L.box(width=HYP_GUTTER, height="1px").item(shrink=0)
-    roles = L.row(independent, gap_box, dependent, align="start", width="fill")
+    roles = L.row(
+        independent,
+        gap_box,
+        dependent,
+        align="start",
+        width="fill",
+        padding=("0px", "30px"),
+    )
     scope_tag = note(scene, text="Ámbito", size="15px")
     domain = L.box("edificaciones de", font_size="22px", color=INK_SOFT)
     scope = L.row(scope_tag, domain, concepts["alba"], gap="14px", align="center")
-    roles_rule = hairline(scene)
-    footer = L.column(scope, roles_rule, roles, gap="22px", width="fill")
     hyp_tag = note(scene, text="Hipótesis", color=STEEL, size="18px")
     hyp_rule = hairline(scene)
-    heading = L.row(hyp_tag, hyp_rule, gap="18px", align="center", width="fill")
+    heading = L.row(
+        hyp_tag,
+        hyp_rule,
+        scope.item(shrink=0),
+        gap="18px",
+        align="center",
+        width="fill",
+    )
 
     page(
         scene,
         body=[
             L.column(goal_tag, objective, gap="22px", width="fill"),
-            L.column(heading, chain, footer, gap="28px", width="fill"),
+            L.column(
+                heading,
+                L.column(chain, roles, gap="30px", width="fill"),
+                gap="46px",
+                width="fill",
+            ),
         ],
         top="160px",  # más alto que el resto: el objetivo y la hipótesis lo llenan
-        gap="60px",
+        gap="56px",
     )
+    # Causa y efecto como dos tarjetas: cada una abarca su lado y su variable.
+    pad = 0.25  # 30 px, lo que se metió el contenido
+    sides = [
+        (cause.bounds(), independent.bounds()),
+        (effect.bounds(), dependent.bounds()),
+    ]
+    card_top = max(a.top for a, _ in sides) + pad
+    card_bottom = min(b.bottom for _, b in sides) - pad
+    cards = [
+        panel(
+            scene,
+            min(a.left, b.left) - pad,
+            card_top,
+            max(a.right, b.right) - min(a.left, b.left) + 2 * pad,
+            card_top - card_bottom,
+            fill=CARD,
+            border=RULE,
+            anchor=Anchor.TOP_LEFT,
+        ).z_index(-1)
+        for a, b in sides
+    ]
     # Medir antes del primer play: recién maquetadas, las cajas se miden solas;
     # después, cada bounds() recompila toda la presentación hasta aquí.
     obj_bounds = {name: box.bounds() for name, box in obj_keys.items()}
@@ -310,6 +350,7 @@ def purpose(scene: Scene) -> None:
             *[box.animate.opacity(0.35).duration(0.5) for box in obj_words],
             hyp_tag.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.4),
             hyp_rule.animate.grow_from_edge(Direction.LEFT).duration(0.6),
+            *[card.animate.fade_in().duration(0.5) for card in cards],
         )
     )
     travel: list[Playable] = []
@@ -371,7 +412,6 @@ def purpose(scene: Scene) -> None:
     # normativo (efecto esperado).
     scene.play(
         stagger(
-            roles_rule.animate.grow_from_edge(Direction.LEFT).duration(0.5),
             enter(independent, direction=Direction.UP, duration=0.35, each=0.08),
             enter(dependent, direction=Direction.UP, duration=0.35, each=0.08),
             each=0.35,
@@ -420,9 +460,9 @@ def specific(scene: Scene) -> None:
         scene,
         body=[
             # La fila toma todo el alto de la página: el producto baja al pie.
-            scene.layout.row(
-                *cards, gap="32px", align="stretch", width="fill"
-            ).item(grow=1),
+            scene.layout.row(*cards, gap="32px", align="stretch", width="fill").item(
+                grow=1
+            ),
         ],
         top="160px",
         gap="48px",

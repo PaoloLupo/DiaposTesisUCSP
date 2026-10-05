@@ -1,7 +1,9 @@
 """Bloque 8 · Conclusiones: objetivos, hallazgos, alcance y cierre."""
 
 from gaanim import (
+    Anchor,
     Direction,
+    Drawable,
     Scene,
     Section,
     SectionStep,
@@ -9,32 +11,36 @@ from gaanim import (
     stagger,
 )
 
+from tesis.app import thesis_image
 from tesis.building import draw_plan, grow_walls
 from tesis.components import (
-    column_list,
     enter,
+    finding_card,
     header,
     numbered_row,
     page,
     source,
-    stat_card,
     takeaway,
 )
 from tesis.data.thesis import (
     DRIFTS,
-    SEISMIC_FORCES,
-    SEISMIC_WEIGHT,
-    crack_failures,
     relative,
 )
 from tesis.kit import LEFT_EDGE, t
 from tesis.theme import (
     BRICK,
+    BRICK_SOFT,
+    CARD,
+    CONCRETE,
+    CONCRETE_SOFT,
     DISPLAY,
-    FAIL,
+    GOLD,
     INK,
     INK_SOFT,
+    MONO,
     MUTED,
+    PAPER_DEEP,
+    RULE,
     STEEL,
 )
 
@@ -58,7 +64,7 @@ OBJECTIVES = [
     ),
     (
         "Evaluar",
-        "En el caso, el modelo completo permitió extraer y organizar fuerzas, masas y\n"
+        "En el caso, el modelo completo permitió extraer y organizar fuerzas y\n"
         "deformaciones; la idealización cambia resultados y diagnósticos.",
     ),
 ]
@@ -88,108 +94,242 @@ def objectives(scene: Scene) -> None:
     scene.stop("objetivos-cumplidos")
 
 
+def _mesh_wall(scene: Scene) -> Drawable:
+    """Muro confinado como área con malla; al lado, apagada, la barra que lo idealiza."""
+    g = scene.geometry
+    w, h, c = 1.45, 1.35, 0.13
+    parts: list[Drawable] = [g.rect(w, h).fill(BRICK_SOFT).no_stroke()]
+    parts += [
+        g.line(-w / 2 + w * i / 6, -h / 2, -w / 2 + w * i / 6, h / 2).stroke(
+            BRICK, 0.012
+        )
+        for i in range(1, 6)
+    ]
+    parts += [
+        g.line(-w / 2, -h / 2 + h * j / 5, w / 2, -h / 2 + h * j / 5).stroke(
+            BRICK, 0.012
+        )
+        for j in range(1, 5)
+    ]
+    parts += [
+        g.rect(c, h + c)
+        .fill(CONCRETE_SOFT)
+        .stroke(CONCRETE, 0.014)
+        .move_to(side * (w + c) / 2, c / 2)
+        for side in (-1, 1)
+    ]
+    parts.append(
+        g.rect(w, c).fill(CONCRETE_SOFT).stroke(CONCRETE, 0.014).move_to(0, (h + c) / 2)
+    )
+    bar = w / 2 + c + 0.5
+    parts.append(g.line(bar, -h / 2, bar, h / 2 + c / 2).stroke(RULE, 0.05))
+    parts.append(
+        g.line(bar - 0.28, h / 2 + c / 2, bar + 0.28, h / 2 + c / 2).stroke(RULE, 0.09)
+    )
+    return g.group(parts)
+
+
+def _directional(scene: Scene) -> Drawable:
+    """Planta con el sismo en X al 100 % y en Y al 30 %."""
+    g = scene.geometry
+    w, h = 2.3, 1.25
+    origin = (-0.55, -0.2)
+    x_tip, y_tip = origin[0] + 1.45, origin[1] + 0.44
+    return g.group(
+        [
+            g.rect(w, h).fill(PAPER_DEEP).stroke(RULE, 0.014),
+            g.arrow(*origin, x_tip, origin[1], head_length=0.16, head_width=0.16)
+            .fill(STEEL)
+            .no_stroke(),
+            g.arrow(*origin, origin[0], y_tip, head_length=0.14, head_width=0.14)
+            .fill(STEEL)
+            .no_stroke()
+            .opacity(0.55),
+            t(
+                scene,
+                "100 %",
+                x_tip,
+                origin[1] + 0.12,
+                font=MONO,
+                size=0.17,
+                color=STEEL,
+                anchor=Anchor.BOTTOM_RIGHT,
+            ),
+            t(
+                scene,
+                "30 %",
+                origin[0] + 0.1,
+                y_tip,
+                font=MONO,
+                size=0.17,
+                color=STEEL,
+                anchor=Anchor.LEFT,
+            ),
+        ]
+    )
+
+
+def _drift_bars(scene: Scene, share: float) -> Drawable:
+    """Deriva con la sección mínima actual frente a columnas de 0.25 m."""
+    g = scene.geometry
+    tall, width, gap = 1.45, 0.5, 0.4
+    short = tall * share
+    base = -0.65
+    left, right = -(width + gap) / 2, (width + gap) / 2
+    return g.group(
+        [
+            g.rect(width, tall)
+            .fill(CONCRETE_SOFT)
+            .no_stroke()
+            .move_to(left, base + tall / 2),
+            g.rect(width, short)
+            .fill(STEEL)
+            .no_stroke()
+            .move_to(right, base + short / 2),
+            g.dashed_line(
+                left - width / 2,
+                base + tall,
+                right + width / 2,
+                base + tall,
+                dash_length=0.06,
+                gap_length=0.05,
+            ).stroke(MUTED, 0.012),
+            g.arrow(
+                right,
+                base + tall - 0.02,
+                right,
+                base + short + 0.06,
+                head_length=0.12,
+                head_width=0.13,
+            )
+            .fill(STEEL)
+            .no_stroke(),
+            g.line(left - width, base, right + width, base).stroke(INK_SOFT, 0.014),
+            t(
+                scene,
+                "E.070",
+                left,
+                base - 0.1,
+                size=0.15,
+                color=MUTED,
+                anchor=Anchor.TOP,
+            ),
+            t(
+                scene,
+                "0.25 m",
+                right,
+                base - 0.1,
+                size=0.15,
+                color=STEEL,
+                anchor=Anchor.TOP,
+            ),
+        ]
+    )
+
+
 def findings(scene: Scene) -> None:
     header(scene, KICKER, "Lo que muestra el caso: idealización, norma y criterio")
-    weight_gap = relative(SEISMIC_WEIGHT[0], SEISMIC_WEIGHT[1])
-    force_gap = max(
-        relative(SEISMIC_FORCES["MCT"][i], SEISMIC_FORCES["MSTA"][i]) for i in range(4)
-    )
-    drift_gap = relative(DRIFTS["X"]["MCT"][3], DRIFTS["X"]["MSTA"][3])
+    # Solo lo escrito en las Conclusiones; el 22.61 % sale de la Tabla 52.
     norm_gap = relative(DRIFTS["X"]["MSTA"][2], DRIFTS["X"]["MSTO"][2])
-    cracks = len(crack_failures("MSTA"))
     tiles = [
+        (_mesh_wall(scene), "MCT", "menos conservador\ny más detallado", BRICK),
+        (_directional(scene), "E.030", "más exigente\nque la de 2003", STEEL),
         (
-            f"{weight_gap:.2f} %",
-            "peso sísmico MSTA vs MCT",
-            f"y fuerzas por nivel con\nvariación ≤ {force_gap:.2f} %",
-            BRICK,
-        ),
-        (
-            f"{drift_gap:.2f} %",
-            "menos deriva con MCT",
-            "el modelo de áreas evita\nconservadurismo innecesario",
-            BRICK,
-        ),
-        (
-            f"{norm_gap:.2f} %",
-            "menos deriva por columnas\nde 0.25 m (propuesta E.070)",
-            "compensa la mayor exigencia\nde la E.030 vigente",
+            _drift_bars(scene, 1 - norm_gap / 100),
+            f"−{norm_gap:.2f} %",
+            "deriva con columnas\nde 0.25 m",
             STEEL,
         ),
         (
-            f"{cracks} de 24",
-            "muros de MSTA fallan\nfisuración en el piso 1",
-            "con MCT, ninguno: el\ndiagnóstico depende del modelo",
-            FAIL,
+            scene.media.image(
+                thesis_image("cap7/ui_alba.png"), width=2.8, height=2.0, fit="contain"
+            ),
+            "Alba",
+            "apoyo de código\nlibre",
+            BRICK,
         ),
     ]
     cards = [
-        stat_card(scene, value=big, title=head, detail=body, color=color)
-        for big, head, body, color in tiles
+        finding_card(scene, picture=picture, value=value, text=text, color=color)
+        for picture, value, text, color in tiles
     ]
     quote = takeaway(
-        scene,
-        text="El criterio del ingeniero sigue siendo el factor determinante: Alba es una "
-        "herramienta de apoyo, de código libre, para extraer, verificar y documentar.",
+        scene, text="El criterio del ingeniero sigue siendo el factor determinante"
     )
     page(
         scene,
         body=[
-            scene.layout.row(*cards, gap="32px", align="stretch", width="fill"),
+            scene.layout.row(
+                *cards, gap="28px", align="stretch", width="fill", height="fill"
+            ),
             quote,
         ],
-        gap="56px",
+        gap="36px",
     )
     for card in cards:
         scene.play(
             enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08)
         )
     scene.play(enter(quote, direction=Direction.UP, duration=0.5, each=0.1))
-    source(
-        scene,
-        "Tesis · Tablas 50, 51 y 52, pp. 129–131; Tabla 36, p. 87; Conclusiones, p. 135",
-    )
+    source(scene, "Tesis · Conclusiones, pp. 135–136 · Tabla 52, p. 131")
     scene.stop("hallazgos")
 
 
-LIMITS = [
-    "Requiere un modelo de ETABS ya elaborado y analizado",
-    "Depende de etiquetas Pier únicas y bien asignadas",
-    "No modifica el modelo: el ingeniero decide los cambios",
-    "Un confinamiento en T o L no puede pertenecer a dos Pier",
-    "Un solo caso de estudio: resultados no generalizables",
-]
-FUTURE = [
-    "Diseño automático de los elementos de confinamiento",
-    "Asignación de fuerzas en intersecciones T y L",
-    "Análisis no lineal con macromodelos de albañilería",
-    "Redes neuronales para detectar irregularidades en planta",
-    "Mantener Alba al día con el RNE y usarlo en docencia",
+# Las siete recomendaciones (p. 137), agrupadas por a quién le toca continuar.
+RECOMMENDATIONS = [
+    ("Modelamiento", STEEL, "Modelos completos con elementos área"),
+    ("Modelamiento", STEEL, "Fuerzas en uniones T y L"),
+    ("Modelamiento", STEEL, "Análisis no lineal con macromodelos"),
+    ("Alba", BRICK, "Diseño de confinamientos en Alba"),
+    ("Alba", BRICK, "Código libre al día con el RNE"),
+    ("Nuevos usos", GOLD, "CNN para irregularidades en planta"),
+    ("Nuevos usos", GOLD, "Alba como recurso docente"),
 ]
 
 
 def outlook(scene: Scene) -> None:
-    header(scene, KICKER, "Alcance actual y líneas de continuidad")
-    limits = column_list(scene, title="Limitaciones", items=LIMITS, color=STEEL)
-    future = column_list(
-        scene, title="Recomendaciones y trabajo futuro", items=FUTURE, color=BRICK
+    header(scene, KICKER, "La investigación deja siete líneas para continuar")
+    L = scene.layout
+    tiles = [
+        L.column(
+            L.box(width="fill", height="5px", background=color),
+            L.box(f"{i + 1}", font=DISPLAY, font_size="76px", weight=700, color=color),
+            L.box(text, font_size="29px", weight=700, color=INK).item(grow=1),
+            L.box(
+                group.upper(),
+                font_size="16px",
+                weight=900,
+                color=color,
+                letter_spacing=0.03,
+            ),
+            gap="16px",
+            padding=("28px", "30px"),
+            background=CARD,
+            border=RULE,
+            border_width="2px",
+            width="fill",
+            height="fill",
+        ).item(grow=1)
+        for i, (group, color, text) in enumerate(RECOMMENDATIONS)
+    ]
+    rows = [
+        L.row(*tiles[:4], gap="28px", align="stretch", width="fill").item(grow=1),
+        L.row(*tiles[4:], gap="28px", align="stretch", width="fill").item(grow=1),
+    ]
+    page(scene, body=rows, gap="28px")
+    scene.play(
+        stagger(
+            *[
+                enter(
+                    tile, direction=Direction.UP, distance=0.08, duration=0.3, each=0.05
+                )
+                for tile in tiles
+            ],
+            each=0.12,
+        )
     )
-    page(
-        scene,
-        body=[
-            scene.layout.row(limits, future, gap="60px", align="start", width="fill")
-        ],
-        top="230px",
-    )
-    scene.play(enter(limits, each=0.06, duration=0.3))
-    scene.stop("alcance-limites")
-    scene.play(enter(future, each=0.06, duration=0.3))
-    scene.stop("alcance-futuro")
-    source(
-        scene,
-        "Tesis · Tabla 49, p. 125; §8.2.4, p. 132; Recomendaciones, p. 137",
-    )
-    scene.stop("alcance-fuente")
+    source(scene, "Tesis · Recomendaciones, p. 137")
+    scene.stop("recomendaciones")
 
 
 def closing(scene: Scene) -> None:
@@ -265,21 +405,24 @@ SECTION = Section(
             build=findings,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. Cifras de respaldo: peso 1.04 % y Fi ≤ 2.14 % entre MCT y MSTA; derivas de MCT "
-                "hasta 13.65 % menores; las columnas de 0.25 m (propuesta E.070) reducen derivas hasta "
-                "22.61 % frente a MSTO; 7 de 24 muros de MSTA no cumplen fisuración en el piso 1 y "
-                "ninguno en MCT. Cerrar con el rol del criterio del ingeniero."
+                "1 min. Lo que dicen las Conclusiones (pp. 135–136). (1) El MCT reduce "
+                "conservadurismo innecesario y da más detalle: las áreas reparten mejor la carga de "
+                "losa y cuentan el aporte de los muros ortogonales. (2) La E.030 vigente es más "
+                "rigurosa que la de 2003: combinación direccional 100 % + 30 % y factores sísmicos "
+                "mayores. (3) Las columnas de 0.25 m de la propuesta E.070 reducen las derivas hasta "
+                "22.61 % y neutralizan esa exigencia. (4) Alba es una herramienta de apoyo de código "
+                "libre. Cerrar con el criterio del usuario como factor determinante."
             ),
         ),
         SectionStep(
-            name="Conclusiones · alcance y futuro",
+            name="Conclusiones · recomendaciones",
             build=outlook,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. Limitaciones de la implementación (Tabla 49, p. 125) y del estudio (un "
-                "caso). Recomendaciones (p. 137): diseño de confinamientos, intersecciones T/L, "
-                "análisis no lineal, CNN para irregularidades, mantenimiento del código libre y uso "
-                "educativo."
+                "45 s. Recomendaciones (p. 137): modelos completos con elementos área, fuerzas en "
+                "intersecciones T y L (un confinamiento solo puede tener una etiqueta Pier), diseño "
+                "de confinamientos en Alba, mantenimiento del código libre con el RNE, análisis no "
+                "lineal con macromodelos, CNN para irregularidades en planta y uso educativo."
             ),
         ),
         SectionStep(

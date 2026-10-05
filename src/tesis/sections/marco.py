@@ -61,66 +61,76 @@ from tesis.theme import (
 KICKER = "05 · Marco de trabajo"
 
 
+KEY_PROCESS = [
+    "Se repite en cada iteración",
+    "Muchos datos iguales",
+    "Riesgo de transcripción",
+    "Criterio normativo explícito",
+    "Alimenta la revisión",
+]
+ROLE_ROW = "118px"
+
+
 def scope(scene: Scene) -> None:
-    header(
-        scene,
-        KICKER,
-        "Se automatiza lo repetitivo; decide el ingeniero",
-    )
+    header(scene, KICKER, "Se automatiza lo repetitivo")
     L = scene.layout
     criteria = L.column(
         note(scene, text="Un proceso es clave si…"),
-        # Los criterios completan el rótulo, en gris para no competir con la tabla.
-        L.box(
-            "se repite en cada iteración, maneja muchos datos iguales, expone a errores "
-            "de transcripción, aplica un criterio normativo explícito y alimenta la "
-            "revisión del ingeniero.",
-            font_size="28px",
-            color=INK_SOFT,
-            width="90%",
+        L.row(
+            *[
+                L.box(
+                    text,
+                    font_size="25px",
+                    color=INK,
+                    background=PAPER_DEEP,
+                    padding=("10px", "18px"),
+                )
+                for text in KEY_PROCESS
+            ],
+            gap="14px",
+            width="fill",
         ),
-        gap="14px",
+        gap="16px",
         width="fill",
     )
     engineer = role_column(
         scene,
         title="Ingeniero estructural",
         color=STEEL,
+        row_height=ROLE_ROW,
         rows=[
             ("Estructura", "define la distribución de muros"),
             ("Modela y analiza", "construye el modelo en ETABS"),
             ("Interpreta", "lee diagnósticos y resultados"),
-            ("Decide", "modifica muros, espesores o materiales"),
+            ("Decide", "cambia muros o materiales"),
         ],
     )
     alba = role_column(
         scene,
         title="Marco de trabajo · Alba",
         color=BRICK,
+        row_height=ROLE_ROW,
         rows=[
-            ("Extracción", "lee y valida datos del modelo por API"),
+            ("Extracción", "lee y valida el modelo por API"),
             ("Verificación", "ejecuta los módulos E.070 y E.030"),
-            ("Retroalimentación", "señala muro, piso, dirección y valores"),
+            ("Retroalimentación", "señala muro, piso y dirección"),
             ("Reporte", "documenta la iteración en PDF"),
         ],
     )
     # Estructura → Extracción y Retroalimentación → Interpreta.
     gutter = arrow_gutter(
-        scene, slots=[("modelo", True), None, ("diagnóstico", False), None]
+        scene,
+        slots=[("modelo", True), None, ("diagnóstico", False), None],
+        row_height=ROLE_ROW,
     )
     table = L.row(engineer, gutter, alba, gap="24px", width="fill")
-    closing = takeaway_box(
-        scene,
-        text="El marco no genera la estructuración ni modifica el modelo: asiste la evaluación",
-    )
-    page(scene, body=[criteria, table, closing], gap="44px", top="200px")
+    page(scene, body=[criteria, table], gap="56px", top="200px")
     scene.play(enter(criteria))
     scene.stop("criterios-procesos-clave")
 
     scene.play(enter(engineer, each=0.05, duration=0.3))
     scene.play(enter(alba, each=0.05, duration=0.3))
     scene.play(enter(gutter, each=0.15, duration=0.4))
-    scene.play(enter(closing))
     source(
         scene,
         "Tesis · §6.1 Procesos clave para la automatización, p. 98; §6.1.3 Evaluación de cumplimiento, p. 100",
@@ -214,16 +224,67 @@ def general_flow(scene: Scene) -> None:
     )
     p7 = io(scene, 1.8, y3, 2.55, 0.72, "Generar reporte PDF", size=0.19)
     t8 = terminal(scene, 4.35, y3, "Fin", w=0.9)
+    # Aviso del dato ausente: símbolo, rótulo y dos líneas cortas, en una caja a su
+    # medida; el texto va encima de la caja, que se crea después de medirlo.
+    dx, dy = -6.7, -0.6
+    warn = scene.geometry.group(
+        [
+            scene.geometry.circle(0.17)
+            .no_fill()
+            .stroke(FAIL, 0.03)
+            .move_to(dx + 0.17, dy - 0.15),
+            t(
+                scene,
+                "!",
+                dx + 0.17,
+                dy - 0.15,
+                size=0.22,
+                weight=900,
+                color=FAIL,
+                anchor=Anchor.CENTER,
+            ),
+        ]
+    ).z_index(1)
+    diag_lines = [
+        t(
+            scene,
+            "Dato ausente o incompatible",
+            dx + 0.5,
+            dy,
+            size=0.19,
+            weight=900,
+            color=FAIL,
+        ),
+        t(
+            scene,
+            "diagnóstico: se detiene el módulo",
+            dx + 0.5,
+            dy - 0.36,
+            size=0.17,
+            color=INK_SOFT,
+        ),
+        t(
+            scene,
+            "no es un incumplimiento",
+            dx + 0.5,
+            dy - 0.64,
+            size=0.17,
+            weight=700,
+            color=INK,
+        ),
+    ]
+    for line in diag_lines:
+        line.z_index(1)
+    diag_right = max(line.bounds().right for line in diag_lines) + 0.25
     diag = panel(
-        scene, -6.95, -0.35, 3.45, 1.3, fill=CARD, border=RULE, anchor=Anchor.TOP_LEFT
-    )
-    diag_t = t(
         scene,
-        "Dato ausente o incompatible:\nse emite un diagnóstico y se\ndetiene el módulo afectado.\nNo es un incumplimiento.",
-        -6.75,
-        -0.5,
-        size=0.16,
-        color=INK_SOFT,
+        dx - 0.25,
+        dy + 0.25,
+        diag_right - dx + 0.25,
+        1.3,
+        fill=CARD,
+        border=RULE,
+        anchor=Anchor.TOP_LEFT,
     )
     links = [
         link(scene, (-6.27, y1), (-5.95, y1)),
@@ -238,7 +299,7 @@ def general_flow(scene: Scene) -> None:
     no = link(scene, (1.8, y2 - 0.68), (1.8, y3 + 0.37))
     end = link(scene, (3.1, y3), (3.88, y3))
     to_diag = scene.geometry.dashed_line(
-        -1.9, y1 - 0.5, -3.55, -0.35, dash_length=0.07, gap_length=0.05
+        -1.9, y1 - 0.5, diag_right, dy + 0.25, dash_length=0.07, gap_length=0.05
     ).stroke(MUTED, 0.014)
     yes_t = t(
         scene,
@@ -279,8 +340,9 @@ def general_flow(scene: Scene) -> None:
         stagger(
             to_diag.animate.create().duration(0.4),
             diag.animate.fade_in().duration(0.3),
-            diag_t.animate.fade_in().duration(0.3),
-            each=0.15,
+            warn.animate.fade_in().duration(0.3),
+            *[line.animate.fade_in().duration(0.3) for line in diag_lines],
+            each=0.12,
         )
     )
     scene.stop("flujo-importacion")

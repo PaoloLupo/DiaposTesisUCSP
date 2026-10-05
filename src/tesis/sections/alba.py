@@ -21,10 +21,8 @@ from tesis.components import (
     hairline,
     header,
     module_card,
-    note,
     panel,
     source,
-    takeaway_at,
 )
 from tesis.components import page as page_column
 from tesis.diagram import link
@@ -33,7 +31,6 @@ from tesis.theme import (
     BRICK,
     BRICK_DEEP,
     BRICK_SOFT,
-    CARD,
     DISPLAY,
     INK,
     INK_SOFT,
@@ -61,10 +58,16 @@ def architecture(scene: Scene) -> None:
     header(
         scene, KICKER, "Alba organiza el marco en seis módulos, del modelo al reporte"
     )
-    x0, w, h, gap, top = -2.55, 5.4, 0.6, 0.16, 2.3
+    x0, w, h, gap, top = -2.55, 5.4, 0.72, 0.27, 2.25
     cards = [
         module_card(
-            scene, number=i + 1, name=name, tag=tech, core=i >= 2, highlight=i == 4
+            scene,
+            number=i + 1,
+            name=name,
+            tag=tech,
+            core=i >= 2,
+            highlight=i == 4,
+            height=f"{h * 120:.0f}px",
         )
         for i, (name, tech) in enumerate(MODULES)
     ]
@@ -178,11 +181,6 @@ def architecture(scene: Scene) -> None:
     ]
     scene.play(sequence(*[token.animate.move_to(x, y).duration(0.4) for x, y in path]))
     scene.play(token.animate.fade_out().duration(0.2))
-    takeaway_at(
-        scene,
-        "Cada diagrama de flujo del capítulo 6 es una rutina del módulo 5",
-        y=-2.95,
-    )
     source(scene, "Tesis · Figura 50, p. 118 y Tabla 46, p. 115")
     scene.stop("arquitectura-flujo")
 
@@ -268,11 +266,11 @@ def api(scene: Scene) -> None:
                     width="fill",
                 ),
                 hairline(scene, color="#E9E4DA"),
-                gap="12px",
+                gap="16px",
                 width="fill",
             )
         )
-    table = L.column(*call_rows, gap="12px", width="fill")
+    table = L.column(*call_rows, gap="22px", width="fill")
     closing = L.box(
         "Antes de leer: ¿hay una instancia abierta y el modelo está analizado? Si falta algo, "
         "la consola lo advierte y no se calcula.",
@@ -346,7 +344,7 @@ def interface(scene: Scene) -> None:
     header(scene, KICKER, "La interfaz sigue las etapas del marco de trabajo")
     # La captura queda a la izquierda como mapa; a la derecha, una pantalla que toma
     # la proporción de cada zona la muestra entera.
-    width = 6.8
+    width = 4.6
     s = width / 1920
     height = 1032 * s
     x_left, y_top = LEFT_EDGE + 0.3, 2.5
@@ -518,7 +516,7 @@ def report(scene: Scene) -> None:
         LEFT_EDGE,
         2.4,
         7.4,
-        3.4,
+        3.9,
         fill="#FFFFFF",
         border=RULE,
         anchor=Anchor.TOP_LEFT,
@@ -526,15 +524,15 @@ def report(scene: Scene) -> None:
     fragment = scene.media.image(
         thesis_image("cap7/resultado_typst.png"),
         width=7.0,
-        height=3.0,
+        height=3.5,
         fit="contain",
         quality="high",
-    ).move_to(LEFT_EDGE + 3.7, 0.7)
+    ).move_to(LEFT_EDGE + 3.7, 0.45)
     cap1 = t(
         scene,
         "Fragmento del PDF generado por Alba",
         LEFT_EDGE,
-        -1.1,
+        -1.6,
         size=0.17,
         color=MUTED,
     )
@@ -543,7 +541,7 @@ def report(scene: Scene) -> None:
         0.55,
         2.4,
         6.75,
-        3.4,
+        3.9,
         fill="#23262E",
         border=None,
         anchor=Anchor.TOP_LEFT,
@@ -562,9 +560,9 @@ def report(scene: Scene) -> None:
                     scene,
                     line.replace("$", "\\$"),
                     0.8,
-                    2.12 - i * 0.3,
+                    2.1 - i * 0.36,
                     font=MONO,
-                    size=0.15,
+                    size=0.17,
                     color=color,
                 )
             )
@@ -572,7 +570,7 @@ def report(scene: Scene) -> None:
         scene,
         "Plantilla Typst: los valores llegan desde un JSON",
         0.55,
-        -1.1,
+        -1.6,
         size=0.17,
         color=MUTED,
     )
@@ -610,32 +608,91 @@ def report(scene: Scene) -> None:
                 scene.geometry.arrow(0, 0, 0.4, 0).fill(MUTED).no_stroke()
             )
     chain = L.row(*chain_items, gap="16px", align="center", width="fill")
-    sections = [
-        "Datos de diseño",
-        "Requisitos mínimos",
-        "Carga vertical",
-        "Análisis sísmico",
-        "Sismo moderado",
-        "Información del modelo",
-    ]
-    section_chips = L.column(
-        note(scene, text="Secciones del reporte"),
-        L.row(
-            *[
-                chip(scene, text=name, background=CARD, border=RULE, font="Lato")
-                for name in sections
-            ],
-            gap="16px",
-            width="fill",
-        ),
-        gap="14px",
-        width="fill",
-    )
-    page_column(scene, body=[chain, section_chips], top="700px", gap="44px")
+    page_column(scene, body=[chain], top="790px")
     scene.play(enter(chain, each=0.08, duration=0.3))
-    scene.play(enter(section_chips, each=0.06, duration=0.25))
-    source(scene, "Tesis · Figuras 48 y 49, pp. 116–117; Tabla 48, p. 124")
-    scene.stop("reporte-estructura")
+    source(scene, "Tesis · Figuras 48 y 49, pp. 116–117")
+    scene.stop("reporte-cadena")
+
+
+# Recortes de assets/reporte (tools/render_report.py): una página por sección.
+REPORT_PARTS = [
+    ("datos", "Datos de diseño"),
+    ("requisitos", "Requisitos mínimos"),
+    ("carga-vertical", "Carga vertical"),
+    ("sismico", "Análisis sísmico"),
+    ("sismo-moderado", "Sismo moderado"),
+    ("modelo", "Información del modelo"),
+]
+
+
+def report_parts(scene: Scene) -> None:
+    header(scene, KICKER, "El reporte del caso reúne seis partes en 21 páginas")
+    L = scene.layout
+    cover = L.box(
+        scene.media.image(
+            "reporte/portada.png",
+            width=3.95,
+            height=5.59,
+            fit="contain",
+            quality="high",
+        ),
+        background="#FFFFFF",
+        border=RULE,
+        border_width="2px",
+    ).item(shrink=0)
+    cells = [
+        L.column(
+            L.row(
+                L.box(
+                    f"{i + 1}", font=DISPLAY, font_size="34px", weight=700, color=BRICK
+                ),
+                L.box(name, font_size="24px", weight=900, color=INK),
+                gap="12px",
+                align="center",
+            ),
+            L.box(
+                scene.media.image(
+                    f"reporte/{image}.png",
+                    width=3.18,
+                    height=2.385,
+                    fit="contain",
+                    quality="high",
+                ),
+                background="#FFFFFF",
+                border=RULE,
+                border_width="2px",
+            ),
+            gap="8px",
+        )
+        for i, (image, name) in enumerate(REPORT_PARTS)
+    ]
+    grid = L.column(
+        L.row(*cells[:3], gap="36px"),
+        L.row(*cells[3:], gap="36px"),
+        gap="30px",
+    )
+    page_column(
+        scene,
+        body=[L.row(cover, grid, gap="48px", align="start", width="fill")],
+        top="190px",
+    )
+    scene.play(cover.animate.fade_in_from(Direction.UP, 0.08).duration(0.5))
+    scene.play(
+        stagger(
+            *[
+                enter(
+                    cell, direction=Direction.UP, distance=0.08, duration=0.3, each=0.1
+                )
+                for cell in cells
+            ],
+            each=0.12,
+        )
+    )
+    source(
+        scene,
+        "Tesis · Anexo: reporte automatizado del modelo ejemplo · secciones de la Tabla 48, p. 124",
+    )
+    scene.stop("reporte-partes")
 
 
 SECTION = Section(
@@ -680,9 +737,20 @@ SECTION = Section(
             build=report,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "45 s. Python procesa y exporta un JSON; la plantilla Typst compone el PDF con fórmulas, "
+                "30 s. Python procesa y exporta un JSON; la plantilla Typst compone el PDF con fórmulas, "
                 "tablas, referencias normativas y capturas. El fragmento corresponde a la densidad "
-                "mínima (0.032) del caso. Secciones según Tabla 48 (p. 124)."
+                "mínima (0.032) del caso."
+            ),
+        ),
+        SectionStep(
+            name="Alba · partes del reporte",
+            build=report_parts,
+            transition=Transition.cross_fade(0.45),
+            notes=(
+                "30 s. El reporte real del caso (anexo, 21 páginas) con sus seis secciones de la "
+                "Tabla 48 (p. 124): datos de diseño, requisitos mínimos (espesor y densidad), carga "
+                "vertical (esfuerzo axial), análisis sísmico (peso, modos, fuerzas y derivas), sismo "
+                "moderado (fisuración y corte global) e información del modelo y la versión de Alba."
             ),
         ),
     ],

@@ -13,6 +13,7 @@ from gaanim import (
     Color,
     Direction,
     Drawable,
+    Easing,
     Playable,
     RollingNumber,
     Scene,
@@ -58,6 +59,7 @@ from tesis.data.thesis import (
 from tesis.kit import LEFT_EDGE, dimension, label, status, t
 from tesis.theme import (
     BRICK,
+    BRICK_DEEP,
     BRICK_SOFT,
     CARD,
     CONCRETE,
@@ -68,6 +70,7 @@ from tesis.theme import (
     INK_SOFT,
     MONO,
     MUTED,
+    PAPER,
     PASS,
     RULE,
     STEEL,
@@ -183,7 +186,10 @@ def density_check(scene: Scene) -> None:
     groups = [
         (legend(LEFT_EDGE + 0.2, BRICK, "Muros en X"), masonry_x),
         (legend(LEFT_EDGE + 2.3, STEEL, "Muros en Y"), plan.by_direction("Y")),
-        (legend(LEFT_EDGE + 4.4, CONCRETE, "Placas de Concreto (X2)"), plan.instances("X2")),
+        (
+            legend(LEFT_EDGE + 4.4, CONCRETE, "Placas de Concreto (X2)"),
+            plan.instances("X2"),
+        ),
     ]
     for items, walls in groups:
         scene.play(
@@ -399,7 +405,10 @@ def density_check(scene: Scene) -> None:
             )
             scene.play(
                 [
-                    *[g.animate.grow_from_edge(Direction.DOWN).duration(0.6) for g in ghosts],
+                    *[
+                        g.animate.grow_from_edge(Direction.DOWN).duration(0.6)
+                        for g in ghosts
+                    ],
                     note.animate.fade_in().duration(0.4),
                 ]
             )
@@ -938,6 +947,255 @@ def drift(scene: Scene) -> None:
     scene.stop("deriva-lectura")
 
 
+# Estado del arte (cap. 3): dos líneas de investigación que la tesis une.
+# (año, autores, tema, carril). Arriba la albañilería confinada; abajo, la
+# automatización con Python y la API de ETABS.
+TIMELINE = [
+    (1982, "Primera norma", "diseño por esfuerzos admisibles", "alba"),
+    (1985, "Pastorutti · Echevarría", "refuerzo horizontal y columnas", "alba"),
+    (1997, "Zeballos et al.", "esbeltez con elementos finitos", "alba"),
+    (2004, "San Bartolomé et al.", "propuesta de diseño sísmico", "alba"),
+    (2006, "Norma E.070", "y el ejemplo de San Bartolomé", "alba"),
+    (2010, "San Bartolomé y Quiun", "diseño ante sismo severo", "alba"),
+    (2018, "González", "albañilería en ETABS", "alba"),
+    (2024, "Jara y Ñaupa", "pórticos frente a albañilería", "alba"),
+    (2019, "Sarvade y Pore", "Python para concreto armado", "auto"),
+    (2021, "Quraishi y Dhapekar", "Python en ingeniería civil", "auto"),
+    (2022, "Fernández", "redes neuronales para derivas", "auto"),
+    (2024, "Torres Carranza", "API ETABS + VBA · NSR-10", "auto"),
+    (2025, "Le et al. · Burga Mori", "API ETABS + VBA o Python", "auto"),
+]
+AXIS_Y = -0.25
+BREAK = 2016  # antes de este año el eje se comprime
+
+
+def _year_x(year: float) -> float:
+    if year <= BREAK:
+        return -6.5 + (year - 1980) * 5.3 / (BREAK - 1980)
+    return -1.2 + (year - BREAK) * 7.8 / (2026 - BREAK)
+
+
+def state_of_art(scene: Scene) -> None:
+    header(scene, KICKER, "Dos líneas de investigación que la tesis une")
+    g = scene.geometry
+    lanes = {"alba": BRICK, "auto": STEEL}
+    legend = [
+        t(
+            scene,
+            "●  Albañilería confinada",
+            LEFT_EDGE,
+            -2.75,
+            size=0.17,
+            weight=700,
+            color=BRICK,
+            anchor=Anchor.LEFT,
+        ),
+        t(
+            scene,
+            "●  Automatización y API de ETABS",
+            LEFT_EDGE,
+            -3.12,
+            size=0.17,
+            weight=700,
+            color=STEEL,
+            anchor=Anchor.LEFT,
+        ),
+    ]
+    x0, x_break, x1 = _year_x(1980), _year_x(BREAK), _year_x(2026)
+    axis_old = g.line(x0, AXIS_Y, x_break - 0.08, AXIS_Y).stroke(INK_SOFT, 0.025)
+    axis_new = (
+        g.arrow(
+            x_break + 0.08,
+            AXIS_Y,
+            x1 + 0.45,
+            AXIS_Y,
+            head_length=0.16,
+            head_width=0.16,
+            body_width=0.025,
+        )
+        .fill(INK_SOFT)
+        .no_stroke()
+    )
+    # Corte del eje: dos barras inclinadas donde cambia la escala.
+    cut = g.group(
+        [
+            g.line(
+                x_break - 0.14 + d, AXIS_Y - 0.12, x_break - 0.02 + d, AXIS_Y + 0.12
+            ).stroke(INK_SOFT, 0.025)
+            for d in (0.0, 0.12)
+        ]
+    )
+    ticks = [
+        t(
+            scene,
+            f"{year}",
+            _year_x(year),
+            AXIS_Y - 0.16,
+            font=MONO,
+            size=0.13,
+            color=MUTED,
+            anchor=Anchor.TOP,
+        )
+        for year in (1980, 1990, 2000, 2020)
+    ]
+
+    # Cada hito: punto en el eje, tallo y rótulo de dos líneas en el primer nivel
+    # libre de su lado; cerca del final del eje el rótulo crece hacia la izquierda.
+    # Desde 2016 la albañilería va arriba y la automatización abajo; antes solo hay
+    # albañilería y alterna de lado para no amontonarse.
+    levels = (0.6, 1.2, 1.8, 2.4)
+    taken: dict[tuple[int, int], list[tuple[float, float]]] = {}
+    # La tesis se queda con el tercer nivel de arriba, junto al final del eje.
+    taken[(1, 2)] = [(x1 - 2.9, x1 + 0.2)]
+    events: list[tuple[float, list[Drawable]]] = []
+    old = 0
+    for year, who, topic, lane in sorted(TIMELINE, key=lambda e: (e[0], e[3])):
+        color = lanes[lane]
+        if year < BREAK:
+            side = 1 if old % 2 == 0 else -1
+            old += 1
+        else:
+            side = 1 if lane == "alba" else -1
+        x = _year_x(year)
+        head = t(scene, f"{year} · {who}", 0, 0, size=0.165, weight=700, color=color)
+        body = t(scene, topic, 0, 0, size=0.15, color=INK_SOFT)
+        width = max(head.bounds().width, body.bounds().width)
+        # Nada cruza la columna de la tesis, al final del eje.
+        right = x + 0.05 + width > _year_x(2026) - 0.2
+        span = (x - width - 0.05, x + 0.05) if right else (x - 0.05, x + width + 0.05)
+        level = next(
+            k
+            for k in range(len(levels))
+            if all(
+                span[1] + 0.12 < a or span[0] - 0.12 > b
+                for a, b in taken.get((side, k), [])
+            )
+        )
+        taken.setdefault((side, level), []).append(span)
+        stem_end = AXIS_Y + side * levels[level]
+        anchor = (
+            (Anchor.BOTTOM_RIGHT if right else Anchor.BOTTOM_LEFT)
+            if side > 0
+            else (Anchor.TOP_RIGHT if right else Anchor.TOP_LEFT)
+        )
+        tx = x + 0.06 if right else x - 0.06
+        if side > 0:
+            body.move_to(tx, stem_end + 0.04, anchor)
+            head.move_to(tx, body.bounds().top + 0.04, anchor)
+        else:
+            head.move_to(tx, stem_end - 0.04, anchor)
+            body.move_to(tx, head.bounds().bottom - 0.04, anchor)
+        # Fondo del color del papel: los tallos que pasan detrás del rótulo se cortan.
+        top_y = max(head.bounds().top, body.bounds().top) + 0.04
+        bottom_y = min(head.bounds().bottom, body.bounds().bottom) - 0.04
+        left_x = min(head.bounds().left, body.bounds().left) - 0.06
+        right_x = max(head.bounds().right, body.bounds().right) + 0.06
+        knockout = (
+            g.rect(right_x - left_x, top_y - bottom_y)
+            .fill(PAPER)
+            .no_stroke()
+            .move_to((left_x + right_x) / 2, (top_y + bottom_y) / 2)
+            .z_index(1)
+        )
+        head.z_index(2)
+        body.z_index(2)
+        stem = g.line(x, AXIS_Y, x, stem_end).stroke(RULE, 0.018)
+        dot = g.circle(0.075).fill(color).no_stroke().move_to(x, AXIS_Y).z_index(3)
+        events.append((x, [dot, stem, knockout, head, body]))
+
+    def reveal(lo: float, hi: float, duration: float) -> list[Playable]:
+        """Barrido de lo a hi: cada hito aparece cuando el cursor pasa por su año."""
+        out: list[Playable] = []
+        for x, (dot, stem, knockout, head, body) in events:
+            if lo <= x < hi:
+                at = (x - lo) / (hi - lo) * duration
+                out += [
+                    dot.animate.fade_in().duration(0.2).delay(at),
+                    stem.animate.create().duration(0.25).delay(at),
+                    knockout.animate.fade_in().duration(0.2).delay(at + 0.05),
+                    head.animate.fade_in().duration(0.3).delay(at + 0.1),
+                    body.animate.fade_in().duration(0.3).delay(at + 0.15),
+                ]
+        return out
+
+    cursor = (
+        g.line(x0, AXIS_Y - 0.22, x0, AXIS_Y + 0.22).stroke(BRICK, 0.035).z_index(3)
+    )
+    scene.play(
+        [
+            *[item.animate.fade_in().duration(0.4) for item in legend],
+            axis_old.animate.create().duration(0.6),
+            *[tick.animate.fade_in().duration(0.3) for tick in ticks[:3]],
+        ]
+    )
+    sweep = 3.2
+    scene.play(
+        [
+            cursor.animate.fade_in().duration(0.2),
+            cursor.animate.move_to(x_break - 0.2, AXIS_Y)
+            .duration(sweep)
+            .easing(Easing.LINEAR),
+            *reveal(x0, x_break, sweep),
+        ]
+    )
+    scene.stop("estado-albanileria")
+
+    scene.play(
+        [
+            cut.animate.fade_in().duration(0.3),
+            axis_new.animate.grow_arrow().duration(0.6),
+            ticks[3].animate.fade_in().duration(0.3),
+            cursor.animate.move_to(x1 - 0.3, AXIS_Y)
+            .duration(sweep)
+            .easing(Easing.LINEAR),
+            *reveal(x_break, x1, sweep),
+        ]
+    )
+    scene.stop("estado-automatizacion")
+
+    # La tesis cruza los dos carriles al final del eje.
+    top = AXIS_Y + levels[2]
+    bridge = g.line(x1, AXIS_Y - 0.75, x1, top).stroke(BRICK, 0.04)
+    mark = g.circle(0.14).fill(BRICK).no_stroke().move_to(x1, AXIS_Y).z_index(3)
+    thesis_body = t(
+        scene,
+        "Alba: API ETABS + Python · E.070",
+        x1 + 0.06,
+        top + 0.04,
+        size=0.17,
+        color=BRICK_DEEP,
+        anchor=Anchor.BOTTOM_RIGHT,
+    )
+    thesis_head = t(
+        scene,
+        "2026 · Esta tesis",
+        x1 + 0.06,
+        thesis_body.bounds().top + 0.04,
+        size=0.2,
+        weight=900,
+        color=BRICK,
+        anchor=Anchor.BOTTOM_RIGHT,
+    )
+    scene.play(
+        [
+            cursor.animate.fade_out().duration(0.3),
+            mark.animate.fade_in().duration(0.3),
+            bridge.animate.create().duration(0.5),
+            thesis_head.animate.fade_in_from(Direction.DOWN, 0.06)
+            .duration(0.4)
+            .delay(0.3),
+            thesis_body.animate.fade_in_from(Direction.DOWN, 0.06)
+            .duration(0.4)
+            .delay(0.4),
+        ]
+    )
+    source(
+        scene,
+        "Tesis · cap. 3 Estado del arte, pp. 21–32 · Tabla 6, p. 32",
+    )
+    scene.stop("estado-tesis")
+
+
 SECTION = Section(
     "fundamentos",
     [
@@ -976,6 +1234,20 @@ SECTION = Section(
                 "divide entre h. El dibujo está exagerado y no es una solución FEM. Límite E.030 "
                 "para albañilería: 0.005. En el caso MCT la máxima es 0.00133 (Y, piso 3), 27 % "
                 "del límite (Tabla 52 (p. 131))."
+            ),
+        ),
+        SectionStep(
+            name="Fundamentos · estado del arte",
+            build=state_of_art,
+            transition=Transition.cross_fade(0.45),
+            notes=(
+                "45 s. Cap. 3 en una línea de tiempo. Arriba, décadas de investigación "
+                "experimental en albañilería confinada, casi toda de la PUCP: primera norma "
+                "(1982), refuerzo y columnas (1985), esbeltez con elementos finitos (1997), la "
+                "E.070 vigente y el ejemplo de San Bartolomé que es nuestro caso (2006). Abajo, "
+                "desde 2019 la automatización con Python y la API de ETABS (Tabla 6, p. 32): "
+                "vigas y columnas en Vietnam, irregularidades con la NSR-10, análisis sísmico "
+                "E.030. La tesis une ambas líneas: la API aplicada a la E.070."
             ),
         ),
     ],
