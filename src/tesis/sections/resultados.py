@@ -17,6 +17,7 @@ from gaanim import (
     stagger,
 )
 
+from tesis.components import chip, compare_table, enter, header, page, pill, source
 from tesis.data.thesis import (
     DRIFT_LIMIT,
     DRIFTS,
@@ -28,7 +29,6 @@ from tesis.data.thesis import (
     SHEAR_DEMAND,
     relative,
 )
-from tesis.components import chip, compare_table, enter, header, page, pill, source
 from tesis.kit import LEFT_EDGE, label, t
 from tesis.theme import (
     BRICK,

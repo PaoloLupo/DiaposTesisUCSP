@@ -20,6 +20,7 @@ from gaanim import (
     stagger,
 )
 
+from tesis.components import header, source, takeaway_at
 from tesis.data.materiales_inei import (
     MATERIALES_ORDENADOS,
     SOURCE_LABEL,
@@ -28,7 +29,6 @@ from tesis.data.materiales_inei import (
 from tesis.data.sudamerica import COUNTRIES, Ring
 from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
 from tesis.data.thesis import CRACKING_FLOOR1
-from tesis.components import header, source, takeaway_at
 from tesis.kit import (
     dash,
     label,
@@ -196,16 +196,15 @@ def materials(scene: Scene) -> None:
     )
     source(
         scene,
-        f"{SOURCE_LABEL} · Características de la vivienda (VIV6). "
-        "El material de las paredes no acredita confinamiento ni desempeño sísmico.",
+        f"{SOURCE_LABEL} · Características de la vivienda."
     )
     scene.stop("materiales-listo")
 
 
-# Mapa de placas en Mercator, a todo el ancho útil. El alto del marco va de 1° N a
-# 19° S y fija la escala; MAP_LON es la longitud que cae en x = 0, de modo que la
+# Mapa de placas en Mercator, a todo el ancho útil y del título a la fuente. El alto
+# del marco va de 1° N a 19° S y fija la escala; MAP_LON es la longitud que cae en x = 0, de modo que la
 # fosa quede cerca del centro: Nazca a la izquierda, la Sudamericana a la derecha.
-MAP_LEFT, MAP_RIGHT, MAP_TOP, MAP_BOTTOM = -7.3, 7.3, 2.73, -2.52
+MAP_LEFT, MAP_RIGHT, MAP_TOP, MAP_BOTTOM = -7.3, 7.3, 2.73, -3.5
 MAP_NORTH, MAP_SOUTH = 1.0, -19.0
 MAP_LON = -80.8
 
@@ -558,7 +557,7 @@ def plates(scene: Scene) -> None:
         .move_to(cx, cy)
         .z_index(30)
     )
-    block_scale, block_y = 0.36, 0.25
+    block_scale, block_y = 0.40, 0.25
     block = scene.media.lottie("placas_subduccion_paleta.lottie")
     block.scale_by(block_scale / lens).move_to(*inside(0, block_y)).z_index(31)
     block_labels = [
@@ -574,14 +573,14 @@ def plates(scene: Scene) -> None:
         ).z_index(31)
         for name, dx, dy, color in (
             ("NAZCA", -4.33, 2.25, STEEL),
-            ("SUDAMERICANA", 4.52, 2.98, INK_SOFT),
+            ("SUDAMERICANA", 4.8, 2.98, INK_SOFT),
         )
     ]
     explain = t(
         scene,
-        "La placa de Nazca se hunde (subduce) bajo la Sudamericana.\n"
-        "El contacto se traba, acumula energía y la libera en sismos.",
-        *inside(0, -1.2),
+        "La placa de Nazca subduce bajo la Sudamericana.\n"
+        "Acumula energía y la libera en sismos.",
+        *inside(0, -1.3),
         size=0.165 / lens,
         color=INK_SOFT,
         anchor=Anchor.TOP,
@@ -708,10 +707,6 @@ def plates(scene: Scene) -> None:
         scene.camera.animate.reset()
         .duration(1.1)
         .easing(Easing.ease_in_out(EasingCurve.CUBIC))
-    )
-    takeaway_at(
-        scene,
-        "Toda la costa está frente al borde de placas: el sismo es una certeza",
     )
     source(
         scene,
@@ -1438,15 +1433,15 @@ def manual_transfer(scene: Scene) -> None:
     etabs_more = t(
         scene, "⋮", -5.55, -0.7, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT
     )
-    count = t(
-        scene,
-        "24 muros × 4 pisos = 96 filas por tabla y combinación",
-        -7.1,
-        -1.2,
-        font=MONO,
-        size=0.14,
-        color=MUTED,
-    )
+    # count = t(
+    #     scene,
+    #     "24 muros × 4 pisos = 96 filas por tabla y combinación",
+    #     -7.1,
+    #     -1.2,
+    #     font=MONO,
+    #     size=0.14,
+    #     color=MUTED,
+    # )
 
     trunk_y, fork_x = 0.5, 0.0
     trunk = scene.geometry.line(-2.45, trunk_y, fork_x, trunk_y).stroke(BRICK, 0.03)
@@ -1566,24 +1561,24 @@ def manual_transfer(scene: Scene) -> None:
     mathcad_more = t(
         scene, "⋮", 1.6, -1.52, font=MONO, size=0.16, color=MUTED, anchor=Anchor.LEFT
     )
-    risks = [
-        label(scene, "Riesgos del traslado", -2.38, 0.0, color=MUTED, size=0.14)
-    ] + [
-        item
-        for i, text in enumerate(TRANSFER_RISKS)
-        for item in (
-            dash(scene, -2.3, -0.42 - i * 0.34, color=INK_SOFT),
-            t(
-                scene,
-                text,
-                -2.12,
-                -0.42 - i * 0.34,
-                size=0.18,
-                color=INK_SOFT,
-                anchor=Anchor.LEFT,
-            ),
-        )
-    ]
+    # risks = [
+    #     label(scene, "Errores comunes", -2.38, 0.0, color=MUTED, size=0.14)
+    # ] + [
+    #     item
+    #     for i, text in enumerate(TRANSFER_RISKS)
+    #     for item in (
+    #         dash(scene, -2.3, -0.42 - i * 0.34, color=INK_SOFT),
+    #         t(
+    #             scene,
+    #             text,
+    #             -2.12,
+    #             -0.42 - i * 0.34,
+    #             size=0.18,
+    #             color=INK_SOFT,
+    #             anchor=Anchor.LEFT,
+    #         ),
+    #     )
+    # ]
 
     scene.play([d.animate.fade_out().duration(0.35) for d in first])
     scene.play(
@@ -1608,7 +1603,7 @@ def manual_transfer(scene: Scene) -> None:
                 each=0.02,
             ).delay(0.4),
             etabs_more.animate.fade_in().duration(0.2).delay(1.0),
-            count.animate.fade_in().duration(0.3).delay(1.1),
+            # count.animate.fade_in().duration(0.3).delay(1.1),
         ]
     )
     scene.play(
@@ -1650,7 +1645,7 @@ def manual_transfer(scene: Scene) -> None:
             mathcad_more.animate.fade_in().duration(0.2).delay(2.2),
         ]
     )
-    scene.play(stagger(*[r.animate.fade_in().duration(0.25) for r in risks], each=0.08))
+    # scene.play(stagger(*[r.animate.fade_in().duration(0.25) for r in risks], each=0.08))
     scene.stop("traslado-manual")
 
     # 3 · Si algo no cumple, se modifica el modelo y el traslado empieza de nuevo.
@@ -1697,7 +1692,7 @@ def manual_transfer(scene: Scene) -> None:
     turns.move_to(*badge, Anchor.CENTER)
     scene.play(
         [
-            *[r.animate.opacity(0.35).duration(0.3) for r in risks],
+            # *[r.animate.opacity(0.35).duration(0.3) for r in risks],
             loop.animate.create().duration(0.8),
             loop_head.animate.fade_in().duration(0.2).delay(0.7),
             loop_label.animate.fade_in().duration(0.5).delay(0.4),
@@ -1800,7 +1795,7 @@ def manual_transfer(scene: Scene) -> None:
     source(
         scene,
         "Tesis · §1.1 Problemática y §1.2 Justificación, pp. 1–2. Valores: $V_e$ y $0.55 V_m$ del "
-        "piso 1, MCT (Tabla 35, p. 86). Normas: extracto de la lista de ETABS.",
+        "piso 1, MCT (Tabla 35, p. 86).",
     )
     scene.stop("pregunta-de-investigacion")
 

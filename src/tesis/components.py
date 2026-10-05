@@ -215,16 +215,18 @@ def objective_card(
 ) -> Box:
     """Tarjeta de un objetivo: número, verbo, enunciado y producto en tipografía técnica.
 
-    El enunciado crece, así el producto queda al fondo aunque los textos difieran.
+    El enunciado crece, así el producto queda al fondo, bajo su filete, aunque los
+    textos difieran.
     """
     L = scene.layout
     return L.box(
-        L.box(f"{number}", font=DISPLAY, font_size="108px", weight=700, color=BRICK),
-        L.box(verb, font_size="43px", weight=900, color=INK),
-        L.box(text, font_size="28px", color=INK_SOFT).item(grow=1),
-        L.box(product, font=MONO, font_size="19px", color=BRICK_DEEP),
-        padding="36px",
-        gap="20px",
+        L.box(f"{number}", font=DISPLAY, font_size="120px", weight=700, color=BRICK),
+        L.box(verb, font_size="46px", weight=900, color=INK),
+        L.box(text, font_size="32px", color=INK_SOFT).item(grow=1),
+        hairline(scene),
+        L.box(product, font=MONO, font_size="21px", color=BRICK_DEEP),
+        padding="40px",
+        gap="24px",
         background=CARD,
         border=RULE,
         border_width="2px",
@@ -299,7 +301,8 @@ def stage(
             align="baseline",
         ),
         L.box(picture, width="fill", height=height, align="center", justify="center"),
-        L.box(caption, font_size="20px", color=INK_SOFT),
+        # El pie se centra bajo el gráfico, no bajo el nombre.
+        L.box(caption, font_size="20px", color=INK_SOFT, width="fill", align="center"),
         gap="14px",
         **size,
     )

@@ -10,8 +10,11 @@ from typing import Literal
 from gaanim import (
     Anchor,
     Box,
+    Color,
     Direction,
     Drawable,
+    Playable,
+    RollingNumber,
     Scene,
     Section,
     SectionStep,
@@ -76,16 +79,20 @@ KICKER = "03 · Fundamentos"
 def density_check(scene: Scene) -> None:
     header(scene, KICKER, "Densidad de muros: cada dirección se revisa por separado")
 
-    plan = draw_plan(scene, (-3.45, 0.0), 7.3, grid=False, drawn_thickness=0.09)
+    plan = draw_plan(scene, (-3.45, 0.3), 7.3, grid=False, drawn_thickness=0.09)
+    # Bajo la planta, el símbolo de ejes y a su derecha las notas, en renglones
+    # alineados a la izquierda.
+    gx, gy, arm = LEFT_EDGE + 0.2, -2.5, 0.45
+    note_x, note_rows = gx + 0.9, (-2.05, -2.4)
     area_note = t(
         scene,
         f"Planta típica · $A_p$ = {FLOOR_AREA:.2f} m² · t = 0.13 m",
-        -3.45,
-        -2.05,
+        note_x,
+        note_rows[0],
         font=MONO,
         size=0.15,
         color=MUTED,
-        anchor=Anchor.TOP,
+        anchor=Anchor.LEFT,
     )
     # Presentación gradual de la planta: primero el contorno y los ejes, luego
     # los muros por dirección, cada grupo con su entrada en la leyenda.
@@ -98,7 +105,6 @@ def density_check(scene: Scene) -> None:
         color=MUTED,
         anchor=Anchor.CENTER,
     )
-    gx, gy, arm = LEFT_EDGE + 0.2, -2.55, 0.45
     axes = [
         scene.geometry.arrow(
             gx, gy, gx + arm, gy, head_length=0.1, head_width=0.1, body_width=0.018
@@ -149,7 +155,7 @@ def density_check(scene: Scene) -> None:
         )
     )
 
-    legend_y = 2.3
+    legend_y = 2.65
 
     def legend(x: float, color: str, text: str) -> list[Drawable]:
         swatch = (
@@ -177,7 +183,7 @@ def density_check(scene: Scene) -> None:
     groups = [
         (legend(LEFT_EDGE + 0.2, BRICK, "Muros en X"), masonry_x),
         (legend(LEFT_EDGE + 2.3, STEEL, "Muros en Y"), plan.by_direction("Y")),
-        (legend(LEFT_EDGE + 4.4, CONCRETE, "Concreto (X2)"), plan.instances("X2")),
+        (legend(LEFT_EDGE + 4.4, CONCRETE, "Placas de Concreto (X2)"), plan.instances("X2")),
     ]
     for items, walls in groups:
         scene.play(
@@ -201,13 +207,13 @@ def density_check(scene: Scene) -> None:
         ")",
         ">=",
         part("req", "frac(Z U S N, 56)", color=STEEL),
-        size=0.42,
-    ).move_to(x0, 2.35, Anchor.TOP_LEFT)
+        size=0.38,
+    ).move_to(x0, 2.85, Anchor.TOP_LEFT)
     minimum = scene.text.equation(
         'D_"mín" = frac(0.45 dot 1 dot 1 dot 4, 56) =',
         part("v", f'{DENSITY_MIN * 100:.2f} "%"', color=STEEL),
-        size=0.3,
-    ).move_to(x0, 1.12, Anchor.TOP_LEFT)
+        size=0.26,
+    ).move_to(x0, 1.57, Anchor.TOP_LEFT)
     scene.play([formula.animate.write().duration(0.9)])
     scene.play(minimum.animate.fade_in_from(Direction.UP, 0.08).duration(0.5))
 
@@ -261,7 +267,7 @@ def density_check(scene: Scene) -> None:
     # El inset vuelve al muro antes de sumar por dirección.
     scene.play(detail.animate.pop_in().duration(0.5))
 
-    rows: tuple[tuple[Literal["X", "Y"], float], ...] = (("X", 0.2), ("Y", -1.45))
+    rows: tuple[tuple[Literal["X", "Y"], float], ...] = (("X", 0.22), ("Y", -1.66))
     for direction, y in rows:
         color = BRICK if direction == "X" else STEEL
         tag = label(
@@ -288,12 +294,8 @@ def density_check(scene: Scene) -> None:
             .no_stroke()
             .move_to(track_left + track_w / 2, y - 0.28)
         )
-        ratio = computed(
-            lambda v: min(v / FLOOR_AREA / 0.06, 1.0), inputs=[counter.parameter]
-        )
-        bar = scene.geometry.fill_level(
-            track, color, direction="left", keep_outline=False
-        ).set_fill_level(ratio)
+        # La barra se llena muro a muro: cada bloque mide el aporte L·t de un muro.
+        per_m2 = track_w / (FLOOR_AREA * 0.06)
         threshold_x = track_left + track_w * DENSITY_MIN / 0.06
         tick = scene.geometry.line(threshold_x, y - 0.1, threshold_x, y - 0.46).stroke(
             INK, 0.018
@@ -313,8 +315,8 @@ def density_check(scene: Scene) -> None:
             part("v", f'{density(direction) * 100:.2f} "%"', color=color),
             ">=",
             f'{DENSITY_MIN * 100:.2f} "%"',
-            size=0.27,
-        ).move_to(x0, y - 0.72, Anchor.TOP_LEFT)
+            size=0.24,
+        ).move_to(x0, y - 0.62, Anchor.TOP_LEFT)
         other = "Y" if direction == "X" else "X"
         dim = [w.animate.opacity(0.15).duration(0.4) for w in plan.by_direction(other)]
         lit = [w.animate.opacity(1).duration(0.4) for w in plan.by_direction(direction)]
@@ -329,7 +331,6 @@ def density_check(scene: Scene) -> None:
                         sum_label,
                         counter.visual,
                         track,
-                        bar,
                         tick,
                         tick_label,
                     )
@@ -337,38 +338,74 @@ def density_check(scene: Scene) -> None:
             ]
         )
         cumulative = 0.0
-        steps = []
-        for name, drawable in plan.walls.items():
-            if not name.startswith(direction):
-                continue
+
+        def add(
+            name: str,
+            color: Color,
+            *,
+            y: float = y,
+            left: float = track_left,
+            per_m2: float = per_m2,
+            counter: RollingNumber = counter,
+        ) -> list[Playable]:
+            """Suma un muro: se marca en planta, crece su bloque y avanza el total."""
+            nonlocal cumulative
             wall = next(w for w in WALLS if w.name == name.split("_")[0])
-            cumulative += wall.area
-            steps.append(
-                [
-                    drawable.animate.indicate().duration(0.3),
-                    counter.animate.set(round(cumulative, 2)).duration(0.28),
-                ]
+            block = (
+                scene.geometry.rect(max(wall.area * per_m2 - 0.012, 0.01), 0.16)
+                .fill(color)
+                .no_stroke()
+                .move_to(left + cumulative * per_m2, y - 0.28, Anchor.LEFT)
+                .z_index(2)
             )
-        for step in steps:
-            scene.play(step)
+            cumulative += wall.area
+            return [
+                plan.walls[name].animate.indicate().duration(0.3),
+                block.animate.grow_from_edge(Direction.LEFT).duration(0.28),
+                counter.animate.set(round(cumulative, 2)).duration(0.28),
+            ]
+
+        # Primero la albañilería; en X, el concreto (X2) entra al final para que
+        # su aporte se lea contra el de un muro común.
+        for name in plan.walls:
+            if name.startswith(direction) and name.split("_")[0] != "X2":
+                scene.play(add(name, color))
         if direction == "X":
-            x2 = plan.walls["X2"]
+            # Sección transformada: cada X2 se engrosa en planta hasta su espesor
+            # equivalente (t·Ec/Em ≈ 6 t) y entra a la barra como un bloque gris.
+            x2_wall = next(w for w in WALLS if w.name == "X2")
+            k = x2_wall.thickness / 0.13
+            ghosts = []
+            for d in plan.instances("X2"):
+                b = d.bounds()
+                thick = (b.top - b.bottom) * k
+                ghosts.append(
+                    scene.geometry.rect(b.right - b.left, thick)
+                    .fill(CONCRETE)
+                    .stroke(CONCRETE, 0.014)
+                    .opacity(0.45)
+                    .move_to((b.left + b.right) / 2, b.bottom, Anchor.BOTTOM)
+                    .z_index(3)
+                )
             note = t(
                 scene,
-                'X2 · concreto: $t_"eq" = t thin E_c slash E_m$ = 0.794 m',
-                -3.9,
-                -2.45,
+                'X2 · concreto: $t_"eq" = t thin E_c slash E_m$ = 0.794 m ≈ 6 t',
+                note_x,
+                note_rows[1],
                 font=MONO,
                 size=0.15,
                 color=CONCRETE,
-                anchor=Anchor.TOP,
+                anchor=Anchor.LEFT,
             )
             scene.play(
                 [
-                    x2.animate.indicate().duration(0.5),
+                    *[g.animate.grow_from_edge(Direction.DOWN).duration(0.6) for g in ghosts],
                     note.animate.fade_in().duration(0.4),
                 ]
             )
+            for name in [n for n in plan.walls if n.split("_")[0] == "X2"]:
+                scene.play([a.duration(0.5) for a in add(name, CONCRETE)])
+            scene.play([g.animate.fade_out().duration(0.4) for g in ghosts])
         chip = status(scene, density(direction) >= DENSITY_MIN, 6.6, y - 0.9, size=0.16)
         scene.play(
             [
@@ -381,8 +418,8 @@ def density_check(scene: Scene) -> None:
     scene.play([w.animate.opacity(1).duration(0.4) for w in plan.all_walls])
     takeaway_at(
         scene,
-        "Cumple en ambas direcciones; Y queda más cerca del mínimo",
-        y=-3.22,
+        "Cumple en ambas direcciones",
+        y=-3.32,
     )
     source(
         scene,
@@ -611,7 +648,7 @@ def strength_checks(scene: Scene) -> None:
         },
     ]
     L = scene.layout
-    slots = [L.box(width="fill", height="235px").item(shrink=0) for _ in cards]
+    slots = [L.box(width="fill", height="255px").item(shrink=0) for _ in cards]
     boxes: list[Box] = []
     for spec, slot in zip(cards, slots, strict=True):
         eq1 = scene.text.equation(spec["eq"][0], size=0.3)
@@ -660,14 +697,15 @@ def strength_checks(scene: Scene) -> None:
             ).item(grow=1)
         )
     row = L.row(*boxes, gap="32px", align="stretch", width="fill", height="fill")
-    page(scene, body=[row], top="190px", bottom="110px")
+    page(scene, body=[row], top="165px", bottom="110px")
     # Medir los huecos antes de cualquier play: después, cada bounds() recompila
     # toda la presentación hasta el cursor.
     areas = [slot.bounds() for slot in slots]
     for i, (spec, box, area) in enumerate(zip(cards, boxes, areas, strict=True)):
         # El dibujo se coloca en coordenadas sobre el hueco que reservó el layout.
         cx, cy = (area.left + area.right) / 2, (area.top + area.bottom) / 2
-        drawing, extras, arrows = _check_drawing(scene, i, cx, cy - 1.375)
+        # El dibujo va algo por encima del centro del hueco: aire sobre el rótulo.
+        drawing, extras, arrows = _check_drawing(scene, i, cx, cy - 1.375 + 0.12)
         scene.play(
             [
                 stagger(

@@ -47,7 +47,7 @@ KICKER = "04 · Proceso manual"
 
 def case_study(scene: Scene) -> None:
     header(scene, KICKER, "Caso de estudio: vivienda de cuatro pisos en Lima")
-    plan = draw_plan(scene, (-2.45, -0.3), 7.5, labels=True, drawn_thickness=0.085)
+    plan = draw_plan(scene, (-2.4, 0.17), 8.1, labels=True, drawn_thickness=0.09)
     ox, oy = plan.origin
     s = plan.scale
     dims = [
@@ -97,16 +97,16 @@ def case_study(scene: Scene) -> None:
         *[
             L.column(
                 caption_note(scene, text=name, size="17px"),
-                L.box(value, font_size="26px", color=INK),
+                L.box(value, font_size="27px", color=INK),
                 gap="4px",
             )
             for name, value in rows
         ],
-        gap="17px",
+        gap="27px",
         within="safe",
         width="fill",
         height="fill",
-        padding=("200px", "24px", "110px", "1266px"),
+        padding=("150px", "24px", "110px", "1290px"),
     )
     scene.play(enter(sheet, each=0.04, duration=0.3))
     scene.stop("caso-datos")
@@ -115,8 +115,8 @@ def case_study(scene: Scene) -> None:
     note = t(
         scene,
         "X2: muros de concreto armado en el eje A\npara acercar el centro de rigidez al de masas",
-        -2.45,
-        -3.0,
+        -2.4,
+        -2.78,
         size=0.2,
         color=CONCRETE,
         weight=700,
@@ -130,8 +130,8 @@ def case_study(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · Tablas 20 y 21, pp. 52–53; Figura 34, p. 66 · planta de San Bartolomé (2006), "
-        "etiquetas Pier del modelo en ETABS (′ = simétrico _2)",
+        "San Bartolomé (2006). Ejemplo de aplicación de la Norma E.070 en el diseño de un "
+        "edificio de albañilería confinada. PUCP · Tesis, Tablas 20–21 y Fig. 34 · ′ = simétrico",
     )
     scene.stop("caso-x2")
 

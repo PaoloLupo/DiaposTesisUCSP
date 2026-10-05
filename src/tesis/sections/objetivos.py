@@ -9,6 +9,7 @@ from gaanim import (
     Direction,
     Drawable,
     Easing,
+    EasingCurve,
     Playable,
     Scene,
     Section,
@@ -72,7 +73,7 @@ def _keys(source: str) -> dict[str, str]:
 CONCEPTS = {
     "marco": ("un marco de trabajo", 36),
     "auto": ("automatizado", 36),
-    "api": ("integrado", 28),
+    "api": ("integrado", 36),
     "etabs": ("ETABS", 36),
     "norma": ("verificaciones normativas", 36),
     "alba": ("albañilería confinada", 30),
@@ -142,34 +143,34 @@ def _word(scene: Scene, phrase: str, px: float, bounds: Bounds) -> Text:
     ).move_to((bounds.left + bounds.right) / 2, _baseline(bounds, px))
 
 
-def _node(scene: Scene, tag: str, *body: Drawable) -> Box:
-    """Concepto del esquema: rótulo en versalitas sobre sus palabras."""
-    return scene.layout.column(note(scene, text=tag, size="15px"), *body, gap="10px")
+# La hipótesis se lee en dos lados del mismo ancho, separados por el verbo:
+# causa (lo que se implementa) → efecto esperado. Las variables y el ámbito van
+# debajo, alineados con esos lados.
+HYP_SIDE = "640px"  # lado de la causa; el efecto toma el resto
+HYP_GUTTER = "260px"
+CAPTION = {"font_size": "20px", "color": INK_SOFT}
 
 
-def _link(scene: Scene, top: Box, bottom: str) -> tuple[Box, Drawable]:
-    """Relación entre dos conceptos: el verbo encima de la flecha y el medio debajo."""
-    L = scene.layout
-    arrow = scene.geometry.arrow(0, 0, 1.9, 0).fill(INK_SOFT).no_stroke()
-    column = L.column(
-        top,
-        arrow,
-        L.box(bottom, font_size="20px", color=INK_SOFT, text_align="center"),
-        gap="6px",
-        align="center",
-        width="fill",
-    ).item(grow=1)
-    return column, arrow
+def _side(scene: Scene, tag: str, *body: Drawable, width: str = HYP_SIDE) -> Box:
+    """Un lado de la hipótesis: rótulo en versalitas sobre sus líneas."""
+    return scene.layout.column(
+        note(scene, text=tag, size="15px"), *body, gap="12px", width=width
+    ).item(shrink=0)
 
 
-def _role(scene: Scene, tag: str, value: Drawable) -> Box:
-    """Papel de un concepto en la investigación (variable), en el color de la hipótesis."""
+def _line(scene: Scene, *words: Drawable) -> Box:
+    """Renglón de conceptos y palabras de enlace que comparten la línea base."""
+    return scene.layout.row(*words, gap="12px", align="end")
+
+
+def _role(scene: Scene, tag: str, value: Drawable, width: str = HYP_SIDE) -> Box:
+    """Papel de un lado en la investigación (variable), en el color de la hipótesis."""
     return scene.layout.column(
         note(scene, text=tag, color=STEEL, size="14px"),
         value,
         gap="6px",
-        padding=("18px", "0px", "0px", "0px"),
-    )
+        width=width,
+    ).item(shrink=0)
 
 
 def purpose(scene: Scene) -> None:
@@ -180,19 +181,48 @@ def purpose(scene: Scene) -> None:
     goal_tag = note(scene, text="Objetivo general", color=BRICK, size="18px")
     objective, obj_keys, obj_words = _prose(scene, OBJECTIVE)
 
-    # Abajo, la hipótesis como esquema: propuesta → software → efecto esperado,
-    # dentro del ámbito de la albañilería confinada.
+    # Abajo, la hipótesis como relación: si se implementa la propuesta, permitirá
+    # el efecto esperado. Cada concepto ocupa el sitio de una palabra subrayada.
     concepts = {
         name: L.box(phrase, font=DISPLAY, font_size=f"{px}px", color=BRICK)
         for name, (phrase, px) in CONCEPTS.items()
     }
-    permit = L.box("permitirá", font=DISPLAY, font_size="28px", weight=700, color=STEEL)
-    link_api, arrow_api = _link(scene, concepts["api"], "mediante su API")
-    link_data, arrow_data = _link(scene, permit, "extrae y procesa los datos")
+    glue = L.box("con", font=DISPLAY, font_size="36px", color=INK_SOFT)
     captions = {
-        "etabs": L.box("modelo de elementos finitos", font_size="20px", color=INK_SOFT),
-        "norma": L.box("ejecutadas y documentadas", font_size="20px", color=INK_SOFT),
+        "cause": L.box("mediante su API, sobre el modelo de elementos finitos", **CAPTION),
+        "effect": L.box(
+            "ejecutadas y documentadas, a partir de los datos\n"
+            "extraídos y procesados de forma sistemática",
+            **CAPTION,
+        ),
     }
+    cause = _side(
+        scene,
+        "Si se implementa",
+        _line(scene, concepts["marco"], concepts["auto"]),
+        _line(scene, concepts["api"], glue, concepts["etabs"]),
+        captions["cause"],
+    )
+    effect = _side(
+        scene,
+        "Efecto esperado",
+        _line(scene, concepts["norma"]),
+        captions["effect"],
+        width="fill",
+    )
+    permit = L.box("permitirá", font=DISPLAY, font_size="30px", weight=700, color=STEEL)
+    arrow = scene.geometry.arrow(0, 0, 1.6, 0).fill(STEEL).no_stroke()
+    verb = L.column(
+        permit,
+        arrow,
+        gap="8px",
+        align="center",
+        width=HYP_GUTTER,
+        padding=("22px", "0px", "0px", "0px"),
+    ).item(shrink=0)
+    chain = L.row(cause, verb, effect, align="start", width="fill")
+
+    # El ámbito cierra la hipótesis; debajo del filete, cada variable bajo su lado.
     shift = scene.geometry.arrow(0, 0, 0.26, 0).fill(MUTED).no_stroke()
     independent = _role(
         scene,
@@ -209,39 +239,15 @@ def purpose(scene: Scene) -> None:
         scene,
         "Variable dependiente",
         L.box("cumplimiento normativo", font_size="21px", weight=700, color=INK),
-    )
-    proposal = _node(
-        scene, "Propuesta", concepts["marco"], concepts["auto"], independent
-    )
-    software = _node(scene, "Software comercial", concepts["etabs"], captions["etabs"])
-    effect = _node(
-        scene, "Efecto esperado", concepts["norma"], captions["norma"], dependent
-    )
-    chain = L.row(
-        proposal,
-        link_api,
-        software,
-        link_data,
-        effect,
-        gap="28px",
-        align="start",
         width="fill",
     )
-    # Ámbito: una llave horizontal que abarca todo el esquema.
-    ticks = [L.box(width="2px", height="18px", background=MUTED) for _ in range(2)]
-    spans = [hairline(scene, color=MUTED) for _ in range(2)]
-    domain = L.box("para edificaciones de", font_size="22px", color=INK_SOFT)
-    scope = L.row(
-        ticks[0],
-        spans[0],
-        domain,
-        concepts["alba"],
-        spans[1],
-        ticks[1],
-        gap="14px",
-        align="center",
-        width="fill",
-    )
+    gap_box = L.box(width=HYP_GUTTER, height="1px").item(shrink=0)
+    roles = L.row(independent, gap_box, dependent, align="start", width="fill")
+    scope_tag = note(scene, text="Ámbito", size="15px")
+    domain = L.box("edificaciones de", font_size="22px", color=INK_SOFT)
+    scope = L.row(scope_tag, domain, concepts["alba"], gap="14px", align="center")
+    roles_rule = hairline(scene)
+    footer = L.column(scope, roles_rule, roles, gap="22px", width="fill")
     hyp_tag = note(scene, text="Hipótesis", color=STEEL, size="18px")
     hyp_rule = hairline(scene)
     heading = L.row(hyp_tag, hyp_rule, gap="18px", align="center", width="fill")
@@ -250,10 +256,10 @@ def purpose(scene: Scene) -> None:
         scene,
         body=[
             L.column(goal_tag, objective, gap="22px", width="fill"),
-            L.column(heading, chain, scope, gap="26px", width="fill"),
+            L.column(heading, chain, footer, gap="28px", width="fill"),
         ],
-        top="200px",
-        gap="46px",
+        top="160px",  # más alto que el resto: el objetivo y la hipótesis lo llenan
+        gap="60px",
     )
     # Medir antes del primer play: recién maquetadas, las cajas se miden solas;
     # después, cada bounds() recompila toda la presentación hasta aquí.
@@ -332,32 +338,25 @@ def purpose(scene: Scene) -> None:
         )
     scene.play(stagger(*travel, each=0.12))
 
-    # Las relaciones se dibujan en el orden en que se lee la hipótesis.
+    # La relación se dibuja en el orden en que se lee la hipótesis.
     scene.play(
         stagger(
-            proposal.children[0].animate.fade_in().duration(0.3),
             parallel(
-                arrow_api.animate.grow_from_edge(Direction.LEFT).duration(0.45),
-                link_api.children[2].animate.fade_in().duration(0.35),
-            ),
-            parallel(
-                software.children[0].animate.fade_in().duration(0.3),
-                captions["etabs"].animate.fade_in().duration(0.3),
+                cause.children[0].animate.fade_in().duration(0.3),
+                glue.animate.fade_in().duration(0.3),
+                captions["cause"].animate.fade_in().duration(0.35),
             ),
             parallel(
                 permit.animate.fade_in_from(Direction.DOWN, 0.05).duration(0.35),
-                arrow_data.animate.grow_from_edge(Direction.LEFT).duration(0.45),
-                link_data.children[2].animate.fade_in().duration(0.35),
+                arrow.animate.grow_from_edge(Direction.LEFT).duration(0.45),
             ),
             parallel(
                 effect.children[0].animate.fade_in().duration(0.3),
-                captions["norma"].animate.fade_in().duration(0.3),
+                captions["effect"].animate.fade_in().duration(0.35),
             ),
             parallel(
-                domain.animate.fade_in().duration(0.35),
-                spans[0].animate.grow_from_edge(Direction.RIGHT).duration(0.5),
-                spans[1].animate.grow_from_edge(Direction.LEFT).duration(0.5),
-                *[tick.animate.fade_in().duration(0.2).delay(0.4) for tick in ticks],
+                scope_tag.animate.fade_in().duration(0.3),
+                domain.animate.fade_in().duration(0.3),
             ),
             each=0.3,
         )
@@ -372,6 +371,7 @@ def purpose(scene: Scene) -> None:
     # normativo (efecto esperado).
     scene.play(
         stagger(
+            roles_rule.animate.grow_from_edge(Direction.LEFT).duration(0.5),
             enter(independent, direction=Direction.UP, duration=0.35, each=0.08),
             enter(dependent, direction=Direction.UP, duration=0.35, each=0.08),
             each=0.35,
@@ -405,7 +405,7 @@ SPECIFIC = [
 
 
 def specific(scene: Scene) -> None:
-    header(scene, KICKER, "Cuatro objetivos específicos, cuatro productos")
+    header(scene, KICKER, "Objetivos específicos")
     cards = [
         objective_card(
             scene,
@@ -419,8 +419,12 @@ def specific(scene: Scene) -> None:
     page(
         scene,
         body=[
-            scene.layout.row(*cards, gap="32px", align="stretch", width="fill"),
+            # La fila toma todo el alto de la página: el producto baja al pie.
+            scene.layout.row(
+                *cards, gap="32px", align="stretch", width="fill"
+            ).item(grow=1),
         ],
+        top="160px",
         gap="48px",
     )
     for card in cards:
@@ -437,22 +441,20 @@ def specific(scene: Scene) -> None:
 # el bloque de resultados.
 ART = "metodo"
 STAGE_HEAD = "71px"  # filete + número y nombre + separación: hasta el gráfico
-SLOT = "400px"  # alto común de los gráficos de las etapas
+SLOT = "450px"  # alto común de los gráficos de las etapas
 
-# Diagrama de flujo (flujo.svg, 220 × 290 px del SVG), dibujado a 1.3 px por px.
-FLOW = (220, 290, 1.3)
-# Geometría de flujo.svg en px del SVG, para remarcar el recorrido encima: las
-# flechas que se atraviesan y el contorno de cada símbolo al alcanzarlo.
-FLOW_EDGES = {
-    "a1": [(110, 30), (110, 54)],
-    "a2": [(110, 92), (110, 114)],
-    "bucle": [(168, 150), (202, 150), (202, 74), (174, 74)],
-    "a3": [(110, 184), (110, 202)],
-    "a4": [(110, 240), (110, 256)],
+# Diagrama de flujo (flujo.svg, 220 × 290 px del SVG), dibujado a 1.36 px por px.
+FLOW = (220, 290, 1.36)
+# Recorrido de una ficha por flujo.svg, en px del SVG: tramos entre los centros de
+# los símbolos. La primera pasada no cumple y vuelve por el bucle; la segunda sale.
+FLOW_LEGS = {
+    "entrada": [(110, 17), (110, 74)],
+    "evalua": [(110, 74), (110, 150)],
+    "bucle": [(110, 150), (202, 150), (202, 74), (110, 74)],
+    "verifica": [(110, 150), (110, 222)],
+    "salida": [(110, 222), (110, 271)],
 }
-FLOW_BOXES = {"proceso": (110, 74, 124, 36), "verificacion": (110, 222, 124, 36)}
-FLOW_DECISION = [(110, 116), (168, 150), (110, 184), (52, 150)]
-TRACE = 0.035  # grosor del trazo que remarca el recorrido
+FLOW_TOKEN = 0.075  # radio de la ficha que recorre el diagrama
 # Caja de tinta de flujo.svg (px del SVG): el SVG se escala por su tinta, no por
 # su lienzo, así que el recorrido se ubica respecto de ella.
 FLOW_INK = (46.75, 4.0, 203.5, 284.0)
@@ -804,7 +806,7 @@ def method(scene: Scene) -> None:
         width="fill",
     )
 
-    page(scene, body=[pipeline, case], top="200px", gap="26px")
+    page(scene, body=[pipeline, case], top="150px", gap="26px")
     # Medir antes de animar: los recorridos se remarcan sobre dibujos del layout.
     flow_area = flow.bounds()
     api_b, down_b, back_b = (d.bounds() for d in (api_arrow, down, back))
@@ -854,9 +856,9 @@ def method(scene: Scene) -> None:
     )
     scene.stop("metodo-normas")
 
-    # 2 · El diagrama se arma símbolo por símbolo y se recorre remarcando las
-    # flechas que se atraviesan y cada símbolo alcanzado: en terracota la primera
-    # pasada y la iteración (no cumple); en verde el camino que cumple.
+    # 2 · El diagrama se arma símbolo por símbolo y una ficha lo recorre dejando
+    # una estela: la primera pasada no cumple y vuelve por el bucle (terracota); la
+    # segunda cumple y sale hacia el fin (verde). Cada símbolo se marca al llegar.
     ink_left, ink_top, ink_right, _ink_bottom = FLOW_INK
     k = (flow_area.right - flow_area.left) / (ink_right - ink_left)
 
@@ -866,46 +868,40 @@ def method(scene: Scene) -> None:
             flow_area.top - (sy - ink_top) * k,
         )
 
-    def edge(name: str, color: Color) -> Drawable:
-        pts = [point(*p) for p in FLOW_EDGES[name]]
-        return scene.geometry.polyline(pts).no_fill().stroke(color, TRACE).z_index(8)
+    legs = {
+        name: scene.geometry.polyline([point(*p) for p in pts]).no_fill().opacity(0)
+        for name, pts in FLOW_LEGS.items()
+    }
+    token = (
+        scene.geometry.circle(FLOW_TOKEN)
+        .fill(BRICK)
+        .no_stroke()
+        .move_to(*point(*FLOW_LEGS["entrada"][0]))
+        .z_index(9)
+    )
+    trail = (
+        scene.geometry.traced_path(token, dissipating_time=0.3)
+        .no_fill()
+        .stroke(BRICK, 0.05)
+        .z_index(8)
+    )
 
-    def outline(name: str, color: Color) -> Drawable:
-        cx, cy, w, h = FLOW_BOXES[name]
+    def travel(leg: str, duration: float) -> Playable:
         return (
-            scene.geometry.rect(w * k, h * k)
-            .no_fill()
-            .stroke(color, TRACE)
-            .move_to(*point(cx, cy))
-            .z_index(8)
+            token.animate.move_along(legs[leg])
+            .duration(duration)
+            .easing(Easing.ease_in_out(EasingCurve.SINE))
         )
 
-    def diamond(color: Color) -> Drawable:
-        pts = [point(*p) for p in FLOW_DECISION]
-        return scene.geometry.polygon(pts).no_fill().stroke(color, TRACE).z_index(8)
-
-    def trace(item: Drawable, duration: float = 0.35) -> Playable:
-        return item.animate.create().duration(duration).easing(Easing.LINEAR)
+    def reach(part: str) -> Playable:
+        return flow.part(part).animate.indicate().duration(0.25)
 
     no, yes = (
-        scene.text(text, font=MONO, size=16 / PX, color=color, wrap=False).move_to(
+        scene.text(text, font=MONO, size=18 / PX, color=color, wrap=False).move_to(
             *point(*at)
         )
-        for text, color, at in (("no", BRICK, (180, 139)), ("sí", INK_SOFT, (124, 195)))
+        for text, color, at in (("no", BRICK, (182, 139)), ("sí", INK_SOFT, (124, 195)))
     )
-    first = [
-        edge("a1", BRICK),
-        outline("proceso", BRICK),
-        edge("a2", BRICK),
-        diamond(BRICK),
-    ]
-    loop = edge("bucle", BRICK)
-    second = [
-        diamond(PASS),
-        edge("a3", PASS),
-        outline("verificacion", PASS),
-        edge("a4", PASS),
-    ]
     scene.play(
         sequence(
             links[0].animate.grow_arrow().duration(0.35),
@@ -913,22 +909,37 @@ def method(scene: Scene) -> None:
                 _opening(stages[1]),
                 stagger(
                     *[part.animate.fade_in().duration(0.3) for part in flow_parts],
-                    each=0.12,
+                    each=0.08,
                 ),
-                each=0.3,
+                each=0.25,
             ),
             parallel(
                 no.animate.fade_in().duration(0.3), yes.animate.fade_in().duration(0.3)
             ),
-            flow.part("inicio").animate.indicate().duration(0.4),
-            *[trace(item) for item in first],
-            no.animate.indicate().duration(0.45),
-            trace(loop, 0.7),
-            first[1].animate.indicate().duration(0.45),
-            parallel(trace(second[0], 0.4), first[3].animate.fade_out().duration(0.4)),
-            yes.animate.fill(PASS).duration(0.25),
-            *[trace(item) for item in second[1:]],
-            flow.part("fin").animate.indicate().duration(0.45),
+            parallel(
+                token.animate.grow_from_center().duration(0.3),
+                trail.animate.fade_in().duration(0.01),
+            ),
+            travel("entrada", 0.35),
+            reach("proceso"),
+            travel("evalua", 0.3),
+            parallel(reach("decision"), no.animate.indicate().duration(0.25)),
+            parallel(travel("bucle", 0.6), reach("bucle")),
+            reach("proceso"),
+            travel("evalua", 0.3),
+            parallel(
+                reach("decision"),
+                yes.animate.fill(PASS).duration(0.3),
+                token.animate.fill(PASS).duration(0.2),
+                trail.animate.stroke(PASS, 0.05).duration(0.2),
+            ),
+            travel("verifica", 0.3),
+            reach("verificacion"),
+            travel("salida", 0.25),
+            parallel(
+                reach("fin"),
+                token.animate.scale_to(0).duration(0.3).delay(0.1),
+            ),
         )
     )
     scene.stop("metodo-diagramas")
