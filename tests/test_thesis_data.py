@@ -20,6 +20,8 @@ from tesis.data.thesis import (  # noqa: E402
     CRACKING_FLOOR1,
     DENSITY_MIN,
     DRIFTS,
+    LOAD_SETS,
+    MODE_Y,
     MODELS,
     SEISMIC_FORCES,
     SEISMIC_WEIGHT,
@@ -150,6 +152,30 @@ class ManualProcessTablesTest(unittest.TestCase):
         self.assertAlmostEqual(density("X"), 0.0480, delta=0.00005)
         self.assertAlmostEqual(density("Y"), 0.0374, delta=0.00005)
         self.assertAlmostEqual(DENSITY_MIN, 0.032, delta=0.0005)
+
+    def test_load_sets_of_the_full_model(self) -> None:
+        block = table(self.chapter, "tb:asig_cargas")
+        rows = re.findall(
+            r"\[(Piso Típico|Techo Último Piso)\].*?\[\$([\d.]+).*?\[\$([\d.]+)", block
+        )
+        found = {name: (float(cm), float(cv)) for name, cm, cv in rows}
+        self.assertEqual(found["Piso Típico"], LOAD_SETS["Piso típico"])
+        self.assertEqual(found["Techo Último Piso"], LOAD_SETS["Azotea"])
+
+    def test_translation_mode_in_y(self) -> None:
+        block = table(self.chapter, "tb:an_mod")
+        modes = {
+            int(cells[0]): [float(c) for c in cells[1:]]
+            for cells in (
+                re.findall(r"\[([^\]]*)\]", line) for line in block.splitlines()
+            )
+            if len(cells) == 7 and cells[0].isdigit()
+        }
+        period, ux, uy, rz = modes[MODE_Y["modo"]][:4]
+        self.assertEqual((period, uy), (MODE_Y["T"], MODE_Y["UY"]))
+        self.assertEqual((ux, rz), (0.0, 0.0))  # traslación pura, sin giro
+        # Es el modo con más masa en Y.
+        self.assertEqual(max(modes, key=lambda m: modes[m][2]), MODE_Y["modo"])
 
 
 if __name__ == "__main__":

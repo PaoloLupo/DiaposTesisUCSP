@@ -17,6 +17,14 @@ AXIS_Y = {"A": 0.0, "B": 4.0, "C": 5.0, "D": 8.0}
 STAIR = (7.0, 1.0, 9.6, 4.0)  # vacío de escalera: x0, y0, x1, y1
 FLOOR_AREA = 136.51  # m², tb:info_gen y tb:densidad_ejm
 THICKNESS = 0.13  # m, aparejo de soga
+# Niveles del modelo de ETABS (fig:pisos_conf, «Story Data»), m sobre la base.
+STORIES = (
+    ("Base", 0.0),
+    ("Story1", 2.46),
+    ("Story2", 4.98),
+    ("Story3", 7.50),
+    ("Story4", 10.02),
+)
 
 
 @dataclass(frozen=True)

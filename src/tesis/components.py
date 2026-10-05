@@ -309,6 +309,41 @@ def stage(
     return column.item(shrink=0) if width else column.item(grow=1)
 
 
+@component
+def phase_heading(scene: Scene, *, name: str, tag: str) -> Box:
+    """Rótulo de una fase en versalitas y, a su lado, su nombre técnico en mono."""
+    L = scene.layout
+    return L.row(
+        note(scene, text=name, size="16px"),
+        L.box(tag, font=MONO, font_size="16px", color=MUTED),
+        gap="12px",
+        align="baseline",
+    )
+
+
+@component
+def compact_step(scene: Scene, *, number: int, name: str, text: str) -> Box:
+    """Paso de una lista densa: número en Aleo, nombre y una línea de detalle."""
+    L = scene.layout
+    return L.row(
+        L.box(
+            f"{number}",
+            font=DISPLAY,
+            font_size="30px",
+            weight=700,
+            color=BRICK,
+            width="30px",
+        ).item(shrink=0),
+        L.column(
+            L.box(name, font_size="25px", weight=900, color=INK),
+            L.box(text, font_size="20px", color=INK_SOFT),
+            gap="3px",
+        ),
+        gap="14px",
+        align="start",
+    )
+
+
 def enter(
     box: Box,
     *,

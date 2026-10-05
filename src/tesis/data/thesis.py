@@ -164,6 +164,12 @@ NO_CONFINEMENT_WEIGHT = (
 NO_CONFINEMENT_DRIFT = 38.50  # % más de distorsión sin confinamientos (tb:D_sc)
 AUTOMATIC_DRIFT = -10.53  # % de distorsión con opciones automáticas de ETABS (tb:D_i)
 
+# 05_analisismanual.typ, <tb:asig_cargas>: (CM de acabados, CV) en tonf/m² por Load Set.
+LOAD_SETS = {"Piso típico": (0.10, 0.20), "Azotea": (0.10, 0.10)}
+LIVE_MASS_SHARE = 0.25  # fig:mass_s: masa = 100 % CM + 25 % CV (edificación común)
+# <tb:an_mod>, MCT: el modo 3 es la traslación pura en Y.
+MODE_Y = {"modo": 3, "T": 0.171, "UY": 0.8048}
+
 
 def crack_failures(model: str) -> list[str]:
     return [pier for pier, (ve, cap) in CRACKING_FLOOR1[model].items() if ve > cap]

@@ -1,35 +1,70 @@
-"""Bloque 4 · Proceso manual: caso de estudio, idealizaciones, criterios y ciclo iterativo."""
+"""Bloque 4 · Proceso manual: caso de estudio, modelo completo en ETABS, pórticos planos,
+criterios y ciclo iterativo."""
 
 import math
+from collections.abc import Sequence
 
 from gaanim import (
     Anchor,
+    Anim,
+    Box,
+    Color,
+    Composition,
     Direction,
     Drawable,
+    Easing,
+    EasingCurve,
+    Playable,
     Scene,
     Section,
     SectionStep,
+    Text,
     Transition,
     computed,
+    parallel,
+    sequence,
     stagger,
 )
 
 from tesis.app import thesis_image
 from tesis.building import DEPTH, WIDTH, draw_plan, grow_walls
-from tesis.components import enter, header, image_card, page, panel, source, takeaway_at
+from tesis.components import (
+    compact_step,
+    enter,
+    header,
+    image_card,
+    page,
+    panel,
+    phase_heading,
+    pill,
+    source,
+    takeaway_at,
+)
 from tesis.components import note as caption_note
 from tesis.components import takeaway as takeaway_box
+from tesis.data.planta import STORIES
 from tesis.data.thesis import (
     AUTOMATIC_DRIFT,
     CASE,
+    LOAD_SETS,
     MESH_STEP,
+    MODE_Y,
     NO_CONFINEMENT_DRIFT,
+    WEIGHT_BY_FLOOR,
 )
-from tesis.kit import dimension, label, t
+from tesis.etabs_model import (
+    FRAME,
+    OVERLAY,
+    SLAB,
+    WALL_X,
+    EtabsModel,
+    Story,
+    build_model,
+)
+from tesis.kit import dash, dimension, label, t
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
-    BRICK_SOFT,
     CARD,
     CONCRETE,
     DISPLAY,
@@ -41,6 +76,7 @@ from tesis.theme import (
     RULE,
     STEEL,
 )
+from tesis.vivienda import Iso
 
 KICKER = "04 · Proceso manual"
 
@@ -136,70 +172,945 @@ def case_study(scene: Scene) -> None:
     scene.stop("caso-x2")
 
 
-def _mct_wall(scene: Scene, cx: float, cy: float, w: float, h: float) -> list[Drawable]:
-    """Dos pisos de muro como malla de áreas; confinamientos como barras."""
-    stories = 2
-    sh = h / stories
-    parts: list[Drawable] = []
-    parts.append(scene.geometry.rect(w, h).fill(BRICK_SOFT).no_stroke().move_to(cx, cy))
-    nx, ny = 8, 8
-    for i in range(1, nx):
-        x = cx - w / 2 + i * w / nx
-        parts.append(
-            scene.geometry.line(x, cy - h / 2, x, cy + h / 2).stroke(BRICK, 0.01)
-        )
-    for j in range(1, ny):
-        y = cy - h / 2 + j * h / ny
-        parts.append(
-            scene.geometry.line(cx - w / 2, y, cx + w / 2, y).stroke(BRICK, 0.01)
-        )
-    for x in (cx - w / 2, cx + w / 2):
-        parts.append(
-            scene.geometry.line(x, cy - h / 2, x, cy + h / 2).stroke(CONCRETE, 0.07)
-        )
-    for k in range(1, stories + 1):
-        y = cy - h / 2 + k * sh
-        parts.append(
-            scene.geometry.line(cx - w / 2, y, cx + w / 2, y).stroke(CONCRETE, 0.07)
-        )
-    for k in range(stories + 1):
-        y = cy - h / 2 + k * sh
-        for i in range(nx + 1):
-            parts.append(
-                scene.geometry.circle(0.028)
-                .fill(INK)
-                .no_stroke()
-                .move_to(cx - w / 2 + i * w / nx, y)
+# La vista 3D de ETABS como la arma el ingeniero: Definir, Dibujar y Asignar.
+MODEL_ISO = Iso((-5.6, -0.995), 0.265)
+MODEL_STEPS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "Definir",
+        "Define",
+        (
+            ("Grillas y pisos", "Ejes 1–7 y A–D; cuatro pisos de 2.46 y 2.52 m"),
+            ("Materiales", "Albañilería f'm = 65 y concreto f'c = 175 kgf/cm²"),
+            ("Secciones", "Frames, muros shell-thin y losa membrane"),
+        ),
+    ),
+    (
+        "Dibujar",
+        "Draw",
+        (("Frames, muros y losas", "De nodo a nodo, en los cuatro pisos a la vez"),),
+    ),
+    (
+        "Asignar",
+        "Assign",
+        (
+            ("Malla y brazos rígidos", "Malla de 0.50 m en cada muro; brazos a mano"),
+            ("Diafragma rígido", "D1 en cada losa: se mueve como un sólido"),
+            ("Etiquetas Pier", "Un nombre por muro, el mismo en los cuatro pisos"),
+            ("Cargas y masa", "CM 0.10 y CV 0.20 tonf/m²; masa = CM + 25 % CV"),
+        ),
+    ),
+)
+# Ventanas «Define»: filas en mono, alineadas por columnas de ancho fijo.
+MATERIAL_ROWS = (
+    f"{'Material':<14}{'Tipo':<10}{'E kgf/cm²':<11}{'ν':<6}γ kgf/m³",
+    f"{'ALB65KGF/CM3':<14}{'Masonry':<10}{'32 500':<11}{'0.25':<6}1 800",
+    f"{'C175KGF/CM2':<14}{'Concrete':<10}{'198 431':<11}{'0.15':<6}2 400",
+)
+SECTION_ROWS = (
+    "Frame  C30x13 · CL25x13x13 · CT25x13x13 · V12x20 · V30x20",
+    "Wall   M13 · P13    shell-thin · t = 13 cm",
+    "Slab   LM12         membrane · t = 12 cm",
+)
+DIAPHRAGM_CENTER = (8.3, 4.09)  # centroide de la losa sin el vacío de escalera
+SELECTED = Color.from_hex("#E2A88C")
+ROOF_ARROWS = (
+    (1.5, 2),
+    (1.5, 6),
+    (5, 2),
+    (5, 6),
+    (8.3, 6),
+    (11.6, 2),
+    (11.6, 6),
+    (15.1, 2),
+    (15.1, 6),
+)
+SWAY = 1.1  # m en la azotea: deformada exagerada
+
+
+def _steps_panel(scene: Scene) -> tuple[list[Box], list[Box], list[int | None]]:
+    """Lista de pasos a la derecha; ``heads[g]`` aparece con el primer paso de su fase."""
+    L = scene.layout
+    heads: list[Box] = []
+    rows: list[Box] = []
+    opens: list[int | None] = []
+    groups: list[Box] = []
+    for g, (phase, menu, steps) in enumerate(MODEL_STEPS):
+        head = phase_heading(scene, name=phase, tag=menu)
+        items: list[Box] = []
+        for i, (name, text) in enumerate(steps):
+            items.append(
+                compact_step(scene, number=len(rows) + 1, name=name, text=text)
             )
-    parts.append(
-        scene.geometry.line(
-            cx - w / 2 - 0.3, cy - h / 2, cx + w / 2 + 0.3, cy - h / 2
-        ).stroke(INK_SOFT, 0.02)
+            rows.append(items[-1])
+            opens.append(g if i == 0 else None)
+        heads.append(head)
+        groups.append(L.column(head, *items, gap="14px"))
+    L.column(
+        *groups,
+        gap="30px",
+        within="safe",
+        width="fill",
+        height="fill",
+        justify="start",
+        padding=("150px", "24px", "0px", "1014px"),
     )
-    parts.append(
+    return heads, rows, opens
+
+
+def _pointer(scene: Scene) -> Drawable:
+    """Puntero del ratón; su punta es la esquina superior izquierda."""
+    tip = [
+        (0.0, 0.0),
+        (0.0, -0.3),
+        (0.072, -0.232),
+        (0.118, -0.335),
+        (0.158, -0.318),
+        (0.113, -0.217),
+        (0.205, -0.212),
+    ]
+    return (
+        scene.geometry.polygon(tip)
+        .fill(INK)
+        .stroke(CARD, 0.016)
+        .z_index(OVERLAY + 15)
+        .hidden()
+    )
+
+
+def _click(scene: Scene, x: float, y: float) -> Composition:
+    ring = (
+        scene.geometry.circle(0.05)
+        .no_fill()
+        .stroke(BRICK, 0.012)
+        .move_to(x, y)
+        .z_index(OVERLAY + 14)
+        .hidden()
+    )
+    return sequence(
+        ring.animate.fade_in().duration(0.04),
+        parallel(
+            ring.animate.scale_to(3.2).duration(0.4),
+            ring.animate.fade_out().duration(0.4),
+        ),
+    )
+
+
+def _define_window(
+    scene: Scene, title: str, rows: Sequence[str], top: float, *, head: bool
+) -> tuple[list[Drawable], list[Text], list[float]]:
+    """Ventana de ETABS: título con la ruta del menú y filas que se escriben."""
+    left, width, pitch = -5.8, 5.25, 0.27
+    first = top - 0.62
+    height = 0.62 + pitch * len(rows) + 0.08
+    frame = (
+        scene.geometry.rect(width, height)
+        .fill(CARD)
+        .stroke(RULE, 0.016)
+        .move_to(left + width / 2, top - height / 2)
+        .z_index(OVERLAY)
+    )
+    caption = t(
+        scene,
+        title,
+        left + 0.2,
+        top - 0.2,
+        font=MONO,
+        size=0.12,
+        color=INK_SOFT,
+        anchor=Anchor.LEFT,
+    ).z_index(OVERLAY + 1)
+    rule = (
+        scene.geometry.line(left, top - 0.4, left + width, top - 0.4)
+        .stroke(RULE, 0.01)
+        .z_index(OVERLAY + 1)
+    )
+    ys = [first - i * pitch for i in range(len(rows))]
+    texts = [
         t(
             scene,
-            "malla shell",
-            cx + w / 2 + 0.2,
-            cy + h / 4,
+            row,
+            left + 0.52,
+            y,
             font=MONO,
-            size=0.14,
-            color=BRICK_DEEP,
+            size=0.125,
+            color=MUTED if head and i == 0 else INK,
             anchor=Anchor.LEFT,
-        )
+        ).z_index(OVERLAY + 1)
+        for i, (row, y) in enumerate(zip(rows, ys, strict=True))
+    ]
+    return [frame, caption, rule], texts, ys
+
+
+def _section_icons(scene: Scene, x: float, ys: Sequence[float]) -> list[Drawable]:
+    """Frame, muro y losa en miniatura, con los colores del modelo."""
+    frame_y, wall_y, slab_y = ys
+    frame = scene.geometry.group(
+        [
+            scene.geometry.line(x, frame_y - 0.1, x, frame_y + 0.1).stroke(FRAME, 0.02),
+            scene.geometry.circle(0.022)
+            .fill(FRAME)
+            .no_stroke()
+            .move_to(x, frame_y - 0.1),
+            scene.geometry.circle(0.022)
+            .fill(FRAME)
+            .no_stroke()
+            .move_to(x, frame_y + 0.1),
+        ]
     )
-    parts.append(
+    mini = Iso((x - 0.12, wall_y - 0.06), 0.075)
+    wall = (
+        scene.geometry.polygon(
+            [mini(0, 0, 0), mini(3, 0, 0), mini(3, 0, 2), mini(0, 0, 2)]
+        )
+        .fill(WALL_X)
+        .stroke(BRICK, 0.008)
+    )
+    flat = Iso((x - 0.15, slab_y), 0.06)
+    slab = (
+        scene.geometry.polygon(
+            [flat(0, 0, 0), flat(3, 0, 0), flat(3, 2, 0), flat(0, 2, 0)]
+        )
+        .fill(SLAB)
+        .stroke(CONCRETE, 0.008)
+    )
+    return [g.z_index(OVERLAY + 2).hidden() for g in (frame, wall, slab)]
+
+
+def full_model(scene: Scene) -> None:
+    header(scene, KICKER, "El modelo completo se arma en ETABS en ocho pasos")
+    model = build_model(scene, MODEL_ISO)
+    iso = model.iso
+    top = model.height
+    heads, rows, opens = _steps_panel(scene)
+
+    def step(i: int) -> list[Playable]:
+        """Aparece el paso i (y su fase); el anterior pasa a segundo plano."""
+        anims: list[Playable] = [
+            rows[i].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35)
+        ]
+        group = opens[i]
+        if group is not None:
+            anims.append(heads[group].animate.fade_in().duration(0.3))
+        if i:
+            anims.append(rows[i - 1].animate.opacity(0.4).duration(0.35))
+        return anims
+
+    # 1 · Grillas en la base y pisos que suben desde ella hasta su cota.
+    level_labels = [
         t(
             scene,
-            "frame",
-            cx + w / 2 + 0.2,
-            cy - h / 2 + 0.25,
+            f"{name:<7}{z:5.2f}",
+            iso(0, 0, z)[0] - 0.42,
+            iso(0, 0, z)[1],
             font=MONO,
-            size=0.14,
-            color=CONCRETE,
-            anchor=Anchor.LEFT,
+            size=0.11,
+            color=MUTED if z == 0 else INK_SOFT,
+            anchor=Anchor.RIGHT,
+        ).hidden()
+        for name, z in STORIES
+    ]
+    tx, ty = -6.95, 2.2
+    triad: list[Drawable] = []
+    for (dx, dy), name, color in (
+        ((0.866, -0.5), "X", BRICK),
+        ((0.866, 0.5), "Y", STEEL),
+        ((0.0, 1.0), "Z", INK_SOFT),
+    ):
+        end = (tx + 0.4 * dx, ty + 0.4 * dy)
+        triad.append(
+            scene.geometry.arrow(
+                tx, ty, *end, head_length=0.08, head_width=0.08, body_width=0.016
+            )
+            .fill(color)
+            .no_stroke()
+            .hidden()
+        )
+        triad.append(
+            t(
+                scene,
+                name,
+                end[0] + 0.1 * dx + (0.05 if dx else 0),
+                end[1] + 0.1 * dy,
+                size=0.13,
+                weight=900,
+                color=color,
+                anchor=Anchor.CENTER,
+            ).hidden()
+        )
+    for story, lab in zip(model.stories, level_labels[1:], strict=True):
+        rise = story.z1 * iso.scale
+        story.edge.drawable.shift_by(0, -rise)
+        lab.shift_by(0, -rise)
+    scene.play(
+        [
+            *step(0),
+            stagger(*[g.animate.create().duration(0.5) for g in model.grid], each=0.04),
+            stagger(
+                *[b.animate.fade_in().duration(0.25) for b in model.bubbles],
+                each=0.03,
+            ).delay(0.3),
+            stagger(*[p.animate.fade_in().duration(0.3) for p in triad], each=0.05),
+            level_labels[0].animate.fade_in().duration(0.3).delay(0.5),
+        ]
+    )
+    scene.play(
+        stagger(
+            *[
+                parallel(
+                    story.edge.drawable.animate.fade_in().duration(0.2),
+                    story.edge.drawable.animate.shift_by(0, story.z1 * iso.scale)
+                    .duration(0.8)
+                    .easing(Easing.SMOOTH),
+                    lab.animate.fade_in().duration(0.2),
+                    lab.animate.shift_by(0, story.z1 * iso.scale)
+                    .duration(0.8)
+                    .easing(Easing.SMOOTH),
+                )
+                for story, lab in zip(model.stories, level_labels[1:], strict=True)
+            ],
+            each=0.22,
         )
     )
+    scene.stop("mct-grillas")
+
+    # 2 · Materiales y 3 · secciones: el ingeniero llena las ventanas de «Define».
+    materials, material_texts, material_ys = _define_window(
+        scene, "Define › Material Properties", MATERIAL_ROWS, 2.6, head=True
+    )
+    swatches = [
+        scene.geometry.rect(0.15, 0.15)
+        .fill(color)
+        .no_stroke()
+        .move_to(-5.53, y)
+        .z_index(OVERLAY + 2)
+        .hidden()
+        for color, y in ((BRICK, material_ys[1]), (CONCRETE, material_ys[2]))
+    ]
+    sections, section_texts, section_ys = _define_window(
+        scene, "Define › Section Properties", SECTION_ROWS, 0.95, head=False
+    )
+    icons = _section_icons(scene, -5.53, section_ys)
+
+    def typed(text: Text, row: str, cps: float = 60) -> Anim:
+        return text.animate.typewriter(cps=cps, cursor="▍", keep_cursor=False).duration(
+            len(row) / cps
+        )
+
+    scene.play(
+        [
+            *step(1),
+            *[
+                m.animate.fade_in_from(Direction.UP, 0.06).duration(0.35)
+                for m in materials
+            ],
+            sequence(
+                material_texts[0].animate.fade_in().duration(0.25),
+                parallel(
+                    swatches[0].animate.grow_from_center().duration(0.2),
+                    typed(material_texts[1], MATERIAL_ROWS[1]),
+                ),
+                parallel(
+                    swatches[1].animate.grow_from_center().duration(0.2),
+                    typed(material_texts[2], MATERIAL_ROWS[2]),
+                ),
+            ).delay(0.3),
+        ]
+    )
+    scene.play(
+        [
+            *step(2),
+            *[
+                m.animate.fade_in_from(Direction.UP, 0.06).duration(0.35)
+                for m in sections
+            ],
+            sequence(
+                *[
+                    parallel(icon.animate.fade_in().duration(0.2), typed(text, row))
+                    for icon, text, row in zip(
+                        icons, section_texts, SECTION_ROWS, strict=True
+                    )
+                ]
+            ).delay(0.3),
+        ]
+    )
+    scene.wait(0.3)
+    scene.stop("mct-propiedades")
+
+    # 4 · Dibujo en Story4 con «Similar Stories»: cada clic aparece en los cuatro pisos.
+    def at_top(x: float, y: float) -> tuple[float, float]:
+        return iso(x, y, top)
+
+    pointer = _pointer(scene).move_to(*at_top(6.0, 4.0), Anchor.TOP_LEFT)
+
+    def point_to(
+        x: float, y: float, duration: float = 0.4, easing: Easing = Easing.SMOOTH
+    ) -> Anim:
+        return (
+            pointer.animate.move_to(*at_top(x, y), Anchor.TOP_LEFT)
+            .duration(duration)
+            .easing(easing)
+        )
+
+    windows = [
+        *materials,
+        *material_texts,
+        *swatches,
+        *sections,
+        *section_texts,
+        *icons,
+    ]
+    scene.play(
+        [
+            *step(3),
+            *[w.animate.fade_out().duration(0.3) for w in windows],
+            pointer.animate.fade_in().duration(0.3).delay(0.2),
+        ]
+    )
+    first = [(0.0, 0.0), (3.0, 0.0)]
+    for node in first:
+        scene.play(point_to(*node))
+        scene.play(
+            [
+                _click(scene, *at_top(*node)),
+                *[
+                    s.columns[node].drawable.animate.create().duration(0.4)
+                    for s in model.stories
+                ],
+            ]
+        )
+    others = [
+        shape.drawable
+        for s in model.stories
+        for node, shape in s.columns.items()
+        if node not in first
+    ]
+    scene.play(
+        stagger(
+            *[c.animate.create().duration(0.3) for c in others],
+            total=0.9,
+            origin=at_top(3, 0),
+        )
+    )
+    # Viga X1: se arrastra de nodo a nodo.
+    span = ((0.0, 0.0), (3.0, 0.0))
+    scene.play(point_to(*span[0]))
+    scene.play(
+        [
+            point_to(*span[1], 0.6, Easing.LINEAR),
+            *[
+                s.beams[span]
+                .drawable.animate.create()
+                .duration(0.6)
+                .easing(Easing.LINEAR)
+                for s in model.stories
+            ],
+        ]
+    )
+    scene.play(
+        stagger(
+            *[
+                shape.drawable.animate.create().duration(0.3)
+                for s in model.stories
+                for key, shape in s.beams.items()
+                if key != span
+            ],
+            total=0.9,
+            origin=at_top(3, 0),
+        )
+    )
+    # Muro X1: «Draw Walls» de un nodo al otro; el shell se extiende tras el cursor.
+    scene.play(point_to(*span[0]))
+    for s in model.stories:
+        x1 = s.walls["X1"]
+        a0, _, _, a1 = x1.points
+        x1.drawable.points([iso(*a0), iso(*a0), iso(*a1), iso(*a1)])
+    scene.play(
+        [
+            point_to(*span[1], 0.7, Easing.LINEAR),
+            *[
+                s.walls["X1"]
+                .drawable.animate.points([iso(*p) for p in s.walls["X1"].points])
+                .duration(0.7)
+                .easing(Easing.LINEAR)
+                for s in model.stories
+            ],
+        ]
+    )
+    scene.play(
+        stagger(
+            *[
+                shape.drawable.animate.fade_in().duration(0.3)
+                for s in model.stories
+                for name, shape in s.walls.items()
+                if name != "X1"
+            ],
+            total=1.1,
+            origin=at_top(3, 0),
+        )
+    )
+    # Losas: rectángulo de esquina a esquina; el vacío de escalera ya está en la losa.
+    band = (
+        scene.geometry.polygon(
+            [at_top(0, 0), at_top(WIDTH, 0), at_top(WIDTH, DEPTH), at_top(0, DEPTH)]
+        )
+        .no_fill()
+        .stroke(INK_SOFT, 0.012)
+        .z_index(OVERLAY + 13)
+        .hidden()
+    )
+    band.points([at_top(0, 0)] * 4)
+    scene.play(point_to(0, 0))
+    scene.play(
+        [
+            _click(scene, *at_top(0, 0)),
+            band.animate.fade_in().duration(0.05),
+            band.animate.points(
+                [at_top(0, 0), at_top(WIDTH, 0), at_top(WIDTH, DEPTH), at_top(0, DEPTH)]
+            )
+            .duration(0.9)
+            .easing(Easing.SMOOTH),
+            point_to(WIDTH, DEPTH, 0.9),
+        ]
+    )
+    scene.play(
+        [
+            band.animate.fade_out().duration(0.3),
+            pointer.animate.fade_out().duration(0.3),
+            stagger(
+                *[
+                    parallel(
+                        s.slab.drawable.animate.fade_in().duration(0.4),
+                        s.void.drawable.animate.fade_in().duration(0.4),
+                    )
+                    for s in model.stories
+                ],
+                each=0.15,
+            ),
+        ]
+    )
+    scene.stop("mct-dibujo")
+
+    # 5 · Se ocultan las losas, aparece la malla y la cámara entra a un nudo.
+    mesh = [
+        part.drawable
+        for s in model.stories
+        for parts in s.mesh.values()
+        for part in parts
+    ]
+    scene.play(
+        [
+            *step(4),
+            *[
+                s.slab.drawable.animate.opacity(0.16).duration(0.6)
+                for s in model.stories
+            ],
+        ]
+    )
+    scene.play(stagger(*[m.animate.create().duration(0.5) for m in mesh], total=1.6))
+    junction = (3.0, 0.0)
+    story2 = model.stories[1]
+    focus = iso(*junction, (story2.z0 + story2.z1) / 2)
+    detail = _junction_detail(scene, model, story2, junction)
+    scene.play(
+        [
+            *[lab.animate.fade_out().duration(0.4) for lab in level_labels],
+            scene.camera.animate.to(
+                scene.camera.state_2d((focus[0] - 0.45, focus[1]), 3.2)
+            )
+            .duration(1.3)
+            .easing(Easing.ease_in_out(EasingCurve.CUBIC)),
+            stagger(
+                *[d.animate.fade_in().duration(0.3) for d in detail], each=0.02
+            ).delay(1.0),
+        ]
+    )
+    scene.stop("mct-malla")
+    scene.play(
+        [
+            *[d.animate.fade_out().duration(0.3) for d in detail],
+            scene.camera.animate.reset()
+            .duration(1.1)
+            .easing(Easing.ease_in_out(EasingCurve.CUBIC))
+            .delay(0.2),
+            *[lab.animate.fade_in().duration(0.4).delay(0.9) for lab in level_labels],
+        ]
+    )
+
+    # 6 · Diafragma rígido: cada losa liga sus nudos a un centro D1.
+    centers: list[Drawable] = []
+    spokes: list[Drawable] = []
+    waves: list[Composition] = []
+    for s in model.stories:
+        c = iso(*DIAPHRAGM_CENTER, s.z1)
+        lines = [
+            scene.geometry.dashed_line(
+                *c, *iso(*node, s.z1), dash_length=0.035, gap_length=0.03
+            )
+            .stroke(INK_SOFT, 0.007)
+            .z_index(s.overlay)
+            .hidden()
+            for node in s.columns
+        ]
+        dot = model.ride(
+            scene.geometry.circle(0.04)
+            .fill(INK)
+            .stroke(CARD, 0.01)
+            .move_to(*c)
+            .z_index(OVERLAY + 10)
+            .hidden(),
+            s.z1,
+        )
+        spokes += lines
+        centers.append(dot)
+        # La losa se enciende mientras sus nudos quedan ligados al centro.
+        waves.append(
+            parallel(
+                dot.animate.grow_from_center().duration(0.25),
+                stagger(
+                    *[ln.animate.create().duration(0.45) for ln in lines], each=0.006
+                ),
+                sequence(
+                    s.slab.drawable.animate.opacity(0.55).duration(0.3),
+                    s.slab.drawable.animate.opacity(0.16).duration(0.5).delay(0.3),
+                ),
+            )
+        )
+    d1 = model.ride(
+        t(
+            scene,
+            "D1",
+            iso(*DIAPHRAGM_CENTER, top)[0] - 0.08,
+            iso(*DIAPHRAGM_CENTER, top)[1] - 0.05,
+            font=MONO,
+            size=0.11,
+            weight=700,
+            color=INK,
+            anchor=Anchor.TOP_RIGHT,
+        )
+        .z_index(OVERLAY + 11)
+        .hidden(),
+        top,
+    )
+    scene.play(
+        [
+            *step(5),
+            stagger(*waves, each=0.3),
+            d1.animate.fade_in().duration(0.3).delay(1.0),
+        ]
+    )
+    scene.play([ln.animate.opacity(0.7).duration(0.4) for ln in spokes])
+    scene.stop("mct-diafragma")
+
+    # 7 · Etiquetas Pier: se elige X1 en un piso y la etiqueta llega a los cuatro.
+    x1_label_z = [(s.z0 + s.z1) / 2 for s in model.stories]
+    x1_labels = [
+        model.ride(
+            t(
+                scene,
+                "X1",
+                *iso(1.5, 0, z),
+                font=MONO,
+                size=0.11,
+                weight=700,
+                color=BRICK_DEEP,
+                anchor=Anchor.CENTER,
+            )
+            .z_index(OVERLAY + 11)
+            .hidden(),
+            z,
+        )
+        for z in x1_label_z
+    ]
+    tags: list[Drawable] = []
+    for line in model.lines:
+        if line.name == "X1":
+            continue
+        x, y = iso(*line.middle, top)
+        tags.append(
+            model.ride(
+                t(
+                    scene,
+                    line.label,
+                    x,
+                    y + 0.03,
+                    font=MONO,
+                    size=0.1,
+                    weight=700,
+                    color=BRICK_DEEP if line.direction == "X" else STEEL,
+                    anchor=Anchor.BOTTOM,
+                )
+                .z_index(OVERLAY + 11)
+                .hidden(),
+                top,
+            )
+        )
+    pick = iso(1.5, 0, (model.stories[-1].z0 + top) / 2)
+    pointer.move_to(*at_top(5.0, 2.0), Anchor.TOP_LEFT)
+    x1_walls = [s.walls["X1"].drawable for s in model.stories]
+    scene.play([*step(6), pointer.animate.fade_in().duration(0.3)])
+    scene.play(
+        pointer.animate.move_to(*pick, Anchor.TOP_LEFT)
+        .duration(0.5)
+        .easing(Easing.SMOOTH)
+    )
+    scene.play(
+        [
+            _click(scene, *pick),
+            *[w.animate.fill(SELECTED).duration(0.25) for w in x1_walls],
+        ]
+    )
+    scene.play(
+        [
+            stagger(
+                *[
+                    lab.animate.fade_in_from(Direction.DOWN, 0.05).duration(0.3)
+                    for lab in reversed(x1_labels)
+                ],
+                each=0.12,
+            ),
+            *[w.animate.fill(WALL_X).duration(0.4).delay(0.6) for w in x1_walls],
+            pointer.animate.fade_out().duration(0.3).delay(0.6),
+        ]
+    )
+    scene.play(
+        stagger(
+            *[tag.animate.fade_in().duration(0.25) for tag in tags],
+            total=1.0,
+            origin=pick,
+        )
+    )
+    scene.stop("mct-pier")
+
+    # 8 · Cargas sobre las losas y masa sísmica concentrada en cada diafragma.
+    arrows = [
+        model.ride(
+            scene.geometry.arrow(
+                *iso(x, y, top + 1.5),
+                *iso(x, y, top),
+                head_length=0.07,
+                head_width=0.07,
+                body_width=0.012,
+            )
+            .fill(INK_SOFT)
+            .no_stroke()
+            .z_index(OVERLAY + 12)
+            .hidden(),
+            top,
+        )
+        for x, y in ROOF_ARROWS
+    ]
+    roof_cm, roof_cv = LOAD_SETS["Azotea"]
+    typical_cm, typical_cv = LOAD_SETS["Piso típico"]
+    loads = [
+        t(
+            scene,
+            text,
+            -2.55,
+            y,
+            font=MONO,
+            size=0.11,
+            color=color,
+            anchor=Anchor.LEFT,
+        ).hidden()
+        for text, y, color in (
+            (f"Azotea     CM {roof_cm:.2f} · CV {roof_cv:.2f} tonf/m²", 2.5, INK),
+            (
+                f"Pisos 1–3  CM {typical_cm:.2f} · CV {typical_cv:.2f} tonf/m²",
+                2.27,
+                INK_SOFT,
+            ),
+        )
+    ]
+    weights = WEIGHT_BY_FLOOR["MCT"]
+    masses: list[Drawable] = []
+    mass_labels: list[Drawable] = []
+    for s, w in zip(model.stories, weights, strict=True):
+        cx, cy = iso(*DIAPHRAGM_CENTER, s.z1)
+        r = 0.075 * math.sqrt(w / max(weights))
+        masses.append(
+            model.ride(
+                scene.geometry.circle(r)
+                .fill(BRICK)
+                .stroke(CARD, 0.012)
+                .move_to(cx, cy)
+                .z_index(OVERLAY + 12)
+                .hidden(),
+                s.z1,
+            )
+        )
+        mass_labels.append(
+            model.ride(
+                pill(
+                    scene,
+                    f"{w:.1f} tonf",
+                    cx + 0.14,
+                    cy,
+                    size=0.1,
+                    pad=(0.06, 0.025),
+                    color=INK,
+                    border=RULE,
+                    anchor=Anchor.LEFT,
+                ).z_index(OVERLAY + 12),
+                s.z1,
+            )
+        )
+    scene.play(
+        [
+            *step(7),
+            *[ln.animate.fade_out().duration(0.4) for ln in spokes],
+            stagger(*[a.animate.grow_arrow().duration(0.4) for a in arrows], each=0.05),
+            stagger(
+                *[x.animate.fade_in().duration(0.3) for x in loads], each=0.15
+            ).delay(0.3),
+        ]
+    )
+    scene.play(
+        stagger(
+            *[
+                parallel(
+                    m.animate.grow_from_center().duration(0.3),
+                    lab.animate.fade_in_from(Direction.LEFT, 0.05).duration(0.3),
+                )
+                for m, lab in zip(masses, mass_labels, strict=True)
+            ],
+            each=0.15,
+        )
+    )
+    # Con el modelo completo, el análisis modal: el modo 3 es la traslación en Y.
+    modal = [
+        label(scene, "Análisis modal", -7.3, -2.55, color=MUTED, size=0.13),
+        t(
+            scene,
+            f"Modo {MODE_Y['modo']} · T = {MODE_Y['T']:.3f} s",
+            -7.3,
+            -2.83,
+            font=MONO,
+            size=0.13,
+            color=INK,
+        ),
+        t(
+            scene,
+            f"traslación en Y · {MODE_Y['UY'] * 100:.0f} % de la masa",
+            -7.3,
+            -3.08,
+            size=0.15,
+            color=INK_SOFT,
+        ),
+        t(scene, "deformada exagerada", -7.3, -3.32, font=MONO, size=0.1, color=MUTED),
+    ]
+    scene.play(
+        [
+            *[r.animate.opacity(1).duration(0.4) for r in rows],
+            stagger(*[m.animate.fade_in().duration(0.3) for m in modal], each=0.08),
+        ]
+    )
+    source(
+        scene,
+        "Tesis · §5.3.1, pp. 58–67 (Figuras 23–34, Tabla 24); Figura 21, p. 47; Figura 40, p. 74; "
+        "Tabla 28, p. 77 · modelo esquemático del MCT",
+    )
+    scene.stop(
+        "mct-analisis",
+        loop=sequence(
+            parallel(*model.sway(SWAY, 0.6)),
+            parallel(*model.sway(-SWAY, 1.2)),
+            parallel(*model.sway(0.0, 0.6)),
+        ),
+    )
+
+
+def _junction_detail(
+    scene: Scene, model: EtabsModel, story: Story, node: tuple[float, float]
+) -> list[Drawable]:
+    """Lo que se ve al acercarse a un nudo: nodos de la malla, frames y brazo rígido.
+
+    Todo mide lo que debe medir a 3.2 aumentos; fuera del acercamiento estaría oculto.
+    """
+    iso = model.iso
+    z0, z1 = story.z0, story.z1
+    x_node, _ = node
+    parts: list[Drawable] = []
+    nz = math.ceil((z1 - z0) / MESH_STEP - 1e-6)
+    shared: list[tuple[float, float, float]] = []
+    for name in ("X1", "Y3"):
+        line = next(ln for ln in model.lines if ln.name == name)
+        (ax, ay), (bx, by) = line.a, line.b
+        nu = math.ceil(math.hypot(bx - ax, by - ay) / MESH_STEP - 1e-6)
+        for i in range(nu + 1):
+            for j in range(nz + 1):
+                p = (
+                    ax + (bx - ax) * i / nu,
+                    ay + (by - ay) * i / nu,
+                    z0 + (z1 - z0) * j / nz,
+                )
+                on_frame = (
+                    j in (0, nz) or abs(p[0] - x_node) < 1e-6 and abs(p[1]) < 1e-6
+                )
+                if on_frame:
+                    shared.append(p)
+                    continue
+                parts.append(
+                    scene.geometry.circle(0.0065)
+                    .fill(INK_SOFT)
+                    .no_stroke()
+                    .move_to(*iso(*p))
+                    .z_index(OVERLAY + 8)
+                    .hidden()
+                )
+    parts += [
+        scene.geometry.circle(0.009)
+        .fill(BRICK)
+        .no_stroke()
+        .move_to(*iso(*p))
+        .z_index(OVERLAY + 8)
+        .hidden()
+        for p in shared
+    ]
+    # Brazo rígido al extremo de la viga X1, en la cara de la columna (End Length Offset).
+    parts.append(
+        scene.geometry.line(*iso(x_node - 0.3, 0, z1), *iso(x_node, 0, z1))
+        .stroke(INK, 0.014)
+        .z_index(OVERLAY + 8)
+        .hidden()
+    )
+    rows = nz  # filas de la malla en el piso
+    notes = (
+        ("Brazo rígido en la cara de la columna", (x_node - 0.15, 0, z1)),
+        ("Shell M13 · malla de 0.50 m", (1.25, 0, (z0 + z1) / 2 + 0.2)),
+        ("Nodos compartidos: malla y frames", (x_node, 0, z0 + 4 * (z1 - z0) / rows)),
+        ("Frame · columna de confinamiento", (x_node, 0, z0 + 0.25)),
+    )
+    for i, (text, target) in enumerate(notes):
+        tx, ty = iso(*target)
+        y = 0.55 - i * 0.3
+        parts.append(
+            t(
+                scene,
+                text,
+                -7.18,
+                y,
+                font=MONO,
+                size=0.052,
+                color=INK,
+                anchor=Anchor.LEFT,
+            )
+            .z_index(OVERLAY + 9)
+            .hidden()
+        )
+        parts.append(
+            scene.geometry.line(-6.0, y, tx, ty)
+            .stroke(INK_SOFT, 0.004)
+            .z_index(OVERLAY + 9)
+            .hidden()
+        )
+        parts.append(
+            scene.geometry.circle(0.011)
+            .no_fill()
+            .stroke(INK, 0.004)
+            .move_to(tx, ty)
+            .z_index(OVERLAY + 9)
+            .hidden()
+        )
     return parts
 
 
@@ -275,76 +1186,45 @@ def _mst_frame(
     return parts
 
 
-def idealizations(scene: Scene) -> None:
-    header(scene, KICKER, "Dos formas de idealizar el mismo muro: áreas o barras")
-    columns = [
-        (
-            -3.7,
-            "MCT · modelo completo tridimensional",
-            BRICK,
-            _mct_wall,
-            [
-                "Muros: elementos shell-thin con malla de 0.5 m",
-                "Confinamientos: elementos frame con nodos compatibles",
-                "Cargas: metrado automático del volumen modelado",
-                "Fuerzas por muro: integración en secciones Pier",
-            ],
-        ),
-        (
-            3.7,
-            "MSTA / MSTO · pórticos planos",
-            STEEL,
-            _mst_frame,
-            [
-                "Muros: barras en el centroide de la sección transformada",
-                "Brazos rígidos hasta los bordes del muro",
-                "Cargas: áreas tributarias (método del sobre)",
-                "Diafragma rígido que integra los pórticos",
-            ],
-        ),
+def plane_frames(scene: Scene) -> None:
+    """WIP: se rehará con la explicación del método de pórticos planos."""
+    header(scene, KICKER, "Modelo simplificado: los muros como pórticos planos")
+    wip = label(
+        scene,
+        "WIP · método de pórticos planos",
+        7.3,
+        2.62,
+        size=0.13,
+        anchor=Anchor.TOP_RIGHT,
+    )
+    drawing = _mst_frame(scene, -3.2, 0.6, 2.6, 2.1)
+    bullets = [
+        "Muros: barras en el centroide de la sección transformada",
+        "Brazos rígidos hasta los bordes del muro",
+        "Cargas: áreas tributarias (método del sobre)",
+        "Diafragma rígido que integra los pórticos",
     ]
-    for cx, name, color, draw, bullets in columns:
-        tag = label(scene, name, cx, 2.45, color=color, size=0.16, anchor=Anchor.TOP)
-        drawing = draw(scene, cx, 0.8, 2.6, 2.1)
-        texts: list[Drawable] = []
-        for i, line in enumerate(bullets):
-            y = -0.7 - i * 0.48
-            texts.append(
-                scene.geometry.circle(0.045)
-                .fill(color)
-                .no_stroke()
-                .move_to(cx - 3.1, y - 0.12)
-            )
-            texts.append(t(scene, line, cx - 2.9, y, size=0.22, color=INK))
-        scene.play(
+    texts: list[Drawable] = []
+    for i, line in enumerate(bullets):
+        y = 1.7 - i * 0.6
+        texts.append(dash(scene, 1.0, y - 0.15, color=STEEL))
+        texts.append(t(scene, line, 1.3, y, size=0.24, color=INK))
+    scene.play(
+        stagger(
+            wip.animate.fade_in().duration(0.3),
+            stagger(*[d.animate.fade_in().duration(0.3) for d in drawing], each=0.006),
             stagger(
-                tag.animate.fade_in().duration(0.3),
-                stagger(
-                    *[d.animate.fade_in().duration(0.3) for d in drawing], each=0.006
-                ),
-                stagger(
-                    *[
-                        x.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.3)
-                        for x in texts
-                    ],
-                    each=0.05,
-                ),
-                each=0.25,
-            )
+                *[
+                    x.animate.fade_in_from(Direction.LEFT, 0.06).duration(0.3)
+                    for x in texts
+                ],
+                each=0.05,
+            ),
+            each=0.25,
         )
-        scene.stop(f"idealizacion-{'mct' if color is BRICK else 'mst'}")
-    divider = scene.geometry.line(0, 2.4, 0, -2.6).stroke(RULE, 0.012)
-    scene.play(divider.animate.create().duration(0.4))
-    takeaway_at(
-        scene,
-        "La idealización y la asignación de cargas cambian las fuerzas que llegan a cada muro",
-        y=-3.15,
     )
-    source(
-        scene,
-        "Tesis · §4.5, p. 49; §5.3.1 y §5.3.2, pp. 58 y 67 · esquemas conceptuales",
-    )
-    scene.stop("idealizaciones")
+    source(scene, "Tesis · §5.3.2, p. 67 · esquema conceptual (en preparación)")
+    scene.stop("porticos-planos")
 
 
 def criteria(scene: Scene) -> None:
@@ -595,16 +1475,36 @@ SECTION = Section(
             ),
         ),
         SectionStep(
-            name="Proceso manual · idealizaciones",
-            build=idealizations,
+            name="Proceso manual · modelo completo en ETABS",
+            build=full_model,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. MCT: muros como áreas shell-thin (membrana + placa) con malla, "
-                "confinamientos como frames con nodos compatibles, losas membrane (E.030 art. 30.8), "
-                "cargas por volumen modelado; las fuerzas de diseño se integran en secciones Pier. "
-                "MST (pórticos planos, San Bartolomé): barras en el centroide de secciones "
-                "transformadas (n = Ec/Em, ancho efectivo de muros ortogonales), brazos rígidos, vigas "
-                "T/L y cargas por áreas tributarias. MSTA y MSTO usan esta idealización."
+                "1.5 min. El MCT se arma en ETABS 22 siguiendo sus menús: Definir, Dibujar y "
+                "Asignar (§5.3.1). (1) Grillas en los ejes del plano y cuatro pisos: 2.46 m y "
+                "3 × 2.52 m. (2) Materiales: albañilería ALB65 tipo Masonry (Em = 500 f'm, "
+                "ν = 0.25, γ = 1800 kgf/m³) y concreto C175 (Ec = 15 000√f'c, ν = 0.15). "
+                "(3) Secciones: columnas y vigas como frames; muros M13 y P13 como shell-thin "
+                "(membrana y placa); losa maciza LM12 como membrane (E.030, art. 30.8). (4) Se "
+                "dibuja de nodo a nodo; con Similar Stories cada elemento aparece en los cuatro "
+                "pisos, y los bordes de los shells caen sobre los frames. (5) Ocultando las losas "
+                "se ve la malla de 0.50 m (Wall Auto Mesh): sus nodos coinciden con los de "
+                "columnas y vigas; los brazos rígidos se asignaron a mano (End Length Offsets, "
+                "factor 0.5). (6) Diafragma rígido D1 en cada losa. (7) Etiquetas Pier: un nombre "
+                "por muro, igual en todos los pisos; con ellas ETABS integra los esfuerzos de la "
+                "malla en fuerzas por muro. (8) Load Sets: CM 0.10 y CV 0.20 tonf/m² (azotea "
+                "CV 0.10); masa = CM + 25 % CV: 121.3 tonf por piso típico y 87.8 en la azotea. "
+                "Al analizar, el modo 3 (T = 0.171 s) es la traslación pura en Y; la deformada "
+                "está exagerada. Dibujo esquemático: el orden de los clics es ilustrativo."
+            ),
+        ),
+        SectionStep(
+            name="Proceso manual · pórticos planos (WIP)",
+            build=plane_frames,
+            transition=Transition.cross_fade(0.45),
+            notes=(
+                "WIP. Pendiente: explicación del método de pórticos planos (MSTA y MSTO): barras "
+                "en el centroide de secciones transformadas (n = Ec/Em, ancho efectivo de muros "
+                "ortogonales), brazos rígidos, vigas T/L y cargas por áreas tributarias."
             ),
         ),
         SectionStep(

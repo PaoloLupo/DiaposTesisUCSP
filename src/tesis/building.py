@@ -36,6 +36,7 @@ __all__ = [
     "draw_plan",
     "grow_walls",
     "wall_area_sum",
+    "wall_segments",
 ]
 
 
@@ -86,7 +87,7 @@ def grow_walls(
     )
 
 
-def _wall_segments() -> list[tuple[str, Wall, float, float, float, float]]:
+def wall_segments() -> list[tuple[str, Wall, float, float, float, float]]:
     """(etiqueta, muro, x0, y0, x1, y1) para ambas mitades del edificio."""
     segments = []
     for wall in WALLS:
@@ -146,7 +147,7 @@ def draw_plan(
     thick = (
         drawn_thickness  # unidades de escena; el espesor real no se ve a esta escala
     )
-    for name, wall, ax, ay, bx, by in _wall_segments():
+    for name, wall, ax, ay, bx, by in wall_segments():
         color = (
             color_concrete
             if wall.material == "concreto"
