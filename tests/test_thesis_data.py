@@ -22,7 +22,9 @@ from tesis.data.thesis import (  # noqa: E402
     DENSITY_MIN,
     DRIFTS,
     LOAD_SETS,
+    MESH_N16_VARIATION,
     MODE_Y,
+    MODEL_CHECKS,
     MODELS,
     SEISMIC_FORCES,
     SEISMIC_WEIGHT,
@@ -105,6 +107,56 @@ class ComparisonTablesTest(unittest.TestCase):
                             self.assertEqual(
                                 data[direction][model][int(floor) - 1], float(value)
                             )
+
+
+class ModelingCriteriaTablesTest(unittest.TestCase):
+    """Capítulo 4: modelos de prueba frente al de referencia."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.chapter = (ROOT / "TesisUCSP/04_consideraciones.typ").read_text(
+            encoding="utf-8"
+        )
+
+    def errors(self, label: str) -> list[float]:
+        """Última columna (error %) de cada fila, sin la fila Total."""
+        rows = re.findall(r"\[(\d)\],[^\n]*\[(-?[\d.]+)%\]", table(self.chapter, label))
+        return [float(value) for _, value in rows]
+
+    def largest(self, label: str) -> float:
+        return max(self.errors(label), key=abs)
+
+    def total(self, label: str) -> float:
+        found = re.search(
+            r"\[Total\],[^\n]*\[(-?[\d.]+)%\]", table(self.chapter, label)
+        )
+        assert found is not None, label
+        return float(found.group(1))
+
+    def test_each_test_model_against_its_reference(self) -> None:
+        labels = {
+            "apoyo": ("tb:P_apo", "tb:Fi_apo", "tb:D_apo", "tb:mom_apo"),
+            "confinamiento": ("tb:P_sc", "tb:Fi_sc", "tb:D_sc", None),
+            "automaticas": ("tb:P_si", "tb:Fi_i", "tb:D_i", None),
+        }
+        for model, (weight, force, drift, moment) in labels.items():
+            checks = MODEL_CHECKS[model]
+            with self.subTest(model=model):
+                self.assertEqual(len(self.errors(force)), 4)
+                self.assertEqual(len(self.errors(drift)), 8)
+                self.assertEqual(checks["peso"], self.total(weight))
+                self.assertEqual(checks["fuerza"], self.largest(force))
+                self.assertEqual(checks["deriva"], self.largest(drift))
+                if moment is not None:
+                    self.assertEqual(checks["momento"], self.largest(moment))
+
+    def test_mesh_n8_against_n16(self) -> None:
+        rows = re.findall(r"\[N16\],([^\n]*)", table(self.chapter, "tb:disc_p"))
+        self.assertEqual(len(rows), 4)
+        variation = [
+            abs(float(v)) for row in rows for v in re.findall(r"\[(-?[\d.]+)%\]", row)
+        ]
+        self.assertEqual(max(variation), MESH_N16_VARIATION)
 
 
 class ManualProcessTablesTest(unittest.TestCase):

@@ -40,9 +40,9 @@ from tesis.building import (
 )
 from tesis.components import (
     compact_step,
+    comparison_card,
     enter,
     header,
-    image_card,
     page,
     panel,
     phase_heading,
@@ -51,7 +51,6 @@ from tesis.components import (
     takeaway_at,
 )
 from tesis.components import note as caption_note
-from tesis.components import takeaway as takeaway_box
 from tesis.data.planta import STORIES
 from tesis.data.porticos import (
     BARS,
@@ -69,12 +68,13 @@ from tesis.data.porticos import (
     tributary_x4,
 )
 from tesis.data.thesis import (
-    AUTOMATIC_DRIFT,
     CASE,
     LOAD_SETS,
+    MESH_N16_VARIATION,
+    MESH_SIZES,
     MESH_STEP,
     MODE_Y,
-    NO_CONFINEMENT_DRIFT,
+    MODEL_CHECKS,
     WEIGHT_BY_FLOOR,
 )
 from tesis.etabs_model import (
@@ -2008,67 +2008,95 @@ def plane_frames(scene: Scene) -> None:
     scene.stop("pp-diafragma")
 
 
+def _percent(value: float) -> str:
+    """Diferencia con signo tipográfico; el cero va sin signo."""
+    return "0.00 %" if value == 0 else f"{value:+.2f} %".replace("-", "−")
+
+
 def criteria(scene: Scene) -> None:
     header(scene, KICKER, "El modelo depende de decisiones que el software no toma")
+    support = MODEL_CHECKS["apoyo"]
+    bare = MODEL_CHECKS["confinamiento"]
+    auto = MODEL_CHECKS["automaticas"]
+    measured = [
+        ("Peso sísmico", "peso"),
+        ("Fuerza sísmica", "fuerza"),
+        ("Deriva", "deriva"),
+    ]
+    # (título, frente a qué, captura, cifra, rótulo, filas, color): en el orden del cap. 4.
     cards = [
         (
-            "cap4/Moelo_SC.png",
-            f"+{NO_CONFINEMENT_DRIFT:.1f} %",
-            "más deriva",
-            "Si se omiten columnas y vigas\nde confinamiento; el peso\nsísmico baja 5.96 %.",
-            BRICK,
-        ),
-        (
-            "cap4/mesh_auto.png",
-            f"−{abs(AUTOMATIC_DRIFT):.1f} %",
-            "menos deriva",
-            "Con las opciones automáticas\nde ETABS: puntos de inserción,\nbrazos rígidos y malla.",
-            BRICK,
-        ),
-        (
+            "Malla de los muros",
+            "muro de prueba de 4 pisos",
             "cap4/Prueba_Mesh.png",
             f"{MESH_STEP:.1f} m",
-            "malla suficiente",
-            "Malla N8: variación menor a\n1 % frente a N16 en el muro\nde prueba de 4 pisos.",
+            "malla suficiente (N8)",
+            [
+                ("Mallas probadas", "N2 … N32"),
+                ("Lado", f"{MESH_SIZES[0]:g} … {MESH_SIZES[-1]:g} m"),
+                ("Deriva N16 vs. N8", f"≤ {MESH_N16_VARIATION:.2f} %"),
+                ("Criterio", "< 1 %"),
+            ],
             STEEL,
         ),
         (
-            "cap5/PIERS.png",
-            "X1 … Y7",
-            "etiquetas Pier",
-            "Una etiqueta por muro, igual\nen todos los pisos; con ella\nse agrupan las fuerzas.",
+            "Apoyo simple vs. empotrado",
+            "empotrado frente a apoyo fijo",
+            "cap4/Modelo_empotrado.png",
+            f"≤ {max(abs(v) for v in support.values()):.1f} %",
+            "basta el apoyo simple",
+            [
+                *[(name, _percent(support[key])) for name, key in measured],
+                ("Momento en muros", _percent(support["momento"])),
+            ],
             STEEL,
+        ),
+        (
+            "Sin columnas de confinamiento",
+            "frente al modelo confinado",
+            "cap4/Moelo_SC.png",
+            f"+{bare['deriva']:.1f} %",
+            "más deriva",
+            [(name, _percent(bare[key])) for name, key in measured],
+            BRICK,
+        ),
+        (
+            "Opciones automáticas de ETABS",
+            "inserción, brazos rígidos y malla",
+            "cap4/mesh_auto.png",
+            f"−{abs(auto['deriva']):.1f} %",
+            "menos deriva",
+            [(name, _percent(auto[key])) for name, key in measured],
+            BRICK,
         ),
     ]
     built = [
-        image_card(
+        comparison_card(
             scene,
+            title=title,
+            versus=versus,
             picture=scene.media.image(
-                thesis_image(image), width=2.9, height=2.25, fit="contain"
+                thesis_image(image), width=2.9, height=2.6, fit="contain"
             ),
             value=big,
             unit=unit,
-            body=body.replace("\n", " "),
+            rows=rows,
             color=color,
         )
-        for image, big, unit, body, color in cards
+        for title, versus, image, big, unit, rows, color in cards
     ]
     row = scene.layout.row(
-        *built, gap="32px", align="stretch", width="fill", height="fill"
+        *built, gap="28px", align="stretch", width="fill", height="fill"
     )
-    closing = takeaway_box(
-        scene,
-        text="Alba lee el modelo tal como fue construido: el criterio del ingeniero sigue siendo clave",
-    )
-    page(scene, body=[row, closing], gap="40px")
+    page(scene, body=[row])
     for card in built:
         scene.play(
-            enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.08)
+            enter(card, direction=Direction.UP, distance=0.08, duration=0.3, each=0.06)
         )
-    scene.play(enter(closing))
     source(
         scene,
-        "Tesis · Tablas 8, 14, 16 y 19, pp. 35, 42, 44 y 49; Figura 34, p. 66 · capturas de ETABS de la tesis",
+        "Tesis · cap. 4: Tabla 8, p. 35 · Tablas 10–13, pp. 39–40 · Tablas 14–16, pp. 42–44 "
+        "· Tablas 17–19, pp. 48–49 · capturas de ETABS de la tesis",
     )
     scene.stop("criterios-modelamiento")
 
@@ -2307,11 +2335,15 @@ SECTION = Section(
             build=criteria,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1 min. Evidencia del cap. 4 con modelos de prueba: sin confinamientos el peso "
-                "baja 5.96 % y las derivas suben hasta 38.50 %; con las opciones automáticas de ETABS "
-                "(puntos de inserción, brazos rígidos, malla por defecto) las derivas son hasta 10.53 % "
-                "menores (modelo más rígido, no conservador); la malla N8 de 0.5 m converge con "
-                "variación menor a 1 %. Las etiquetas Pier deben ser únicas y continuas en altura."
+                "1 min. Las cuatro comparaciones del cap. 4, cada una frente a su modelo de "
+                "referencia (peso sísmico, fuerza sísmica y deriva; el apoyo también momentos). "
+                "(1) Malla: el muro de prueba se analizó con mallas N2 a N32; entre N8 y N16 la deriva "
+                "varía 0.01 %, así que basta N8 de 0.5 m. (2) Apoyo: empotrar no cambia peso ni "
+                "fuerzas, la deriva baja hasta 2.63 % y el momento sube hasta 1.89 %; sin estudio de "
+                "suelos basta el apoyo simple. (3) Sin columnas ni vigas de confinamiento: el peso y "
+                "el cortante basal bajan 5.96 % y la deriva sube hasta 38.50 %. (4) Opciones "
+                "automáticas de ETABS (inserción, brazos rígidos, malla): peso igual, deriva hasta "
+                "10.53 % menor, un modelo más rígido y no conservador."
             ),
         ),
         SectionStep(

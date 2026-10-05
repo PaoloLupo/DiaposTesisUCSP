@@ -158,11 +158,20 @@ AXIAL_LIMITS = (9.383, 9.75)  # kgf/cm²
 
 # 04_consideraciones.typ: evidencia de criterios de modelamiento.
 MESH_STEP = 0.5  # m, malla N8: variación < 1 % respecto de N16 (tb:disc_p)
-NO_CONFINEMENT_WEIGHT = (
-    -5.96
-)  # % de peso sísmico sin elementos de confinamiento (tb:P_sc)
-NO_CONFINEMENT_DRIFT = 38.50  # % más de distorsión sin confinamientos (tb:D_sc)
-AUTOMATIC_DRIFT = -10.53  # % de distorsión con opciones automáticas de ETABS (tb:D_i)
+MESH_SIZES = (2.0, 1.0, 0.5, 0.25, 0.125)  # m, mallas N2 … N32 del muro de prueba
+MESH_N16_VARIATION = 0.01  # %, mayor variación de deriva de N16 frente a N8
+# Diferencia de cada modelo de prueba frente al de referencia, en %, con el signo de
+# las tablas: peso total, fuerza sísmica, deriva y momento de mayor valor absoluto.
+MODEL_CHECKS = {
+    # Apoyo empotrado (MAE) frente a apoyo fijo o simple (MAF): tb:P_apo … tb:mom_apo.
+    "apoyo": {"peso": 0.00, "fuerza": 0.00, "deriva": -2.63, "momento": 1.89},
+    # Sin columnas ni vigas de confinamiento (MSC) frente al modelo con ellas (MCC).
+    "confinamiento": {"peso": -5.96, "fuerza": -5.96, "deriva": 38.50},
+    # Opciones por defecto de ETABS (MPD) frente al modelo ajustado (MM).
+    "automaticas": {"peso": 0.02, "fuerza": 0.03, "deriva": -10.53},
+}
+NO_CONFINEMENT_DRIFT = MODEL_CHECKS["confinamiento"]["deriva"]
+AUTOMATIC_DRIFT = MODEL_CHECKS["automaticas"]["deriva"]
 
 # 05_analisismanual.typ, <tb:asig_cargas>: (CM de acabados, CV) en tonf/m² por Load Set.
 LOAD_SETS = {"Piso típico": (0.10, 0.20), "Azotea": (0.10, 0.10)}

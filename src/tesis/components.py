@@ -359,27 +359,44 @@ def enter(
 
 
 @component
-def image_card(
+def comparison_card(
     scene: Scene,
     *,
+    title: str,
+    versus: str,
     picture: Drawable,
     value: str,
     unit: str,
-    body: str,
+    rows: list[tuple[str, str]],
     color: Color = BRICK,
 ) -> Box:
-    """Tarjeta con una captura arriba, una cifra en Aleo, su rótulo y una explicación.
+    """Modelo de prueba: qué cambia, una captura, la cifra clave y todas sus diferencias.
 
-    La explicación crece: las tarjetas vecinas terminan a la misma altura.
+    Título, captura y cifra tienen alto fijo: las filas de tarjetas vecinas empiezan a
+    la misma altura y las tarjetas terminan juntas.
     """
     L = scene.layout
     return L.box(
-        L.box(picture, width="fill", height="300px", align="center", justify="center"),
-        L.box(value, font=DISPLAY, font_size="62px", weight=700, color=color),
-        note(scene, text=unit, color=color, size="17px"),
-        L.box(body, font_size="24px", color=INK_SOFT).item(grow=1),
-        gap="18px",
-        padding=("30px", "30px", "30px", "30px"),
+        L.box(title, font_size="23px", weight=900, color=INK),
+        L.box(versus, font_size="18px", color=MUTED),
+        L.box(picture, width="fill", height="320px", align="center", justify="center"),
+        L.box(value, font=DISPLAY, font_size="54px", weight=700, color=color),
+        note(scene, text=unit, color=color, size="16px"),
+        L.column(
+            *[
+                L.row(
+                    L.box(label, font_size="21px", color=INK_SOFT).item(grow=1),
+                    L.box(figure, font=MONO, font_size="21px", color=INK),
+                    align="center",
+                    width="fill",
+                )
+                for label, figure in rows
+            ],
+            gap="7px",
+            width="fill",
+        ).item(grow=1),
+        gap="12px",
+        padding=("24px", "26px", "24px", "26px"),
         background=CARD,
         border=RULE,
         border_width="2px",
