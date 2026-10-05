@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="210" viewBox="0 0 180 210">
+  <!-- Modelo simplificado original (2006): columna ancha con brazos rígidos. -->
+  <rect id="muro" x="34" y="36" width="112" height="160" fill="#E4E3E0" stroke="#D9D3C7" stroke-width="2" stroke-dasharray="6 5"/>
+  <path id="vigas" d="M16 116 H34 M146 116 H164 M16 36 H34 M146 36 H164 " stroke="#4B515D" stroke-width="3"/>
+  <path id="barra" d="M90 196 V36" stroke="#8A8D93" stroke-width="7"/>
+  <g id="brazos" fill="#8A8D93">
+    <rect x="34" y="112" width="112" height="8"/>
+    <rect x="34" y="32" width="112" height="8"/>
+  </g>
+  <g id="nudos" fill="#FBF9F5" stroke="#8A8D93" stroke-width="2.5">
+    <circle cx="34" cy="116" r="4.5"/>
+    <circle cx="146" cy="116" r="4.5"/>
+    <circle cx="34" cy="36" r="4.5"/>
+    <circle cx="146" cy="36" r="4.5"/>
+  </g>
+  <path id="base" d="M16 197 H164" stroke="#1D2129" stroke-width="4"/>
+</svg>

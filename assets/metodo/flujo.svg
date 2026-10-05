@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="290" viewBox="0 0 220 290">
+  <!-- Diagrama de flujo: inicio, proceso, decisión con iteración y fin. -->
+  <rect id="inicio" x="70" y="4" width="80" height="26" rx="13" fill="#1D2129"/>
+  <g id="a1">
+    <path d="M110 30 V52" fill="none" stroke="#4B515D" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="103,46.2 117,46.2 110,56" fill="#4B515D"/>
+  </g>
+  <g id="proceso">
+    <rect x="48.0" y="56" width="124" height="36" fill="#FBF9F5" stroke="#4B515D" stroke-width="2.5"/>
+    <rect x="66.0" y="71.0" width="88" height="6" fill="#D9D3C7"/>
+  </g>
+  <g id="a2">
+    <path d="M110 92 V110" fill="none" stroke="#4B515D" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="103,104.2 117,104.2 110,114" fill="#4B515D"/>
+  </g>
+  <g id="decision">
+    <polygon points="110,116 168,150 110,184 52,150" fill="#F2DED3" stroke="#B8532F" stroke-width="2.5" stroke-linejoin="round"/>
+    <rect x="84" y="147" width="52" height="6" fill="#E6E1D6"/>
+  </g>
+  <g id="a3">
+    <path d="M110 184 V200" fill="none" stroke="#4B515D" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="103,194.2 117,194.2 110,204" fill="#4B515D"/>
+  </g>
+  <g id="verificacion">
+    <rect x="48.0" y="204" width="124" height="36" fill="#FBF9F5" stroke="#4B515D" stroke-width="2.5"/>
+    <rect x="66.0" y="219.0" width="88" height="6" fill="#D9D3C7"/>
+  </g>
+  <g id="a4">
+    <path d="M110 240 V254" fill="none" stroke="#4B515D" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="103,248.2 117,248.2 110,258" fill="#4B515D"/>
+  </g>
+  <rect id="fin" x="70" y="258" width="80" height="26" rx="13" fill="#1D2129"/>
+  <g id="bucle">
+    <path d="M168 150 H202 V74 H180" fill="none" stroke="#B8532F" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="181.8,67 181.8,81 172,74" fill="#B8532F"/>
+  </g>
+</svg>

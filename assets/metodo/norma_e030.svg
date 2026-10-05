@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="260" viewBox="0 0 200 260">
+  <!-- Norma E.030: hoja con el espectro de diseño sísmico. -->
+  <path id="hoja" d="M2 2 H166 L198 34 V258 H2 Z" fill="#FBF9F5" stroke="#D9D3C7" stroke-width="2.5" stroke-linejoin="round"/>
+  <path id="pliegue" d="M166 2 V34 H198" fill="#ECE7DD" stroke="#D9D3C7" stroke-width="2.5" stroke-linejoin="round"/>
+  <g id="lineas">
+    <rect x="22" y="96" width="132" height="5" fill="#E6E1D6"/>
+    <rect x="22" y="108" width="104" height="5" fill="#E6E1D6"/>
+  </g>
+  <polygon id="area" points="30,232 30.0,196.0 50.0,150.0 92.0,150.0 95.6,154.5 99.2,158.5 102.8,162.1 106.3,165.4 109.9,168.4 113.5,171.1 117.1,173.6 120.7,175.9 124.2,178.1 127.8,180.0 131.4,181.9 135.0,183.6 138.6,185.2 142.2,186.7 145.8,188.1 149.3,189.4 152.9,190.6 156.5,191.8 160.1,192.9 163.7,194.0 167.2,195.0 170.8,195.9 174.4,196.8 178.0,197.6 178,232" fill="#DCE5EF"/>
+  <path id="ejes" d="M30 132 V232 H182" fill="none" stroke="#8B8F98" stroke-width="2.5"/>
+  <polyline id="espectro" points="30.0,196.0 50.0,150.0 92.0,150.0 95.6,154.5 99.2,158.5 102.8,162.1 106.3,165.4 109.9,168.4 113.5,171.1 117.1,173.6 120.7,175.9 124.2,178.1 127.8,180.0 131.4,181.9 135.0,183.6 138.6,185.2 142.2,186.7 145.8,188.1 149.3,189.4 152.9,190.6 156.5,191.8 160.1,192.9 163.7,194.0 167.2,195.0 170.8,195.9 174.4,196.8 178.0,197.6" fill="none" stroke="#2E5B87" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

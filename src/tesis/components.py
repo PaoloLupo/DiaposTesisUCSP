@@ -22,15 +22,14 @@ from gaanim import (
 
 from tesis.theme import (
     BRICK,
-    CAPTION,
-    KICKER,
-    TITLE,
     BRICK_DEEP,
     BRICK_SOFT,
+    CAPTION,
     CARD,
     DISPLAY,
     INK,
     INK_SOFT,
+    KICKER,
     MONO,
     MUTED,
     PAPER_DEEP,
@@ -38,6 +37,7 @@ from tesis.theme import (
     RULE,
     STEEL,
     STEEL_SOFT,
+    TITLE,
 )
 
 SIDE = "24px"  # margen lateral de la retícula (x = ±7.3 sobre un área segura de ±7.5)
@@ -269,6 +269,41 @@ def step(scene: Scene, *, number: int, name: str, text: str, last: bool = False)
         L.box(text, font_size="23px", color=INK_SOFT),
         gap="16px",
     ).item(grow=1)
+
+
+@component
+def stage(
+    scene: Scene,
+    *,
+    number: int,
+    name: str,
+    picture: Drawable,
+    caption: str,
+    height: str = "200px",
+    width: str | None = None,
+) -> Box:
+    """Etapa de un método: filete, número y nombre, un gráfico y una línea de pie.
+
+    El gráfico se centra en un hueco de altura fija: las etapas vecinas alinean
+    sus nombres, sus gráficos y sus pies aunque los dibujos midan distinto. Con
+    ``width`` la etapa tiene ancho fijo; sin él, crece con su fila.
+    """
+    L = scene.layout
+    size = {"width": width} if width else {}
+    column = L.column(
+        hairline(scene),
+        L.row(
+            L.box(f"{number}", font=DISPLAY, font_size="34px", weight=700, color=BRICK),
+            L.box(name, font_size="26px", weight=900, color=INK),
+            gap="14px",
+            align="baseline",
+        ),
+        L.box(picture, width="fill", height=height, align="center", justify="center"),
+        L.box(caption, font_size="20px", color=INK_SOFT),
+        gap="14px",
+        **size,
+    )
+    return column.item(shrink=0) if width else column.item(grow=1)
 
 
 def enter(

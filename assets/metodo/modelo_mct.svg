@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="210" viewBox="0 0 180 210">
+  <!-- Modelo completo tridimensional: muro como elementos de área (shell). -->
+  <rect id="panel" x="48" y="36" width="84" height="160" fill="#F2DED3"/>
+  <path id="malla" d="M48.0 126 V196 M62.0 126 V196 M76.0 126 V196 M90.0 126 V196 M104.0 126 V196 M118.0 126 V196 M132.0 126 V196 M48 126.0 H132 M48 140.0 H132 M48 154.0 H132 M48 168.0 H132 M48 182.0 H132 M48 196.0 H132 M48.0 46 V116 M62.0 46 V116 M76.0 46 V116 M90.0 46 V116 M104.0 46 V116 M118.0 46 V116 M132.0 46 V116 M48 46.0 H132 M48 60.0 H132 M48 74.0 H132 M48 88.0 H132 M48 102.0 H132 M48 116.0 H132" fill="none" stroke="#B8532F" stroke-width="2"/>
+  <g id="columnas" fill="#E4E3E0" stroke="#8A8D93" stroke-width="2">
+    <rect x="34" y="36" width="14" height="160"/>
+    <rect x="132" y="36" width="14" height="160"/>
+  </g>
+  <g id="losas" fill="#4B515D">
+    <rect x="16" y="116" width="148" height="10"/>
+    <rect x="16" y="36" width="148" height="10"/>
+  </g>
+  <path id="base" d="M16 197 H164" stroke="#1D2129" stroke-width="4"/>
+</svg>

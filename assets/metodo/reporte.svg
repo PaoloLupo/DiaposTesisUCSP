@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="260" viewBox="0 0 200 260">
+  <!-- Reporte PDF: fórmula, filas de verificación y marcas de cumplimiento. -->
+  <path id="hoja" d="M2 2 H166 L198 34 V258 H2 Z" fill="#FBF9F5" stroke="#D9D3C7" stroke-width="2.5" stroke-linejoin="round"/>
+  <path id="pliegue" d="M166 2 V34 H198" fill="#ECE7DD" stroke="#D9D3C7" stroke-width="2.5" stroke-linejoin="round"/>
+  <g id="lineas">
+    <rect x="22" y="60" width="120" height="5" fill="#D9D3C7"/>
+    <rect x="22" y="74" width="88" height="5" fill="#D9D3C7"/>
+  </g>
+  <g id="formula">
+    <rect x="22" y="100" width="156" height="30" fill="#ECE7DD"/>
+    <rect x="36" y="112" width="40" height="6" fill="#4B515D"/>
+    <rect x="86" y="109" width="12" height="3" fill="#4B515D"/>
+    <rect x="86" y="118" width="12" height="3" fill="#4B515D"/>
+    <rect x="108" y="112" width="56" height="6" fill="#4B515D"/>
+  </g>
+  <g id="filas">
+    <rect x="22" y="150" width="104" height="6" fill="#D9D3C7"/>
+    <rect x="22" y="178" width="86" height="6" fill="#D9D3C7"/>
+    <rect x="22" y="206" width="112" height="6" fill="#D9D3C7"/>
+  </g>
+  <g id="cumple">
+    <path d="M150 150 l6 6 l12 -13" fill="none" stroke="#2E7A58" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M150 178 l6 6 l12 -13" fill="none" stroke="#2E7A58" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M150 206 l6 6 l12 -13" fill="none" stroke="#2E7A58" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

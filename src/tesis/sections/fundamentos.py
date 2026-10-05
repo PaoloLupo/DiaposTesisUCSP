@@ -32,6 +32,15 @@ from tesis.building import (
     grow_walls,
     wall_area_sum,
 )
+from tesis.components import (
+    enter,
+    hairline,
+    header,
+    page,
+    readout_card,
+    source,
+    takeaway_at,
+)
 from tesis.data.thesis import (
     AXIAL_LIMITS,
     AXIAL_STRESS_FLOOR1,
@@ -42,15 +51,6 @@ from tesis.data.thesis import (
     DRIFTS,
     SHEAR_CAPACITY,
     SHEAR_DEMAND,
-)
-from tesis.components import (
-    enter,
-    hairline,
-    header,
-    page,
-    readout_card,
-    source,
-    takeaway_at,
 )
 from tesis.kit import LEFT_EDGE, dimension, label, status, t
 from tesis.theme import (
@@ -580,9 +580,9 @@ def strength_checks(scene: Scene) -> None:
     demand, capacity = SHEAR_DEMAND["X"]["MCT"][0], SHEAR_CAPACITY["X"]["MCT"][0]
     cards = [
         {
-            "tag": "Gravedad",
+            "tag": "Cargas gravitatorias",
             "color": INK_SOFT,
-            "question": "¿La compresión en el muro\nes admisible?",
+            "question": "¿La compresión en el muro es admisible?",
             "eq": [
                 "sigma_m = P_m slash (L t)",
                 "sigma_m <= 0.2 f'_m [1 - (h slash 35 t)^2] <= 0.15 f'_m",
@@ -661,9 +661,11 @@ def strength_checks(scene: Scene) -> None:
         )
     row = L.row(*boxes, gap="32px", align="stretch", width="fill", height="fill")
     page(scene, body=[row], top="190px", bottom="110px")
-    for i, (spec, box, slot) in enumerate(zip(cards, boxes, slots, strict=True)):
+    # Medir los huecos antes de cualquier play: después, cada bounds() recompila
+    # toda la presentación hasta el cursor.
+    areas = [slot.bounds() for slot in slots]
+    for i, (spec, box, area) in enumerate(zip(cards, boxes, areas, strict=True)):
         # El dibujo se coloca en coordenadas sobre el hueco que reservó el layout.
-        area = slot.bounds()
         cx, cy = (area.left + area.right) / 2, (area.top + area.bottom) / 2
         drawing, extras, arrows = _check_drawing(scene, i, cx, cy - 1.375)
         scene.play(

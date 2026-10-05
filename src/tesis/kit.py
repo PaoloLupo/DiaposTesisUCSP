@@ -57,7 +57,13 @@ def t(
     escriben como matemática: ``"$V_e$"``.
     """
     return scene.text(
-        content, style=style, size=size, color=color, weight=weight, font=font
+        content,
+        style=style,
+        size=size,
+        color=color,
+        weight=weight,
+        font=font,
+        line_spacing=1,
     ).move_to(x, y, anchor)
 
 

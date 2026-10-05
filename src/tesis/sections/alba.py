@@ -16,11 +16,11 @@ from gaanim import (
 
 from tesis.app import thesis_image
 from tesis.components import (
-    module_card,
     chip,
     enter,
     hairline,
     header,
+    module_card,
     note,
     panel,
     source,

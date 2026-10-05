@@ -16,15 +16,15 @@ from gaanim import (
 
 from tesis.app import thesis_image
 from tesis.building import DEPTH, WIDTH, draw_plan, grow_walls
+from tesis.components import enter, header, image_card, page, panel, source, takeaway_at
+from tesis.components import note as caption_note
+from tesis.components import takeaway as takeaway_box
 from tesis.data.thesis import (
     AUTOMATIC_DRIFT,
     CASE,
     MESH_STEP,
     NO_CONFINEMENT_DRIFT,
 )
-from tesis.components import enter, header, image_card, page, panel, source, takeaway_at
-from tesis.components import note as caption_note
-from tesis.components import takeaway as takeaway_box
 from tesis.kit import dimension, label, t
 from tesis.theme import (
     BRICK,
