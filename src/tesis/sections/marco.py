@@ -1,7 +1,13 @@
 """Bloque 5 · Marco de trabajo: qué se automatiza, flujo general, módulos y trazabilidad."""
 
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Literal
+
 from gaanim import (
     Anchor,
+    Box,
+    Composition,
     Direction,
     Drawable,
     Easing,
@@ -10,6 +16,7 @@ from gaanim import (
     Section,
     SectionStep,
     Transition,
+    parallel,
     sequence,
     stagger,
 )
@@ -27,6 +34,7 @@ from tesis.components import (
     pill,
     role_column,
     source,
+    source_block,
 )
 from tesis.components import takeaway as takeaway_box
 from tesis.data.thesis import DENSITY_MIN, SHEAR_CAPACITY, SHEAR_DEMAND
@@ -326,121 +334,361 @@ def general_flow(scene: Scene) -> None:
     scene.stop("flujo-general")
 
 
+@dataclass(frozen=True)
+class FlowStep:
+    """Nodo de un diagrama de módulo; ``no`` es la rama negativa de una decisión."""
+
+    kind: Literal["io", "process", "decision"]
+    text: str
+    no: str | None = None
+    w: float | None = None  # sin ancho, el del carril
+
+    def h(self, size: float) -> float:
+        """Alto según las líneas y la letra; el rombo necesita holgura para el texto."""
+        lines = self.text.count("\n") + 1
+        return lines * 1.55 * size + (0.555 if self.kind == "decision" else 0.235)
+
+    def reach(self, size: float) -> float:
+        """Media altura hasta donde llega una flecha: el vértice o poco antes del borde."""
+        return self.h(size) / 2 + (0.0 if self.kind == "decision" else 0.04)
+
+
+@dataclass(frozen=True)
+class Module:
+    """Diagrama del cap. 6 en dos carriles: se muestra como evidencia, sin recorrido."""
+
+    tab: int
+    stop: str
+    source: str
+    size: float
+    lanes: tuple[tuple[FlowStep, ...], tuple[FlowStep, ...]]
+
+
+@dataclass(frozen=True)
+class Chart:
+    """Diagrama dibujado: nodos y centros por carril, flechas y ramas «no»."""
+
+    nodes: list[list[Drawable]]
+    ys: list[list[float]]
+    arrows: list[Drawable]
+    notes: list[Drawable]
+    flow: list[tuple[Drawable, bool]]  # orden de lectura; True si es flecha
+
+    @property
+    def pieces(self) -> list[Drawable]:
+        return [d for d, _ in self.flow] + self.notes
+
+    def entrance(self) -> Composition:
+        return sequence(
+            stagger(
+                *[
+                    d.animate.grow_arrow().duration(0.25)
+                    if arrow
+                    else d.animate.fade_in().duration(0.25)
+                    for d, arrow in self.flow
+                ],
+                each=0.05,
+            ),
+            parallel(*[n.animate.fade_in().duration(0.25) for n in self.notes]),
+        )
+
+
+DENSITY = (
+    FlowStep(
+        "io",
+        "Parámetros Z, U, S, N, $A_p$ · tabla de muros (etiqueta, L, t, material)",
+    ),
+    FlowStep(
+        "decision",
+        "¿Datos completos y unidades compatibles?",
+        no="no → diagnóstico,\nsin resultado",
+        w=3.9,
+    ),
+    FlowStep("process", "Clasificar muros por dirección (X / Y) y material"),
+    FlowStep("process", "Aporte efectivo: albañilería L·t · concreto L·t·Ec/Em"),
+    FlowStep("process", "Sumar los aportes de cada dirección"),
+    FlowStep("process", '$D_"mín" = Z U S N slash 56$   ·   $D = sum L t slash A_p$'),
+    FlowStep(
+        "decision",
+        '¿$D_X$ y $D_Y >= D_"mín"$?',
+        no="no → registra dirección\ne incumplimiento",
+        w=3.4,
+    ),
+    FlowStep("io", "Tabla comparativa y relación de muros considerados"),
+)
+
+# Figuras 44 a 46 sin Inicio ni Fin, como el diagrama de densidad. Los dos carriles
+# tienen tantos pasos como filas: así ambos llenan el alto.
+EVIDENCE = (
+    Module(
+        tab=1,
+        stop="modulo-axial",
+        source="Tesis · Figura 44, p. 107 (E.070, art. 19.1b)",
+        size=0.2,
+        lanes=(
+            (
+                FlowStep(
+                    "io",
+                    "Tabla por muro, nivel y dirección:\netiqueta, $P_m$, L, t, h, $f'_m$",
+                ),
+                FlowStep(
+                    "process",
+                    "Validar combinación de servicio,\ngeometría, material y unidades",
+                ),
+                FlowStep("process", "Recorrer los registros por muro y nivel"),
+                FlowStep("process", "$sigma_m = P_m slash (L t)$"),
+                FlowStep(
+                    "process",
+                    '$sigma_"adm1" = 0.2 f\'_m [1 - (h slash 35 t)^2]$   ·   '
+                    '$sigma_"adm2" = 0.15 f\'_m$',
+                ),
+            ),
+            (
+                FlowStep(
+                    "decision",
+                    '¿$sigma_m <= sigma_"adm1"$\ny $sigma_m <= sigma_"adm2"$?',
+                    no="no → «no cumple»: identifica\nmuro, nivel y dirección",
+                    w=3.0,
+                ),
+                FlowStep(
+                    "process",
+                    'Estado «cumple»: registrar $sigma_m$, $sigma_"adm1"$ y $sigma_"adm2"$',
+                ),
+                FlowStep("process", "Repetir en todos los muros sin perder su origen"),
+                FlowStep(
+                    "process", "Consolidar e identificar el muro y nivel más exigidos"
+                ),
+                FlowStep("io", "Resultados y mensajes de diagnóstico"),
+            ),
+        ),
+    ),
+    Module(
+        tab=2,
+        stop="modulo-corte",
+        source="Tesis · Figura 45, p. 109 (E.070, arts. 26.2 y 26.3)",
+        size=0.19,
+        lanes=(
+            (
+                FlowStep(
+                    "io",
+                    "Tabla por muro, nivel y dirección:\n"
+                    "etiqueta, $V_e$, $M_e$, $P_g$, L, t, $v'_m$",
+                ),
+                FlowStep(
+                    "process",
+                    "Validar casos de carga, geometría, propiedades y unidades",
+                ),
+                FlowStep("process", "Recorrer cada muro con su nivel y dirección"),
+                FlowStep(
+                    "process",
+                    "$alpha = V_e L slash M_e$, con $1 slash 3 <= alpha <= 1$",
+                ),
+                FlowStep("process", "$V_m = 0.5 v'_m alpha t L + 0.23 P_g$"),
+                FlowStep(
+                    "decision",
+                    "¿$V_e <= 0.55 V_m$?",
+                    no="no → registra el muro\ncon fisuración",
+                    w=2.8,
+                ),
+            ),
+            (
+                FlowStep("process", "Registrar demanda, capacidad y estado por muro"),
+                FlowStep("process", "Agrupar por entrepiso y dirección de análisis"),
+                FlowStep("process", "$sum V_(m i)$   ·   $V_(E i) = 2 sum V_(e i)$"),
+                FlowStep(
+                    "decision",
+                    "¿$sum V_(m i) >= V_(E i)$?",
+                    no="no → registra entrepiso y\ndirección con insuficiencia",
+                    w=3.2,
+                ),
+                FlowStep(
+                    "process", "Generar tablas de fisuración y resistencia global"
+                ),
+                FlowStep("io", "Resultados y diagnósticos"),
+            ),
+        ),
+    ),
+    Module(
+        tab=3,
+        stop="modulo-derivas",
+        source="Tesis · Figura 46, p. 110 (E.030, Tabla N.° 11)",
+        size=0.2,
+        lanes=(
+            (
+                FlowStep(
+                    "io",
+                    "Desplazamientos por nivel y dirección:\n"
+                    "$u_i$, $u_(i-1)$, $h_i$ y factor $c$",
+                ),
+                FlowStep("process", "Validar caso sísmico, unidades y alturas"),
+                FlowStep(
+                    "process", "Ordenar niveles por elevación y separar por dirección"
+                ),
+                FlowStep("process", "$delta_i = abs(u_i - u_(i-1))$"),
+                FlowStep("process", "$Delta_i slash h_i = c dot delta_i slash h_i$"),
+            ),
+            (
+                FlowStep(
+                    "decision",
+                    "¿$Delta_i slash h_i <= 0.005$?",
+                    no="no → registra nivel,\ndirección y distorsión",
+                    w=3.2,
+                ),
+                FlowStep("process", "Estado «cumple»"),
+                FlowStep("process", "Registrar distorsión y límite"),
+                FlowStep(
+                    "process", "Identificar la distorsión máxima y el nivel crítico"
+                ),
+                FlowStep("io", "Tabla y gráfico por dirección"),
+            ),
+        ),
+    ),
+)
+# Pestañas centradas bajo el título; los diagramas ocupan todo el alto restante.
+TAB_Y = 2.55
+CHART_TOP, CHART_BOTTOM = 2.15, -3.45
+LANE_X, LANE_W = (-3.55, 3.55), 5.6
+
+
+def _rows(lanes: Sequence[Sequence[FlowStep]], size: float) -> list[list[float]]:
+    """Centros y por carril: filas compartidas, repartidas de arriba abajo."""
+    count = max(len(lane) for lane in lanes)
+    heights = [
+        max(lane[i].h(size) for lane in lanes if i < len(lane)) for i in range(count)
+    ]
+    gap = (CHART_TOP - CHART_BOTTOM - sum(heights)) / (count - 1)
+    assert gap > 0.1, f"el diagrama no cabe (separación {gap:.2f})"
+    centers: list[float] = []
+    y = CHART_TOP
+    for h in heights:
+        centers.append(y - h / 2)
+        y -= h + gap
+    return [centers[: len(lane)] for lane in lanes]
+
+
+def _flow_node(
+    scene: Scene, step: FlowStep, cx: float, cy: float, w: float, size: float
+) -> Drawable:
+    h = step.h(size)
+    if step.kind == "io":
+        return io(scene, cx, cy, w, h, step.text, size=size)
+    if step.kind == "decision":
+        return decision(scene, cx, cy, w, h, step.text, size=size)
+    return process(scene, cx, cy, w, h, step.text, size=size)
+
+
+def _draw_chart(
+    scene: Scene,
+    lanes: Sequence[Sequence[FlowStep]],
+    xs: Sequence[float],
+    *,
+    size: float,
+    width: float,
+) -> Chart:
+    """Dibuja un diagrama por carriles; el último paso de uno lleva al primero del otro."""
+    ys = _rows(lanes, size)
+    nodes: list[list[Drawable]] = []
+    arrows: list[Drawable] = []
+    notes: list[Drawable] = []
+    flow: list[tuple[Drawable, bool]] = []
+    for lane, (steps, cx, centers) in enumerate(zip(lanes, xs, ys, strict=True)):
+        column: list[Drawable] = []
+        for i, (step, cy) in enumerate(zip(steps, centers, strict=True)):
+            w = step.w or width
+            arrow: Drawable | None = None
+            if i > 0:
+                arrow = link(
+                    scene,
+                    (cx, centers[i - 1] - steps[i - 1].reach(size)),
+                    (cx, cy + step.reach(size)),
+                )
+            elif lane > 0:
+                last, lx, ly = lanes[lane - 1][-1], xs[lane - 1], ys[lane - 1][-1]
+                turn = (lx + cx) / 2
+                arrow = link(
+                    scene,
+                    (lx + (last.w or width) / 2 + 0.04, ly),
+                    (turn, ly),
+                    (turn, cy),
+                    (cx - w / 2 - 0.04, cy),
+                )
+            if arrow is not None:
+                arrows.append(arrow)
+                flow.append((arrow, True))
+            node = _flow_node(scene, step, cx, cy, w, size)
+            column.append(node)
+            flow.append((node, False))
+            if step.no is not None:
+                # La rama «no» se escribe hacia fuera del carril.
+                outer = lane == 0
+                notes.append(
+                    t(
+                        scene,
+                        step.no,
+                        cx + (w / 2 + 0.1) * (-1 if outer else 1),
+                        cy + 0.05,
+                        size=round(size * 0.82, 3),
+                        color=FAIL,
+                        anchor=Anchor.RIGHT if outer else Anchor.LEFT,
+                    )
+                )
+        nodes.append(column)
+    return Chart(nodes, ys, arrows, notes, flow)
+
+
+def _tabs(scene: Scene, names: Sequence[str]) -> tuple[list[Box], list[Box]]:
+    """Pestañas centradas, cada una activa e inactiva en el mismo lugar."""
+    on: list[Box] = []
+    off: list[Box] = []
+    for name in names:
+        for boxes, active in ((on, True), (off, False)):
+            boxes.append(
+                pill(
+                    scene,
+                    name,
+                    0,
+                    TAB_Y,
+                    size=0.17,
+                    font="Lato",
+                    weight=900 if active else 400,
+                    color=BRICK_DEEP if active else MUTED,
+                    background=BRICK_SOFT if active else PAPER_DEEP,
+                    anchor=Anchor.LEFT,
+                )
+            )
+    widths = [
+        max(a.bounds().width, b.bounds().width) for a, b in zip(on, off, strict=True)
+    ]
+    gap = 0.18
+    x = -(sum(widths) + gap * (len(widths) - 1)) / 2
+    for a, b, width in zip(on, off, widths, strict=True):
+        a.move_to(x, TAB_Y, Anchor.LEFT)
+        b.move_to(x, TAB_Y, Anchor.LEFT)
+        x += width + gap
+    return on, off
+
+
 def density_module(scene: Scene) -> None:
     header(
         scene, KICKER, "Cada verificación es un módulo con entradas, reglas y salidas"
     )
-    tabs = ["Densidad", "Esfuerzo axial", "Fisuración y corte", "Derivas"]
-    tab_items: list[Drawable] = []
-    x = 0.55
-    for i, name in enumerate(tabs):
-        tab_items.append(
-            pill(
-                scene,
-                name,
-                x,
-                2.47,
-                size=0.17,
-                font="Lato",
-                weight=900 if i == 0 else 400,
-                color=BRICK_DEEP if i == 0 else MUTED,
-                background=BRICK_SOFT if i == 0 else PAPER_DEEP,
-                anchor=Anchor.LEFT,
-            )
-        )
-        x = tab_items[-1].bounds().right + 0.18
+    tab_on, tab_off = _tabs(
+        scene, ["Densidad", "Esfuerzo axial", "Fisuración y corte", "Derivas"]
+    )
     scene.play(
-        stagger(*[c.animate.fade_in().duration(0.25) for c in tab_items], each=0.06)
+        stagger(
+            *[
+                (tab_on if i == 0 else tab_off)[i].animate.fade_in().duration(0.25)
+                for i in range(len(tab_on))
+            ],
+            each=0.06,
+        )
     )
 
     cx, w = -2.85, 5.3
-    ys = [1.95, 1.12, 0.36, -0.32, -1.0, -1.68, -2.44, -3.18]
-    nodes = [
-        io(
-            scene,
-            cx,
-            ys[0],
-            w,
-            0.6,
-            "Parámetros Z, U, S, N, $A_p$ · tabla de muros (etiqueta, L, t, material)",
-            size=0.165,
-        ),
-        decision(
-            scene,
-            cx,
-            ys[1],
-            3.9,
-            0.85,
-            "¿Datos completos y unidades compatibles?",
-            size=0.165,
-        ),
-        process(
-            scene,
-            cx,
-            ys[2],
-            w,
-            0.5,
-            "Clasificar muros por dirección (X / Y) y material",
-            size=0.175,
-        ),
-        process(
-            scene,
-            cx,
-            ys[3],
-            w,
-            0.5,
-            "Aporte efectivo: albañilería L·t · concreto L·t·Ec/Em",
-            size=0.175,
-        ),
-        process(
-            scene, cx, ys[4], w, 0.5, "Sumar los aportes de cada dirección", size=0.175
-        ),
-        process(
-            scene,
-            cx,
-            ys[5],
-            w,
-            0.5,
-            '$D_"mín" = Z U S N slash 56$   ·   $D = sum L t slash A_p$',
-            size=0.175,
-        ),
-        decision(scene, cx, ys[6], 3.4, 0.8, '¿$D_X$ y $D_Y >= D_"mín"$?', size=0.175),
-        io(
-            scene,
-            cx,
-            ys[7],
-            w,
-            0.5,
-            "Tabla comparativa y relación de muros considerados",
-            size=0.165,
-        ),
-    ]
-    arrows = [
-        link(
-            scene,
-            (cx, ys[i] - (0.43 if i in (1, 6) else 0.3)),
-            (cx, ys[i + 1] + (0.43 if i + 1 in (1, 6) else 0.3)),
-        )
-        for i in range(len(ys) - 1)
-    ]
-    side_error = t(
-        scene,
-        "no → diagnóstico,\nsin resultado",
-        cx - 2.05,
-        ys[1] + 0.05,
-        size=0.14,
-        color=FAIL,
-        anchor=Anchor.RIGHT,
-    )
-    side_fail = t(
-        scene,
-        "no → registra dirección\ne incumplimiento",
-        cx - 1.8,
-        ys[6] + 0.05,
-        size=0.14,
-        color=FAIL,
-        anchor=Anchor.RIGHT,
-    )
+    chart = _draw_chart(scene, [DENSITY], [cx], size=0.17, width=w)
+    nodes, ys, arrows = chart.nodes[0], chart.ys[0], chart.arrows
+    side_error, side_fail = chart.notes
     values = [
         "Z = 0.45 · U = 1 · S = 1 · N = 4 · $A_p$ = 136.51 m²",
         "✓ sin datos faltantes: continúa",
@@ -501,11 +749,39 @@ def density_module(scene: Scene) -> None:
             ]
         )
     scene.play(token.animate.fade_out().duration(0.2))
-    source(
+    reference = source(
         scene,
         "Tesis · Figura 43, p. 105 (E.070, art. 19.2) · valores: Tabla 22, p. 57",
     )
     scene.stop("modulo-recorrido")
+
+    # Los otros tres módulos pasan como evidencia: misma estructura, sin recorrido.
+    shown: list[Drawable] = [
+        *nodes,
+        *arrows,
+        side_error,
+        side_fail,
+        *leaders,
+        *value_items,
+        reference,
+    ]
+    active = 0
+    for module in EVIDENCE:
+        chart = _draw_chart(scene, module.lanes, LANE_X, size=module.size, width=LANE_W)
+        reference = source_block(scene, reference=module.source)
+        scene.play(
+            [
+                *[d.animate.fade_out().duration(0.3) for d in shown],
+                tab_on[active].animate.fade_out().duration(0.3),
+                tab_off[active].animate.fade_in().duration(0.3),
+                tab_off[module.tab].animate.fade_out().duration(0.3),
+                tab_on[module.tab].animate.fade_in().duration(0.3),
+                chart.entrance().delay(0.3),
+                reference.animate.fade_in().duration(0.3).delay(0.3),
+            ]
+        )
+        scene.stop(module.stop)
+        shown, active = [*chart.pieces, reference], module.tab
 
 
 def traceability(scene: Scene) -> None:
@@ -653,10 +929,12 @@ SECTION = Section(
             build=density_module,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "1.25 min. Figura 43 (p. 105) como ejemplo de módulo: entradas, validación, "
+                "1.5 min. Figura 43 (p. 105) como ejemplo de módulo: entradas, validación, "
                 "clasificación, aporte efectivo (concreto con Ec/Em), suma, comparación y salida. "
-                "A la derecha, los valores del caso en cada paso. Los otros módulos (axial, "
-                "fisuración y corte, derivas) siguen la misma estructura con sus diagramas del cap. 6."
+                "A la derecha, los valores del caso en cada paso. Luego tres pasadas rápidas, "
+                "unos 5 s cada una y sin recorrerlas: esfuerzo axial (Fig. 44), fisuración y corte "
+                "(Fig. 45, por muro y luego por entrepiso) y derivas (Fig. 46). Basta decir que "
+                "siguen la misma estructura: datos, validación, cálculo, decisión y salida."
             ),
         ),
         SectionStep(
