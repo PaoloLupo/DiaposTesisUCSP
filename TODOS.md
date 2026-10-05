@@ -3,7 +3,7 @@
 - [ ] Como no hay estado teorico, en fundamentos quisar colocar una diapo de palabras clave
 
 # Cambios
-- [ ] Objetivo general - hipotesis : cambio de diseño a uno mas claro y didactico
+- [ ] Objetivo general - hipotesis : cambio de diseño a uno mas claro y didactico PARCIALMENTE HECHO
 - [ ] Hacer un slide para presentar de forma animada una linea de tiempo con las investigaciones presentes en el estado del arte
 - [ ] Proceso manual- caso de estudio: colocar la referencia del caso de estudio, poner que es de Bartolome
 - [x] Proceso manual- idealizaciones: separar en dos slides, sobre el modelamiento del MCT y el MSTO (QUIZAS CORRECIONES PEQUEÑAS)
