@@ -3,7 +3,7 @@
 Sustentación animada en Gaanim de la tesis *Marco de trabajo para la automatización del
 diseño de la distribución de muros en planta para edificios de albañilería confinada*
 (UCSP). Pensada para **30 minutos**: 8 bloques, 32 diapositivas de contenido, 8 divisores
-de agenda y una portada (41 segmentos, 86 pausas).
+de agenda y una portada (41 segmentos, 90 pausas).
 
 ## Ejecutar
 
@@ -38,12 +38,12 @@ Los tiempos incluyen la explicación oral; las pausas (`scene.stop`) esperan al 
 | 01 Problemática | Material de las viviendas (INEI 2025) · muro confinado y sismo · traslado manual y pregunta | 3:00 | 3:45 |
 | 02 Objetivos y método | Objetivo general e hipótesis · objetivos específicos · metodología | 2:00 | 5:45 |
 | 03 Fundamentos | Densidad con la planta real · tres verificaciones de resistencia · deriva | 4:00 | 9:45 |
-| 04 Proceso manual | Caso de estudio · modelo completo en ETABS · pórticos planos (WIP) · criterios de modelamiento · ciclo manual | 4:00 | 13:45 |
-| 05 Marco de trabajo | Qué se automatiza · flujo general · módulo de densidad · trazabilidad | 3:45 | 17:30 |
-| 06 Alba | Arquitectura · API de ETABS · interfaz · reporte | 3:00 | 20:30 |
-| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia | 4:45 | 25:15 |
-| 08 Conclusiones | Objetivos · hallazgos · alcance y futuro · cierre | 2:45 | 28:00 |
-| Divisores | 8 × ~6 s | 0:50 | ≈ 28:50 |
+| 04 Proceso manual | Caso de estudio · modelo completo en ETABS · pórticos planos · criterios de modelamiento · ciclo manual | 5:30 | 15:15 |
+| 05 Marco de trabajo | Qué se automatiza · flujo general · módulo de densidad · trazabilidad | 3:45 | 19:00 |
+| 06 Alba | Arquitectura · API de ETABS · interfaz · reporte | 3:00 | 22:00 |
+| 07 Resultados | Modelos · peso y fuerzas · derivas · cortante · resistencia | 4:45 | 26:45 |
+| 08 Conclusiones | Objetivos · hallazgos · alcance y futuro · cierre | 2:45 | 29:30 |
+| Divisores | 8 × ~6 s | 0:50 | ≈ 30:20 |
 
 Si hace falta recortar, las diapositivas que menos afectan el argumento son
 *Proceso manual · criterios de modelamiento*, *Alba · API de ETABS* y *Resultados · cortante*:
@@ -75,6 +75,7 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
 | Símbolos de diagramas de flujo | `src/tesis/diagram.py` |
 | Dibujo de la planta del caso | `src/tesis/building.py` |
 | Modelo de ETABS (MCT) en isométrica | `src/tesis/etabs_model.py` |
+| Pórticos planos (MSTA): barras, brazos y dinteles | `src/tesis/data/porticos.py` |
 | Muros, longitudes y densidad del caso | `src/tesis/data/planta.py` |
 | Cifras transcritas de la tesis | `src/tesis/data/thesis.py` |
 | Datos INEI 2025 | `src/tesis/data/materiales_inei.py` |

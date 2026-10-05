@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from tesis.data.planta import FLOOR_AREA, density, wall_area_sum  # noqa: E402
+from tesis.data.porticos import BARS, X4, X4_START  # noqa: E402
 from tesis.data.thesis import (  # noqa: E402
     AXIAL_LIMITS,
     AXIAL_STRESS_FLOOR1,
@@ -161,6 +162,22 @@ class ManualProcessTablesTest(unittest.TestCase):
         found = {name: (float(cm), float(cv)) for name, cm, cv in rows}
         self.assertEqual(found["Piso Típico"], LOAD_SETS["Piso típico"])
         self.assertEqual(found["Techo Último Piso"], LOAD_SETS["Azotea"])
+
+    def test_plane_frame_example_wall(self) -> None:
+        block = table(self.chapter, "tb:geome")
+        row = re.search(
+            r"\[X4\],\s*\[([\d.]+)\],\s*\[([\d.]+)\],\s*\[([\d.]+)\],\s*\[([\d.]+)\]",
+            block,
+        )
+        assert row is not None
+        cg, a1, a2, i3 = (float(v) for v in row.groups())
+        self.assertEqual((cg, a1, a2, i3), (X4["cg"], X4["A1"], X4["A2"], X4["I3"]))
+        # Una barra por muro: 14 muros y sus simétricos (X7 e Y7 no se repiten).
+        self.assertEqual(len(BARS), 26)
+        self.assertEqual(len({name for name, _, _ in BARS}), 26)
+        # La barra de X4 está a cg de la cara exterior de la columna de Y4.
+        x4 = next((x, y) for name, x, y in BARS if name == "X4")
+        self.assertAlmostEqual(x4[0], X4_START + X4["cg"], delta=0.001)
 
     def test_translation_mode_in_y(self) -> None:
         block = table(self.chapter, "tb:an_mod")
