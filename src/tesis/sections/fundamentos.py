@@ -382,15 +382,16 @@ def density_check(scene: Scene) -> None:
             x2_wall = next(w for w in WALLS if w.name == "X2")
             k = x2_wall.thickness / 0.13
             ghosts = []
-            for d in plan.instances("X2"):
-                b = d.bounds()
-                thick = (b.top - b.bottom) * k
+            # Cajas desde los datos de la planta: un bounds() aquí, tras tantos
+            # play, compilaba la escena hasta este punto (~0.7 s por recarga).
+            for name in (n for n in plan.walls if n.split("_")[0] == "X2"):
+                left, bottom, right, top = plan.wall_box(name)
                 ghosts.append(
-                    scene.geometry.rect(b.right - b.left, thick)
+                    scene.geometry.rect(right - left, (top - bottom) * k)
                     .fill(CONCRETE)
                     .stroke(CONCRETE, 0.014)
                     .opacity(0.45)
-                    .move_to((b.left + b.right) / 2, b.bottom, Anchor.BOTTOM)
+                    .move_to((left + right) / 2, bottom, Anchor.BOTTOM)
                     .z_index(3)
                 )
             note = t(
@@ -1079,17 +1080,22 @@ def state_of_art(scene: Scene) -> None:
             else (Anchor.TOP_RIGHT if right else Anchor.TOP_LEFT)
         )
         tx = x + 0.06 if right else x - 0.06
+        # Cada caja se mide una vez ya colocada: el que se coloca primero no se mueve.
         if side > 0:
             body.move_to(tx, stem_end + 0.04, anchor)
-            head.move_to(tx, body.bounds().top + 0.04, anchor)
+            bb = body.bounds()
+            head.move_to(tx, bb.top + 0.04, anchor)
+            hb = head.bounds()
         else:
             head.move_to(tx, stem_end - 0.04, anchor)
-            body.move_to(tx, head.bounds().bottom - 0.04, anchor)
+            hb = head.bounds()
+            body.move_to(tx, hb.bottom - 0.04, anchor)
+            bb = body.bounds()
         # Fondo del color del papel: los tallos que pasan detrás del rótulo se cortan.
-        top_y = max(head.bounds().top, body.bounds().top) + 0.04
-        bottom_y = min(head.bounds().bottom, body.bounds().bottom) - 0.04
-        left_x = min(head.bounds().left, body.bounds().left) - 0.06
-        right_x = max(head.bounds().right, body.bounds().right) + 0.06
+        top_y = max(hb.top, bb.top) + 0.04
+        bottom_y = min(hb.bottom, bb.bottom) - 0.04
+        left_x = min(hb.left, bb.left) - 0.06
+        right_x = max(hb.right, bb.right) + 0.06
         knockout = (
             g.rect(right_x - left_x, top_y - bottom_y)
             .fill(PAPER)

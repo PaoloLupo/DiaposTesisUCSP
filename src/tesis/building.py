@@ -52,10 +52,23 @@ class Plan:
     labels: dict[str, Text]
     origin: tuple[float, float]
     scale: float
+    thickness: float  # espesor dibujado de los muros, en unidades de escena
 
     def to_scene(self, x: float, y: float) -> tuple[float, float]:
         ox, oy = self.origin
         return ox + x * self.scale, oy + y * self.scale
+
+    def wall_box(self, name: str) -> tuple[float, float, float, float]:
+        """Caja (izquierda, abajo, derecha, arriba) del muro dibujado, desde los datos.
+
+        Evita ``bounds()``, que tras un ``play`` compila la escena hasta el cursor.
+        Vale mientras el muro no se haya movido ni escalado después de dibujarlo.
+        """
+        _, wall, ax, ay, bx, by = next(s for s in wall_segments() if s[0] == name)
+        cx, cy = self.to_scene((ax + bx) / 2, (ay + by) / 2)
+        length = (bx - ax + by - ay) * self.scale
+        w, h = (length, self.thickness) if wall.direction == "X" else (self.thickness, length)
+        return cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2
 
     def by_direction(self, direction: str) -> list[Drawable]:
         return [d for name, d in self.walls.items() if name.startswith(direction)]
@@ -204,7 +217,9 @@ def draw_plan(
             )
             bubbles.append(_bubble(scene, label, left, by_))
 
-    return Plan(slab, void, walls, grid_lines, bubbles, wall_labels, (ox, oy), scale)
+    return Plan(
+        slab, void, walls, grid_lines, bubbles, wall_labels, (ox, oy), scale, thick
+    )
 
 
 def _bubble(scene: Scene, label: str, x: float, y: float) -> Drawable:

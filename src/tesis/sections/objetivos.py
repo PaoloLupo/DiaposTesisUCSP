@@ -280,12 +280,18 @@ def purpose(scene: Scene) -> None:
         top="160px",  # más alto que el resto: el objetivo y la hipótesis lo llenan
         gap="56px",
     )
-    # Causa y efecto como dos tarjetas: cada una abarca su lado y su variable.
-    pad = 0.25  # 30 px, lo que se metió el contenido
+    # Medir antes del primer play y todo junto: recién maquetadas, las cajas se
+    # miden con una sola compilación del layout; declarar algo entre medidas
+    # (las tarjetas) obligaría a compilarlo otra vez.
     sides = [
         (cause.bounds(), independent.bounds()),
         (effect.bounds(), dependent.bounds()),
     ]
+    obj_bounds = {name: box.bounds() for name, box in obj_keys.items()}
+    slots = {name: box.bounds() for name, box in concepts.items()}
+
+    # Causa y efecto como dos tarjetas: cada una abarca su lado y su variable.
+    pad = 0.25  # 30 px, lo que se metió el contenido
     card_top = max(a.top for a, _ in sides) + pad
     card_bottom = min(b.bottom for _, b in sides) - pad
     cards = [
@@ -301,10 +307,6 @@ def purpose(scene: Scene) -> None:
         ).z_index(-1)
         for a, b in sides
     ]
-    # Medir antes del primer play: recién maquetadas, las cajas se miden solas;
-    # después, cada bounds() recompila toda la presentación hasta aquí.
-    obj_bounds = {name: box.bounds() for name, box in obj_keys.items()}
-    slots = {name: box.bounds() for name, box in concepts.items()}
 
     # Las cajas de los conceptos solo reservan su sitio: las palabras que llegan
     # desde el objetivo son textos libres que se transforman en ellas.
