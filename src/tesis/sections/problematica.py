@@ -35,6 +35,7 @@ from tesis.kit import (
     numeral,
     t,
 )
+from tesis.subduccion import draw_subduction
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -557,23 +558,23 @@ def plates(scene: Scene) -> None:
         .move_to(cx, cy)
         .z_index(30)
     )
-    block_scale, block_y = 0.40, 0.25
-    block = scene.media.lottie("placas_subduccion_paleta.lottie")
-    block.scale_by(block_scale / lens).move_to(*inside(0, block_y)).z_index(31)
+    # Bloque diagrama dibujado con polígonos (4.5 unidades de pantalla de ancho):
+    # sus partes van de z 31 a ~60, sobre el velo; los rótulos, encima.
+    block = draw_subduction(scene, inside(0.07, 0.22), 4.5 / lens, z_index=31)
     block_labels = [
         t(
             scene,
             name,
-            *inside(dx * block_scale, block_y + dy * block_scale),
+            *at,
             font=MONO,
             size=0.15 / lens,
             weight=700,
             color=color,
             anchor=Anchor.CENTER,
-        ).z_index(31)
-        for name, dx, dy, color in (
-            ("NAZCA", -4.33, 2.25, STEEL),
-            ("SUDAMERICANA", 4.8, 2.98, INK_SOFT),
+        ).z_index(70)
+        for name, at, color in (
+            ("NAZCA", block.nazca, STEEL),
+            ("SUDAMERICANA", block.south_america, INK_SOFT),
         )
     ]
     explain = t(
@@ -585,7 +586,7 @@ def plates(scene: Scene) -> None:
         color=INK_SOFT,
         anchor=Anchor.TOP,
     ).z_index(31)
-    section_view = [veil, block, *block_labels, explain]
+    section_view = [veil, block.root, *block_labels, explain]
     for part in section_view:
         part.view_layer("corte")
     cut = scene.camera.inset(
@@ -605,7 +606,9 @@ def plates(scene: Scene) -> None:
     scene.play(
         [
             veil.animate.fade_in().duration(0.6),
-            sequence(block.animate.fade_in().duration(0.5), block).delay(0.3),
+            sequence(
+                block.root.animate.fade_in().duration(0.5), block.motion()
+            ).delay(0.3),
             *[b.animate.fade_in().duration(0.4).delay(0.8) for b in block_labels],
             explain.animate.fade_in().duration(0.6).delay(1.1),
         ]

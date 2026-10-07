@@ -75,6 +75,7 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
 | Símbolos de diagramas de flujo | `src/tesis/diagram.py` |
 | Dibujo de la planta del caso | `src/tesis/building.py` |
 | Modelo de ETABS (MCT) en isométrica | `src/tesis/etabs_model.py` |
+| Bloque de la subducción (Nazca bajo la Sudamericana) | `src/tesis/subduccion.py` |
 | Pórticos planos (MSTA): barras, brazos y dinteles | `src/tesis/data/porticos.py` |
 | Muros, longitudes y densidad del caso | `src/tesis/data/planta.py` |
 | Cifras transcritas de la tesis | `src/tesis/data/thesis.py` |
