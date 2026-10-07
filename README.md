@@ -127,7 +127,7 @@ Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) 
 
 ## Actualizar Gaanim
 
-El proyecto usa el wheel de `C:/Tools/gaanim` (0.4.2), fijado en `[tool.uv.sources]` de
+El proyecto usa el wheel de `C:/Tools/gaanim` (0.10.2), fijado en `[tool.uv.sources]` de
 `pyproject.toml`. Al cambiar de versión, actualiza esa ruta; si el wheel se reconstruye con el
 mismo número de versión, fuerza la reinstalación:
 

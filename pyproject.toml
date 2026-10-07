@@ -17,4 +17,4 @@ reportUnusedCallResult = false
 reportImplicitStringConcatenation = false
 
 [tool.uv.sources]
-gaanim = { path = "C:/Tools/gaanim/gaanim-0.10.1-py3-none-any.whl" }
+gaanim = { path = "C:/Tools/gaanim/gaanim-0.10.2-py3-none-any.whl" }
