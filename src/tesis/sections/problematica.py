@@ -195,10 +195,7 @@ def materials(scene: Scene) -> None:
             each=0.09,
         )
     )
-    source(
-        scene,
-        f"{SOURCE_LABEL} · Características de la vivienda."
-    )
+    source(scene, f"{SOURCE_LABEL} · Características de la vivienda.")
     scene.stop("materiales-listo")
 
 
@@ -606,9 +603,9 @@ def plates(scene: Scene) -> None:
     scene.play(
         [
             veil.animate.fade_in().duration(0.6),
-            sequence(
-                block.root.animate.fade_in().duration(0.5), block.motion()
-            ).delay(0.3),
+            sequence(block.root.animate.fade_in().duration(0.5), block.motion()).delay(
+                0.3
+            ),
             *[b.animate.fade_in().duration(0.4).delay(0.8) for b in block_labels],
             explain.animate.fade_in().duration(0.6).delay(1.1),
         ]
