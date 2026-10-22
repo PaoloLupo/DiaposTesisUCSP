@@ -66,10 +66,11 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
   y el cierre.
 - **Modelos en 3D real:** la vivienda de Problemática, el modelo completo (MCT) y los pórticos
   planos (MSTA) viven en el mundo 3D de Gaanim, en metros y con los colores planos del deck.
-  Una cámara en perspectiva (`tesis.model3d.CameraRig`) los encuadra a la izquierda del panel
-  de pasos: va de la planta a la vista 3D, entra a un nudo, pone de frente un pórtico o rodea
-  el modelo. Con la cámara en perspectiva la capa 2D no se mueve, y al entrar a la diapositiva
-  siguiente la cámara vuelve a la vista 2D (`release_camera`, en `section_index.py`).
+  Cada toma (`tesis.model3d.Shot`, una órbita `camera.state_orbit` de Gaanim) los encuadra en
+  perspectiva a la izquierda del panel de pasos, y `orbit_to` pasa de una toma a otra rodeando
+  el foco: de la planta a la vista 3D, a un nudo, a un pórtico de frente o alrededor del modelo.
+  La capa 2D no se mueve con la cámara, y cada diapositiva empieza en la vista 2D
+  (`Section(..., camera="reset")`, en `section_index.py`).
 
 ## Dónde editar
 

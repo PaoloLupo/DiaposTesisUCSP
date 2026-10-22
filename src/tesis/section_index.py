@@ -25,7 +25,6 @@ from gaanim import (
 )
 
 from tesis.kit import LEFT_EDGE, RIGHT_EDGE, t
-from tesis.model3d import release_camera
 from tesis.theme import (
     BRICK,
     DISPLAY,
@@ -164,15 +163,16 @@ class SectionIndex:
                 f"Pregunta guía: {question} Transición breve, 5-10 s."
             ),
         )
-        Section(section.key, [divider, *section.steps], title=title).build(
-            self.scene, on_enter=self._advance
-        )
+        # Cada diapositiva empieza en la vista 2D: la cámara 3D de la anterior se
+        # suelta tras su última pausa y la acompaña mientras sale en la transición.
+        Section(
+            section.key, [divider, *section.steps], title=title, camera="reset"
+        ).build(self.scene, on_enter=self._advance)
         self._previous = active
 
     def _divider(self, scene: Scene, active: int) -> None:
         previous = self._previous
         _, title, question, _ = SECTIONS[active]
-        _ = scene.camera.reset()
         rail = self._rail or self._build_rail()
         self._set_seal(False)
 
@@ -251,11 +251,7 @@ class SectionIndex:
         return rail
 
     def _advance(self, scene: Scene, progress: SectionProgress) -> None:
-        """Al entrar a cada escena el riel avanza y aparece su número (el divisor no cuenta).
-
-        Antes, la cámara 3D de la diapositiva anterior (si la hubo) vuelve a la vista 2D.
-        """
-        release_camera(scene)
+        """Al entrar a cada escena el riel avanza y aparece su número (el divisor no cuenta)."""
         if progress.index == 1 or self._rail is None:
             return
         numbered = progress.step.name not in UNNUMBERED

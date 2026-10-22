@@ -24,7 +24,7 @@ from tesis.building import AXIS_X, AXIS_Y, DEPTH, STAIR, WIDTH, wall_segments
 from tesis.data.planta import STORIES
 from tesis.data.thesis import MESH_STEP
 from tesis.kit import t
-from tesis.model3d import P2, P3, anchor, beneath, lay_flat, world
+from tesis.model3d import P2, P3, anchor, lay_flat, pinned, world
 from tesis.theme import CONCRETE, INK_SOFT, MONO, MUTED
 
 SNAP = 0.07  # m: un extremo a menos de medio espesor de un eje cae sobre el eje
@@ -179,12 +179,11 @@ class EtabsModel:
         for wall in self.walls():
             d0, d1 = shift(wall.z0), shift(wall.z1)
             if wall.line.direction == "X":
-                # Fuera de su plano: el muro se inclina entre los dos niveles. El
-                # desplazamiento es relativo: ``animate.move_to_3d`` de un grupo con
-                # ``origin`` suma el origen (Gaanim 0.17 en desarrollo).
+                # Fuera de su plano: el muro se corre y se inclina entre los dos niveles.
+                x, y, zc = wall.center
                 tilt = -math.asin((d1 - d0) / (wall.z1 - wall.z0))
                 anims.append(
-                    ease(wall.group.animate.shift_by_3d(*change(wall.center[2])))
+                    ease(wall.group.animate.move_to_3d(*world(x, y + shift(zc), zc)))
                 )
                 anims.append(ease(wall.group.animate.rotate_to_3d(tilt, 0, 0)))
             else:
@@ -199,7 +198,10 @@ class EtabsModel:
                 for part, pts in zip(wall.mesh, wall.mesh_points, strict=True):
                     anims.append(ease(part.animate.points([drift(*p) for p in pts])))
         for story in self.stories:
-            anims.append(ease(story.slab.group.animate.shift_by_3d(*change(story.z1))))
+            slab = world(0, shift(story.z1), story.z1)
+            anims.append(ease(story.slab.group.animate.move_to_3d(*slab)))
+        # Los acompañantes se corren desde la deformada anterior: aquí solo se conoce
+        # su altura, no su posición.
         for drawable, z in self.riders:
             anims.append(ease(drawable.animate.shift_by_3d(*change(z))))
         self.amplitude = amplitude
@@ -289,7 +291,7 @@ def stand(drawable: Drawable, line: WallLine, z: float) -> Drawable:
     drawable.in_3d().move_to_3d(*world(x, y, z))
     if line.direction == "Y":
         drawable.rotate_to_3d(0, math.pi / 2, 0)
-    return beneath(drawable)
+    return drawable
 
 
 def _wall(scene: Scene, line: WallLine, z0: float, z1: float) -> Wall:
@@ -415,6 +417,4 @@ def _bubble(scene: Scene, name: str, at: P3) -> Drawable:
     text = t(
         scene, name, 0, 0, font=MONO, size=0.1, color=INK_SOFT, anchor=Anchor.CENTER
     )
-    return beneath(
-        scene.geometry.group([ring, text]).move_to_3d(*world(*at)).billboard().hidden()
-    )
+    return pinned(scene.geometry.group([ring, text]), at, anchor=Anchor.CENTER)

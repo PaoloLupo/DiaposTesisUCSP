@@ -35,7 +35,7 @@ from tesis.kit import (
     numeral,
     t,
 )
-from tesis.model3d import P3, CameraRig, Shot, pinned
+from tesis.model3d import P3, Shot, orbit_to, pinned
 from tesis.subduccion import draw_subduction
 from tesis.theme import (
     BRICK,
@@ -778,7 +778,7 @@ def seismic(scene: Scene) -> None:
     header(scene, KICKER, "Frente al sismo, la vivienda confinada trabaja como unidad")
 
     house = build_house(scene)
-    rig = CameraRig(scene, HOUSE_BUILD)
+    scene.camera.to(HOUSE_BUILD.state(scene))
     heading = label(scene, "Proceso constructivo", LIST_X, 2.62, color=MUTED, size=0.14)
     steps = [
         _entry(scene, title, body, LIST_TOP - i * LIST_GAP, str(i + 1))
@@ -829,7 +829,9 @@ def seismic(scene: Scene) -> None:
         )
         for bricks, joints in zip(house.bricks, house.mortar, strict=True)
     ]
-    scene.play([*enter(2), stagger(*courses, each=0.09), *rig.to(HOUSE_TURN, 2.4)])
+    scene.play(
+        [*enter(2), stagger(*courses, each=0.09), orbit_to(scene, HOUSE_TURN, 2.4)]
+    )
     scene.wait(0.3)
 
     # 4 · El concreto de las columnas sube y encierra el acero y el dentado.
@@ -886,12 +888,8 @@ def seismic(scene: Scene) -> None:
         size: float,
         anchor: Anchor,
     ) -> Drawable:
-        return pinned(
-            scene,
-            t(scene, text, 0, 0, size=size, weight=700, color=color, anchor=anchor),
-            at,
-            offset,
-        )
+        label = t(scene, text, 0, 0, size=size, weight=700, color=color)
+        return pinned(label, at, offset, anchor)
 
     quake_label = tag(
         "Sismo", mid(QUAKE_TAIL, tip), (0, 0.14), INK_SOFT, 0.2, Anchor.BOTTOM
@@ -913,7 +911,7 @@ def seismic(scene: Scene) -> None:
         [
             heading.animate.fade_out().duration(0.3),
             *[s.animate.fade_out().duration(0.3) for s in steps],
-            *rig.to(HOUSE_QUAKE, 1.4),
+            orbit_to(scene, HOUSE_QUAKE, 1.4),
         ]
     )
     scene.play(

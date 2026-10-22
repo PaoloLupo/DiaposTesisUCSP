@@ -1,6 +1,6 @@
 version = 1
-revision = 3
-requires-python = ">=3.14"
+revision = 5
+requires-python = ">=3.15"
 
 [[package]]
 name = "diapostesis"
@@ -11,14 +11,14 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "gaanim", path = "C:/Tools/gaanim/gaanim-0.10.2-py3-none-any.whl" }]
+requires-dist = [{ name = "gaanim", path = "C:/Tools/gaanim/gaanim-0.17.0-py3-none-any.whl" }]
 
 [[package]]
 name = "gaanim"
-version = "0.10.2"
-source = { path = "C:/Tools/gaanim/gaanim-0.10.2-py3-none-any.whl" }
+version = "0.17.0"
+source = { path = "C:/Tools/gaanim/gaanim-0.17.0-py3-none-any.whl" }
 wheels = [
-    { filename = "gaanim-0.10.2-py3-none-any.whl", hash = "sha256:f3f471d6bff8aa5f611a1796665be7fa41b2b3a0ade872ed087564bd70923da7" },
+    { filename = "gaanim-0.17.0-py3-none-any.whl", hash = "sha256:559819aa8fbc459ea0e2d5f4468a77a810a7b0489d8748ba0b9545574581c574" },
 ]
 
 [package.metadata]

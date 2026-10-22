@@ -92,7 +92,7 @@ from tesis.etabs_model import (
     wall_lines,
 )
 from tesis.kit import RIGHT_EDGE, Iso, dimension, label, t
-from tesis.model3d import P2, P3, CameraRig, Shot, lay_flat, pinned, world
+from tesis.model3d import P2, P3, Shot, lay_flat, orbit_to, pinned, world
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -369,7 +369,7 @@ class Pointer:
             (0.205, -0.212),
         ]
         shape = scene.geometry.polygon(tip).fill(INK).stroke(CARD, 0.016)
-        return cls(scene, pinned(scene, shape, point), point)
+        return cls(scene, pinned(shape, point), point)
 
     def jump(self, point: P3) -> None:
         self.arrow.move_to_3d(*world(*point))
@@ -388,9 +388,9 @@ class Pointer:
     def click(self) -> Composition:
         """Onda de clic en la punta del puntero."""
         ring = pinned(
-            self.scene,
             self.scene.geometry.circle(0.05).no_fill().stroke(BRICK, 0.012),
             self.point,
+            anchor=Anchor.CENTER,
         )
         return sequence(
             ring.animate.fade_in().duration(0.04),
@@ -500,7 +500,7 @@ def _level_labels(
             color=MUTED if z == 0 else INK_SOFT,
             anchor=Anchor.RIGHT,
         )
-        labels.append(pinned(scene, text, corner, offset=(-0.32, 0)))
+        labels.append(pinned(text, corner, offset=(-0.32, 0), anchor=Anchor.RIGHT))
     return labels
 
 
@@ -548,7 +548,7 @@ def full_model(scene: Scene) -> None:
     model = build_model(scene)
     top = model.height
     levels = model.levels
-    rig = CameraRig(scene, MCT_PLAN)
+    scene.camera.to(MCT_PLAN.state(scene))
     steps = _steps_panel(scene, MODEL_STEPS)
     step = steps.enter
 
@@ -581,7 +581,7 @@ def full_model(scene: Scene) -> None:
     )
     scene.play(
         [
-            *rig.to(MCT_VIEW, 1.6),
+            orbit_to(scene, MCT_VIEW, 1.6),
             stagger(
                 *[p.animate.fade_in().duration(0.3) for p in triad], each=0.05
             ).delay(0.8),
@@ -828,14 +828,13 @@ def full_model(scene: Scene) -> None:
     )
     scene.play(stagger(*[m.animate.create().duration(0.5) for m in mesh], total=1.6))
     # La cámara vuela al nudo; encabezado y pasos se apartan mientras tanto.
-    detail = _junction_detail(scene, model, rig, model.stories[1])
-    chrome = [*level_labels, *triad]
+    detail = _junction_detail(scene, model, model.stories[1])
+    chrome = [*head.children, *level_labels, *triad]
     scene.play(
         [
-            *[c.animate.opacity(0).duration(0.4) for c in head.children],
             *[c.animate.fade_out().duration(0.4) for c in chrome],
             *steps.hide(4),
-            *rig.to(MCT_JUNCTION, 1.8),
+            orbit_to(scene, MCT_JUNCTION, 1.8),
             stagger(
                 *[d.animate.fade_in().duration(0.3) for d in detail], each=0.02
             ).delay(1.5),
@@ -845,8 +844,7 @@ def full_model(scene: Scene) -> None:
     scene.play(
         [
             *[d.animate.fade_out().duration(0.3) for d in detail],
-            *rig.to(MCT_HIGH, 1.6),
-            *[c.animate.opacity(1).duration(0.4).delay(1.2) for c in head.children],
+            orbit_to(scene, MCT_HIGH, 1.6),
             *[c.animate.fade_in().duration(0.4).delay(1.2) for c in chrome],
             *steps.show(4, delay=1.2),
         ]
@@ -891,20 +889,10 @@ def full_model(scene: Scene) -> None:
         )
     d1 = model.ride(
         pinned(
-            scene,
-            t(
-                scene,
-                "D1",
-                0,
-                0,
-                font=MONO,
-                size=0.11,
-                weight=700,
-                color=INK,
-                anchor=Anchor.CENTER,
-            ),
+            t(scene, "D1", 0, 0, font=MONO, size=0.11, weight=700, color=INK),
             (*DIAPHRAGM_CENTER, top),
             offset=(-0.22, 0.16),
+            anchor=Anchor.CENTER,
         ),
         top,
     )
@@ -1045,7 +1033,13 @@ def full_model(scene: Scene) -> None:
         )
         mass_labels.append(
             model.ride(
-                pinned(scene, tonf, (*DIAPHRAGM_CENTER, s.z1), offset=(0.2, 0)), s.z1
+                pinned(
+                    tonf,
+                    (*DIAPHRAGM_CENTER, s.z1),
+                    offset=(0.2, 0),
+                    anchor=Anchor.LEFT,
+                ),
+                s.z1,
             )
         )
     # Para el análisis modal el edificio se lee como masas concentradas en cada
@@ -1062,7 +1056,7 @@ def full_model(scene: Scene) -> None:
             *[c.animate.fade_out().duration(0.3) for c in centers],
             d1.animate.fade_out().duration(0.3),
             *[p.animate.fade_out().duration(0.3) for p in triad],
-            *rig.to(MCT_SWAY, 1.4),
+            orbit_to(scene, MCT_SWAY, 1.4),
             stagger(*[a.animate.create().duration(0.4) for a in arrows], each=0.05),
             stagger(
                 *[x.animate.fade_in().duration(0.3) for x in loads], each=0.15
@@ -1127,9 +1121,7 @@ def full_model(scene: Scene) -> None:
     )
 
 
-def _junction_detail(
-    scene: Scene, model: EtabsModel, rig: CameraRig, story: Story
-) -> list[Drawable]:
+def _junction_detail(scene: Scene, model: EtabsModel, story: Story) -> list[Drawable]:
     """Lo que se ve al acercarse al nudo: nodos de la malla, frames y brazo rígido.
 
     Los nodos son esferas en el plano de cada muro; los que comparten la malla con
@@ -1180,7 +1172,7 @@ def _junction_detail(
         ("Frame · columna de confinamiento", (x_node, 0, z0 + 0.25)),
     )
     for i, (text, target) in enumerate(notes):
-        tx, ty = rig.project(target, MCT_JUNCTION)
+        tx, ty = MCT_JUNCTION.project(scene, target)
         y = 2.3 - i * 0.7
         card = pill(
             scene,
@@ -1649,10 +1641,12 @@ def plane_frames(scene: Scene) -> None:
     # 3 · La sección vuelve a su lugar en la planta; ahí se reparte la losa (método del sobre).
     # La planta ya es la base del modelo: una cámara cenital la muestra donde estaba
     # la planta dibujada, a la misma escala.
-    rig = CameraRig(scene, MSTA_PLAN)
+    scene.camera.to(MSTA_PLAN.state(scene))
     plan = _ground(scene)
     bbox_center = ((0 + length) / 2, (-stretched + FLANGE) / 2)
-    land = rig.project((X4_START + bbox_center[0], 5.0 + bbox_center[1], 0.0))
+    land = MSTA_PLAN.project(
+        scene, (X4_START + bbox_center[0], 5.0 + bbox_center[1], 0.0)
+    )
     shrink = MSTA_PLAN.scale / SEC_K
     dots = {
         name: scene.geometry.circle(0.045)
@@ -1685,7 +1679,7 @@ def plane_frames(scene: Scene) -> None:
             .duration(1.0)
             .easing(Easing.SMOOTH)
             .delay(0.2),
-            symbol.animate.move_to(*rig.project((X4_START + cg, 5.0, 0.0)))
+            symbol.animate.move_to(*MSTA_PLAN.project(scene, (X4_START + cg, 5.0, 0.0)))
             .duration(1.0)
             .easing(Easing.SMOOTH)
             .delay(0.2),
@@ -1778,7 +1772,7 @@ def plane_frames(scene: Scene) -> None:
                     *plan.bubbles,
                 )
             ],
-            *rig.to(MSTA_VIEW, 1.8),
+            orbit_to(scene, MSTA_VIEW, 1.8),
             *[w.animate.opacity(0.45).duration(0.6).delay(1.2) for w in plan.walls],
         ]
     )
@@ -1863,7 +1857,7 @@ def plane_frames(scene: Scene) -> None:
         [
             *[x.animate.opacity(0.12).duration(0.5) for x in others],
             *[w.animate.opacity(0.2).duration(0.5) for w in plan.walls],
-            *rig.to(MSTA_FRAME_A, 1.6),
+            orbit_to(scene, MSTA_FRAME_A, 1.6),
             frame_label.animate.fade_in().duration(0.4).delay(1.2),
         ]
     )
@@ -1874,7 +1868,7 @@ def plane_frames(scene: Scene) -> None:
         [
             *[x.animate.opacity(1).duration(0.5) for x in others],
             *[w.animate.opacity(0.45).duration(0.5) for w in plan.walls],
-            *rig.to(MSTA_VIEW, 1.4),
+            orbit_to(scene, MSTA_VIEW, 1.4),
             frame_label.animate.fade_out().duration(0.3),
         ]
     )
@@ -1935,7 +1929,9 @@ def plane_frames(scene: Scene) -> None:
     ]
     dead, live = X4_POINT_LOADS
     # La cámara está quieta: la etiqueta se fija en la pantalla, junto a la flecha.
-    load_x, load_y = rig.project((X4_START + X4["cg"], 5.03, levels[2] + 0.75))
+    load_x, load_y = MSTA_VIEW.project(
+        scene, (X4_START + X4["cg"], 5.03, levels[2] + 0.75)
+    )
     load_tag = pill(
         scene,
         f"X4 · CM {dead:.2f} · CV {live:.2f} tonf",
@@ -1992,20 +1988,10 @@ def plane_frames(scene: Scene) -> None:
             )
         )
     d1 = pinned(
-        scene,
-        t(
-            scene,
-            "D1",
-            0,
-            0,
-            font=MONO,
-            size=0.11,
-            weight=700,
-            color=INK,
-            anchor=Anchor.CENTER,
-        ),
+        t(scene, "D1", 0, 0, font=MONO, size=0.11, weight=700, color=INK),
         (*DIAPHRAGM_CENTER, top),
         offset=(-0.22, 0.16),
+        anchor=Anchor.CENTER,
     )
     scene.play(
         [
@@ -2027,8 +2013,8 @@ def plane_frames(scene: Scene) -> None:
     scene.stop(
         "pp-diafragma",
         loop=sequence(
-            parallel(*rig.to(MSTA_VIEW.turned(14, 30), 4.0, SINE)),
-            parallel(*rig.to(MSTA_VIEW, 4.0, SINE)),
+            orbit_to(scene, MSTA_VIEW.turned(14, 30), 4.0, SINE),
+            orbit_to(scene, MSTA_VIEW, 4.0, SINE),
         ),
     )
 
