@@ -14,7 +14,6 @@ from gaanim import (
     Direction,
     Drawable,
     Easing,
-    EasingCurve,
     Material3D,
     Playable,
     Scene,

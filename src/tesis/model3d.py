@@ -21,6 +21,7 @@ from gaanim import (
     Anim,
     CameraConstraint,
     CameraState,
+    Computed,
     Drawable,
     Easing,
     EasingCurve,
@@ -37,8 +38,9 @@ LENS = 0.42  # rad: campo de visión vertical, una perspectiva suave (≈ 24°)
 GLIDE = Easing.ease_in_out(EasingCurve.CUBIC)
 HOLD = 1 / 30  # s: la cámara 3D se suelta un cuadro después de la última pausa
 
-# Restricciones de cámara activas: se sueltan al entrar a la siguiente diapositiva.
-_ACTIVE: list[CameraConstraint] = []
+# Restricciones de cámara activas, con su escena: se sueltan al entrar a la siguiente
+# diapositiva. Las de otra escena (una construcción anterior del guion) se descartan.
+_ACTIVE: list[tuple[Scene, CameraConstraint]] = []
 
 
 def world(x: float, y: float, z: float) -> P3:
@@ -52,12 +54,13 @@ def release_camera(scene: Scene) -> None:
     Se llama al entrar a la diapositiva siguiente, cuyo inicio coincide con la última
     pausa de la anterior: espera un cuadro para que esa pausa conserve su cámara.
     """
-    if not _ACTIVE:
+    mine = [constraint for owner, constraint in _ACTIVE if owner is scene]
+    _ACTIVE.clear()
+    if not mine:
         return
     scene.wait(HOLD)
-    for constraint in _ACTIVE:
+    for constraint in mine:
         constraint.disable()
-    _ACTIVE.clear()
     scene.camera.reset()
 
 
@@ -134,7 +137,7 @@ class CameraRig:
             fx, fy, fz, sx, sy = rest
             return _pose(a, e, math.exp(ls), (fx, fy, fz), (sx, sy), lens)
 
-        def coordinate(which: int, axis: int):  # noqa: ANN202 - Computed
+        def coordinate(which: int, axis: int) -> Computed:
             return computed(lambda *values: pose(*values)[which][axis], inputs=inputs)
 
         def point(which: int) -> Drawable:
@@ -150,7 +153,7 @@ class CameraRig:
         self._constraint = scene.camera.bind_3d(
             eye=self._eye, target=self._target, fov_y=lens
         )
-        _ACTIVE.append(self._constraint)
+        _ACTIVE.append((scene, self._constraint))
 
     def to(
         self, shot: Shot, duration: float = 1.4, easing: Easing = GLIDE

@@ -28,7 +28,7 @@ from gaanim import (
     sequence,
 )
 
-from tesis.model3d import P3, beneath, lay_flat, world
+from tesis.model3d import P3, lay_flat, world
 from tesis.theme import BRICK, PAPER_DEEP, RULE
 
 LX, LY = 6.0, 4.2  # planta, m
@@ -60,7 +60,6 @@ STEEL_BAR = Color.from_hex("#4E535C")
 BRICK_TONES = [Color.from_hex(c) for c in ("#B8532F", "#B04E2C", "#C05A34", "#A94A29")]
 SINE = Easing.ease_in_out(EasingCurve.SINE)
 
-type Axis = Literal["x", "y"]
 ALL = (0, COURSES)
 
 
@@ -140,8 +139,8 @@ class House:
     footing: list[Drawable]  # cimiento corrido
     plinth: list[Drawable]  # sobrecimiento
     steel: list[Drawable]  # barras y estribos de cada columna
-    bricks: list[Drawable]  # ladrillos de cada hilada (copias de un ladrillo)
-    mortar: list[Drawable]  # juntas de cada hilada, con los dinteles
+    bricks: list[Drawable]  # ladrillos y dinteles de cada hilada (copias de un cubo)
+    mortar: list[Drawable]  # juntas de cada hilada
     concrete: list[Drawable]  # columnas, un objeto por hilada
     beams: list[Drawable]
     slab: Drawable
@@ -409,15 +408,20 @@ def build_house(scene: Scene, *, margin: float = 0.45) -> House:
 def ground_arrow(
     scene: Scene, start: tuple[float, float], end: tuple[float, float], color: Color
 ) -> Drawable:
-    """Vector dibujado sobre el terreno, en coordenadas de planta (m)."""
+    """Vector dibujado sobre el terreno, en coordenadas de planta (m).
+
+    Devuelve la flecha, oculta: crece con ``grow_arrow`` dentro de su grupo tendido.
+    """
     arrow = (
         scene.geometry.arrow(
             *start, *end, head_length=0.32, head_width=0.32, body_width=0.08
         )
         .fill(color)
         .no_stroke()
+        .hidden()
     )
-    return beneath(lay_flat(scene.geometry.group([arrow], origin=(0, 0)), 0.01))
+    lay_flat(scene.geometry.group([arrow], origin=(0, 0)), 0.01)
+    return arrow
 
 
 def mid(p: tuple[float, float], q: tuple[float, float]) -> P3:
