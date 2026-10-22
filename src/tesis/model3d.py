@@ -129,9 +129,7 @@ class CameraRig:
             return _pose(a, e, math.exp(ls), (fx, fy, fz), (sx, sy), lens)
 
         def coordinate(which: int, axis: int):  # noqa: ANN202 - Computed
-            return computed(
-                lambda *values: pose(*values)[which][axis], inputs=inputs
-            )
+            return computed(lambda *values: pose(*values)[which][axis], inputs=inputs)
 
         def point(which: int) -> Drawable:
             return (
@@ -206,6 +204,16 @@ def beneath(drawable: Drawable) -> Drawable:
     pantalla; sin esta marca avisaría de textos ocultos que no lo están.
     """
     return drawable.covers_on_purpose()
+
+
+def lay_flat(drawable: Drawable, z: float = 0.0) -> Drawable:
+    """Tiende en el nivel ``z`` un objeto 2D dibujado en planta (x, y en metros).
+
+    El objeto debe agruparse con ``origin=(0, 0)``: así el origen de la planta cae
+    en el origen del modelo y sus coordenadas son las de ETABS.
+    """
+    drawable.in_3d().rotate_to_3d(-math.pi / 2, 0, 0).move_to_3d(*world(0, 0, z))
+    return beneath(drawable)
 
 
 def pinned(

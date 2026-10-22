@@ -10,6 +10,8 @@ y = 2.75, contenido entre y = 2.5 e y = -3.5, fuente en y = -3.8 y el riel de
 avance debajo de y = -4.1.
 """
 
+import math
+from dataclasses import dataclass
 from typing import Literal
 
 from gaanim import (
@@ -190,3 +192,20 @@ def dimension(
         color=color,
         line_width=width,
     )
+
+
+@dataclass(frozen=True)
+class Iso:
+    """Isométrica 2D para íconos pequeños: (x, y, z) en metros a la pantalla.
+
+    Se ven las caras que miran a −y, a +x y a +z. Los modelos grandes viven en el
+    mundo 3D (``tesis.model3d``); esto queda para miniaturas dentro de paneles.
+    """
+
+    origin: tuple[float, float]
+    scale: float
+
+    def __call__(self, x: float, y: float, z: float) -> tuple[float, float]:
+        ox, oy = self.origin
+        c = math.cos(math.pi / 6)
+        return ox + (x + y) * c * self.scale, oy + ((y - x) * 0.5 + z) * self.scale

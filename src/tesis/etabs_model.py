@@ -24,7 +24,7 @@ from tesis.building import AXIS_X, AXIS_Y, DEPTH, STAIR, WIDTH, wall_segments
 from tesis.data.planta import STORIES
 from tesis.data.thesis import MESH_STEP
 from tesis.kit import t
-from tesis.model3d import P2, P3, anchor, beneath, world
+from tesis.model3d import P2, P3, anchor, beneath, lay_flat, world
 from tesis.theme import CONCRETE, INK_SOFT, MONO, MUTED
 
 SNAP = 0.07  # m: un extremo a menos de medio espesor de un eje cae sobre el eje
@@ -183,7 +183,9 @@ class EtabsModel:
                 # desplazamiento es relativo: ``animate.move_to_3d`` de un grupo con
                 # ``origin`` suma el origen (Gaanim 0.17 en desarrollo).
                 tilt = -math.asin((d1 - d0) / (wall.z1 - wall.z0))
-                anims.append(ease(wall.group.animate.shift_by_3d(*change(wall.center[2]))))
+                anims.append(
+                    ease(wall.group.animate.shift_by_3d(*change(wall.center[2])))
+                )
                 anims.append(ease(wall.group.animate.rotate_to_3d(tilt, 0, 0)))
             else:
                 # En su plano: cada punto avanza lo que avanza su altura.
@@ -277,16 +279,6 @@ def rect(x0: float, y0: float, x1: float, y1: float) -> list[P2]:
     return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
 
 
-def lay_flat(drawable: Drawable, z: float = 0.0) -> Drawable:
-    """Tiende en el nivel ``z`` un objeto 2D dibujado en planta (x, y en metros).
-
-    El objeto debe agruparse con ``origin=(0, 0)``: así el origen de la planta cae
-    en el origen del modelo y sus coordenadas son las de ETABS.
-    """
-    drawable.in_3d().rotate_to_3d(-math.pi / 2, 0, 0).move_to_3d(*world(0, 0, z))
-    return beneath(drawable)
-
-
 def stand(drawable: Drawable, line: WallLine, z: float) -> Drawable:
     """Levanta sobre el eje de ``line`` un objeto 2D dibujado en (u, z), en metros.
 
@@ -352,12 +344,9 @@ def _slab(scene: Scene, z: float) -> Slab:
 
 def frame_line(scene: Scene, start: Drawable, end: Drawable) -> Drawable:
     """Frame entre dos anclas: crece de ``start`` a ``end`` y las sigue si se mueven."""
-    return (
-        scene.geometry.line_3d(
-            start, end, FRAME_THICKNESS, segments=10, material=FRAME_MATERIAL
-        )
-        .hidden()
-    )
+    return scene.geometry.line_3d(
+        start, end, FRAME_THICKNESS, segments=10, material=FRAME_MATERIAL
+    ).hidden()
 
 
 def build_model(scene: Scene) -> EtabsModel:

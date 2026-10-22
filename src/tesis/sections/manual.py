@@ -87,13 +87,13 @@ from tesis.etabs_model import (
     Story,
     WallLine,
     build_model,
-    lay_flat,
     rect,
     slab_outline,
     stand,
     wall_lines,
 )
-from tesis.kit import RIGHT_EDGE, dimension, label, t
+from tesis.kit import RIGHT_EDGE, Iso, dimension, label, t
+from tesis.model3d import P2, P3, CameraRig, Shot, lay_flat, pinned, world
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -113,8 +113,6 @@ from tesis.theme import (
     STEEL,
     STEEL_SOFT,
 )
-from tesis.model3d import P2, P3, CameraRig, Shot, pinned, world
-from tesis.vivienda import Iso
 
 KICKER = "04 · Proceso manual"
 
@@ -309,10 +307,14 @@ class StepList:
         """Aparta el panel; animar un paso aún oculto lo haría aparecer."""
         return [b.animate.opacity(0).duration(duration) for b in self._shown(current)]
 
-    def show(self, current: int, duration: float = 0.4) -> list[Playable]:
+    def show(
+        self, current: int, duration: float = 0.4, delay: float = 0.0
+    ) -> list[Playable]:
         """Vuelve el panel como estaba en el paso ``current``."""
         return [
-            b.animate.opacity(0.4 if b in self.rows[:current] else 1).duration(duration)
+            b.animate.opacity(0.4 if b in self.rows[:current] else 1)
+            .duration(duration)
+            .delay(delay)
             for b in self._shown(current)
         ]
 
@@ -525,7 +527,16 @@ def _triad(scene: Scene, origin: P3, length: float = 1.5) -> list[Drawable]:
             ).hidden()
         )
         parts.append(
-            t(scene, name, 0, 0, size=0.13, weight=900, color=color, anchor=Anchor.CENTER)
+            t(
+                scene,
+                name,
+                0,
+                0,
+                size=0.13,
+                weight=900,
+                color=color,
+                anchor=Anchor.CENTER,
+            )
             .move_to_3d(*world(*tip))
             .billboard()
             .hidden()
@@ -572,9 +583,9 @@ def full_model(scene: Scene) -> None:
     scene.play(
         [
             *rig.to(MCT_VIEW, 1.6),
-            stagger(*[p.animate.fade_in().duration(0.3) for p in triad], each=0.05).delay(
-                0.8
-            ),
+            stagger(
+                *[p.animate.fade_in().duration(0.3) for p in triad], each=0.05
+            ).delay(0.8),
             stagger(
                 *[
                     parallel(
@@ -687,7 +698,10 @@ def full_model(scene: Scene) -> None:
         scene.play(
             [
                 pointer.click(),
-                *[s.columns[node].animate.create().duration(0.4) for s in model.stories],
+                *[
+                    s.columns[node].animate.create().duration(0.4)
+                    for s in model.stories
+                ],
             ]
         )
     others = sorted(
@@ -697,7 +711,10 @@ def full_model(scene: Scene) -> None:
         stagger(
             *[
                 parallel(
-                    *[s.columns[node].animate.create().duration(0.3) for s in model.stories]
+                    *[
+                        s.columns[node].animate.create().duration(0.3)
+                        for s in model.stories
+                    ]
                 )
                 for node in others
             ],
@@ -723,7 +740,12 @@ def full_model(scene: Scene) -> None:
     scene.play(
         stagger(
             *[
-                parallel(*[s.beams[key].animate.create().duration(0.3) for s in model.stories])
+                parallel(
+                    *[
+                        s.beams[key].animate.create().duration(0.3)
+                        for s in model.stories
+                    ]
+                )
                 for key in spans
             ],
             total=0.9,
@@ -767,9 +789,7 @@ def full_model(scene: Scene) -> None:
     )
     # Losas: rectángulo de esquina a esquina; el vacío de escalera ya está en la losa.
     full = rect(0, 0, WIDTH, DEPTH)
-    band = (
-        scene.geometry.polygon(full).no_fill().stroke(INK_SOFT, 0.05).hidden()
-    )
+    band = scene.geometry.polygon(full).no_fill().stroke(INK_SOFT, 0.05).hidden()
     lay_flat(scene.geometry.group([band], origin=(0, 0)), top + 0.04)
     band.points([(0.0, 0.0)] * 4)
     scene.play(pointer.to(at_top(0, 0)))
@@ -829,7 +849,7 @@ def full_model(scene: Scene) -> None:
             *rig.to(MCT_HIGH, 1.6),
             *[c.animate.opacity(1).duration(0.4).delay(1.2) for c in head.children],
             *[c.animate.fade_in().duration(0.4).delay(1.2) for c in chrome],
-            *[a.delay(1.2) for a in steps.show(4)],
+            *steps.show(4, delay=1.2),
         ]
     )
 
@@ -846,11 +866,13 @@ def full_model(scene: Scene) -> None:
             .hidden()
             for node in s.columns
         ]
-        model.ride(lay_flat(scene.geometry.group(lines, origin=(0, 0)), s.z1 + 0.03), s.z1)
+        model.ride(
+            lay_flat(scene.geometry.group(lines, origin=(0, 0)), s.z1 + 0.03), s.z1
+        )
         dot = model.ride(
-            scene.geometry.sphere(
-                0.16, material=Material3D.matte(INK)
-            ).move_to_3d(*world(*DIAPHRAGM_CENTER, s.z1)).hidden(),
+            scene.geometry.sphere(0.16, material=Material3D.matte(INK))
+            .move_to_3d(*world(*DIAPHRAGM_CENTER, s.z1))
+            .hidden(),
             s.z1,
         )
         spokes += lines
@@ -871,7 +893,17 @@ def full_model(scene: Scene) -> None:
     d1 = model.ride(
         pinned(
             scene,
-            t(scene, "D1", 0, 0, font=MONO, size=0.11, weight=700, color=INK, anchor=Anchor.CENTER),
+            t(
+                scene,
+                "D1",
+                0,
+                0,
+                font=MONO,
+                size=0.11,
+                weight=700,
+                color=INK,
+                anchor=Anchor.CENTER,
+            ),
             (*DIAPHRAGM_CENTER, top),
             offset=(-0.22, 0.16),
         ),
@@ -890,7 +922,17 @@ def full_model(scene: Scene) -> None:
     # 7 · Etiquetas Pier: se elige X1 en un piso y la etiqueta llega a los cuatro.
     def tag(text: str, at: P3, color: Color, size: float = 0.1) -> Drawable:
         label = (
-            t(scene, text, 0, 0, font=MONO, size=size, weight=700, color=color, anchor=Anchor.CENTER)
+            t(
+                scene,
+                text,
+                0,
+                0,
+                font=MONO,
+                size=size,
+                weight=700,
+                color=color,
+                anchor=Anchor.CENTER,
+            )
             .move_to_3d(*world(*at))
             .billboard()
             .hidden()
@@ -1116,7 +1158,9 @@ def _junction_detail(
     shared = sorted(set(shared))
     parts: list[Drawable] = [
         scene.geometry.points_3d(
-            [world(*p) for p in inner], radius=0.028, material=Material3D.matte(INK_SOFT)
+            [world(*p) for p in inner],
+            radius=0.028,
+            material=Material3D.matte(INK_SOFT),
         ).hidden(),
         scene.geometry.points_3d(
             [world(*p) for p in shared], radius=0.04, material=Material3D.matte(BRICK)
@@ -1336,7 +1380,14 @@ def _ground(scene: Scene) -> Ground:
             .move_to(cx, cy)
         )
         text = t(
-            scene, name, cx, cy, font=MONO, size=0.28, color=INK_SOFT, anchor=Anchor.CENTER
+            scene,
+            name,
+            cx,
+            cy,
+            font=MONO,
+            size=0.28,
+            color=INK_SOFT,
+            anchor=Anchor.CENTER,
         )
         bubbles.append(scene.geometry.group([ring, text]).hidden())
     half = 0.083  # m: medio espesor dibujado, como en las plantas del resto de la tesis
@@ -1355,10 +1406,11 @@ def _ground(scene: Scene) -> Ground:
     for panel_box in (SLAB_ABOVE, SLAB_BELOW):
         lines, _ = _envelope(*panel_box)
         envelope += [
-            scene.geometry.line(*a, *b).stroke(INK_SOFT, 0.028).hidden() for a, b in lines
+            scene.geometry.line(*a, *b).stroke(INK_SOFT, 0.028).hidden()
+            for a, b in lines
         ]
     upper, lower = X4_TRIBUTARY
-    share_labels = [
+    share_labels: list[Drawable] = [
         t(
             scene,
             f"{area:.2f} m²",
@@ -1650,7 +1702,11 @@ def plane_frames(scene: Scene) -> None:
             symbol.animate.fade_out().duration(0.3).delay(0.3),
             x4_dot.animate.grow_from_center().duration(0.3).delay(0.3),
             stagger(
-                *[d.animate.grow_from_center().duration(0.25) for d in dots.values() if d is not x4_dot],
+                *[
+                    d.animate.grow_from_center().duration(0.25)
+                    for d in dots.values()
+                    if d is not x4_dot
+                ],
                 total=0.8,
             ).delay(0.5),
         ]
@@ -1743,9 +1799,7 @@ def plane_frames(scene: Scene) -> None:
     # 5 · En cada nivel: brazos rígidos desde el centroide y dinteles entre sus extremos.
     bar_points = {(round(x, 3), round(y, 3)) for _, x, y in BARS}
     by_level: list[tuple[list[Drawable], list[Drawable]]] = []
-    frame_a: list[Drawable] = [
-        bars[name] for name, _, y in BARS if abs(y) < 1e-6
-    ]
+    frame_a: list[Drawable] = [bars[name] for name, _, y in BARS if abs(y) < 1e-6]
     for z in levels:
         arms: list[Drawable] = []
         lintels: list[Drawable] = []
@@ -1831,7 +1885,9 @@ def plane_frames(scene: Scene) -> None:
     ghost: list[Drawable] = []
     for z in levels:
         panel_fill = (
-            scene.geometry.polygon(_rect(X4_START, z - STORY_HEIGHT, X4_START + length, z))
+            scene.geometry.polygon(
+                _rect(X4_START, z - STORY_HEIGHT, X4_START + length, z)
+            )
             .fill(STEEL_SOFT)
             .stroke(STEEL, 0.03)
             .opacity(0.75)
@@ -1897,9 +1953,9 @@ def plane_frames(scene: Scene) -> None:
             *step(6),
             *[w.animate.fade_out().duration(0.3) for w in (*window, *window_texts)],
             *[g.animate.fade_out().duration(0.4) for g in ghost],
-            stagger(*[a.animate.create().duration(0.3) for a in arrows], total=1.4).delay(
-                0.2
-            ),
+            stagger(
+                *[a.animate.create().duration(0.3) for a in arrows], total=1.4
+            ).delay(0.2),
             load_tag.animate.fade_in_from(Direction.LEFT, 0.05)
             .duration(0.3)
             .delay(1.4),
@@ -1938,7 +1994,17 @@ def plane_frames(scene: Scene) -> None:
         )
     d1 = pinned(
         scene,
-        t(scene, "D1", 0, 0, font=MONO, size=0.11, weight=700, color=INK, anchor=Anchor.CENTER),
+        t(
+            scene,
+            "D1",
+            0,
+            0,
+            font=MONO,
+            size=0.11,
+            weight=700,
+            color=INK,
+            anchor=Anchor.CENTER,
+        ),
         (*DIAPHRAGM_CENTER, top),
         offset=(-0.22, 0.16),
     )

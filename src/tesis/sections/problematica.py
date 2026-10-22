@@ -35,6 +35,7 @@ from tesis.kit import (
     numeral,
     t,
 )
+from tesis.model3d import P3, CameraRig, Shot, pinned
 from tesis.subduccion import draw_subduction
 from tesis.theme import (
     BRICK,
@@ -54,7 +55,7 @@ from tesis.theme import (
     STEEL,
     STEEL_SOFT,
 )
-from tesis.vivienda import House, Iso, draw_house
+from tesis.vivienda import LX, LY, build_house, ground_arrow, mid
 
 KICKER = "01 · Problemática"
 MATERIAL_LABELS = {
@@ -753,6 +754,12 @@ LIST_X, LIST_TOP, LIST_GAP = 0.9, 2.1, 0.92
 DRIFT = 0.3  # m en la losa; exagerado para que se vea
 # Diagrama del sismo sobre el terreno, frente a la fachada (m, en planta).
 QUAKE_TAIL, QUAKE_REACH, QUAKE_ANGLE = (1.6, -2.27), 3.0, math.radians(35)
+# Tomas de la vivienda: se arma vista desde la esquina de la fachada y la cámara gira
+# mientras sube el muro; en el sismo se eleva para leer X e Y sobre el terreno.
+HOUSE_CENTER = (LX / 2, LY / 2, 1.3)
+HOUSE_BUILD = Shot(44, 24, 0.92, HOUSE_CENTER, (-3.2, -0.1))
+HOUSE_TURN = Shot(30, 22, 0.92, HOUSE_CENTER, (-3.2, -0.1))
+HOUSE_QUAKE = Shot(38, 34, 0.74, (LX / 2, LY / 2 - 0.9, 1.0), (-3.3, 0.15))
 
 
 def _entry(
@@ -767,53 +774,11 @@ def _entry(
     return scene.geometry.group(parts)
 
 
-def _ground_vector(
-    scene: Scene,
-    iso: Iso,
-    start: tuple[float, float],
-    end: tuple[float, float],
-    color: Color,
-) -> Drawable:
-    """Vector dibujado sobre el terreno, en coordenadas de planta."""
-    (x0, y0), (x1, y1) = iso(*start, 0), iso(*end, 0)
-    return (
-        scene.geometry.arrow(
-            x0, y0, x1, y1, head_length=0.2, head_width=0.2, body_width=0.05
-        )
-        .fill(color)
-        .no_stroke()
-    )
-
-
-def _nudge(point: tuple[float, float], dx: float, dy: float) -> tuple[float, float]:
-    return point[0] + dx, point[1] + dy
-
-
-def _sway(house: House, dx: float, dy: float):
-    """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura."""
-    swings = []
-    previous = 0.0
-    for amplitude in (1.0, -0.75, 0.5, -0.3, 0.12, 0.0):
-        step = amplitude - previous
-        swings.append(
-            parallel(
-                *[
-                    layer.animate.shift_by(step * dx * share, step * dy * share)
-                    .duration(0.36)
-                    .easing(Easing.ease_in_out(EasingCurve.SINE))
-                    for layer, share in house.layers
-                ]
-            )
-        )
-        previous = amplitude
-    return sequence(*swings)
-
-
 def seismic(scene: Scene) -> None:
     header(scene, KICKER, "Frente al sismo, la vivienda confinada trabaja como unidad")
 
-    iso = Iso((-6.6, -0.33), 0.63)
-    house = draw_house(scene, iso)
+    house = build_house(scene)
+    rig = CameraRig(scene, HOUSE_BUILD)
     heading = label(scene, "Proceso constructivo", LIST_X, 2.62, color=MUTED, size=0.14)
     steps = [
         _entry(scene, title, body, LIST_TOP - i * LIST_GAP, str(i + 1))
@@ -835,7 +800,7 @@ def seismic(scene: Scene) -> None:
             house.ground.animate.fade_in().duration(0.4),
             stagger(
                 *[
-                    p.animate.fade_in_from(Direction.DOWN, 0.04).duration(0.3)
+                    p.animate.fade_in().duration(0.3)
                     for p in house.footing + house.plinth
                 ],
                 each=0.04,
@@ -849,37 +814,30 @@ def seismic(scene: Scene) -> None:
         [
             *enter(1),
             stagger(
-                *[g.animate.fade_in().duration(0.12) for g in house.steel], each=0.035
+                *[bar.animate.create().duration(0.5) for bar in house.steel], each=0.02
             ),
         ]
     )
     scene.wait(0.3)
 
-    # 3 · Hilada por hilada; la cara superior acompaña a la última asentada.
-    courses = []
-    for k, bricks in enumerate(house.masonry):
-        parts = [
-            bricks.animate.fade_in_from(Direction.DOWN, 0.03).duration(0.14),
-            house.tops[k].animate.fade_in().duration(0.08),
-        ]
-        if k:
-            parts.append(house.tops[k - 1].animate.fade_out().duration(0.08))
-        courses.append(parallel(*parts))
-    scene.play([*enter(2), stagger(*courses, each=0.09)])
+    # 3 · Hilada por hilada, ladrillo tras ladrillo; la cámara rodea la esquina para
+    # que se vea el dentado que entra en el hueco de las columnas.
+    courses = [
+        parallel(
+            bricks.animate.create().duration(0.3),
+            joints.animate.fade_in().duration(0.15),
+        )
+        for bricks, joints in zip(house.bricks, house.mortar, strict=True)
+    ]
+    scene.play([*enter(2), stagger(*courses, each=0.09), *rig.to(HOUSE_TURN, 2.4)])
     scene.wait(0.3)
 
-    # 4 · El concreto de las columnas sube y cubre el acero.
+    # 4 · El concreto de las columnas sube y encierra el acero y el dentado.
     scene.play(
         [
             *enter(3),
             stagger(
-                *[
-                    parallel(
-                        pour.animate.fade_in().duration(0.12),
-                        bars.animate.fade_out().duration(0.12),
-                    )
-                    for pour, bars in zip(house.concrete, house.steel)
-                ],
+                *[pour.animate.create().duration(0.12) for pour in house.concrete],
                 each=0.05,
             ),
         ]
@@ -893,11 +851,16 @@ def seismic(scene: Scene) -> None:
             stagger(
                 *[b.animate.fade_in().duration(0.3) for b in house.beams], each=0.05
             ),
-            house.steel[-1].animate.fade_out().duration(0.3),
         ]
     )
-    scene.play(house.slab.animate.fill_level(1).duration(0.9))
-    scene.play([s.animate.opacity(1).duration(0.4) for s in steps[:-1]])
+    scene.play(house.pour_slab(0.9))
+    # El acero quedó dentro del concreto: se retira para que no asome en el sismo.
+    scene.play(
+        [
+            *[s.animate.opacity(1).duration(0.4) for s in steps[:-1]],
+            *[bar.animate.fade_out().duration(0.2) for bar in house.steel],
+        ]
+    )
     scene.stop("proceso-constructivo")
 
     # En el sismo: la dirección real es cualquiera; se idealiza con sus componentes
@@ -907,44 +870,36 @@ def seismic(scene: Scene) -> None:
         _entry(scene, title, body, LIST_TOP - i * LIST_GAP)
         for i, (title, body) in enumerate(IN_QUAKE)
     ]
-    # Triángulo de vectores: el sismo es la hipotenusa; X e Y, los catetos.
+    # Triángulo de vectores sobre el terreno: el sismo es la hipotenusa; X e Y, los catetos.
     x0, y0 = QUAKE_TAIL
     corner = (x0 + QUAKE_REACH * math.cos(QUAKE_ANGLE), y0)
     tip = (corner[0], y0 + QUAKE_REACH * math.sin(QUAKE_ANGLE))
-    quake = _ground_vector(scene, iso, QUAKE_TAIL, tip, INK_SOFT)
-    x_comp = _ground_vector(scene, iso, QUAKE_TAIL, corner, BRICK)
-    y_comp = _ground_vector(scene, iso, corner, tip, STEEL)
+    quake = ground_arrow(scene, QUAKE_TAIL, tip, INK_SOFT)
+    x_comp = ground_arrow(scene, QUAKE_TAIL, corner, BRICK)
+    y_comp = ground_arrow(scene, corner, tip, STEEL)
 
-    def middle(p: tuple[float, float], q: tuple[float, float]) -> tuple[float, float]:
-        return iso((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, 0)
+    def tag(
+        text: str,
+        at: P3,
+        offset: tuple[float, float],
+        color: Color,
+        size: float,
+        anchor: Anchor,
+    ) -> Drawable:
+        return pinned(
+            scene,
+            t(scene, text, 0, 0, size=size, weight=700, color=color, anchor=anchor),
+            at,
+            offset,
+        )
 
-    quake_label = t(
-        scene,
-        "Sismo",
-        *_nudge(middle(QUAKE_TAIL, tip), 0, 0.14),
-        size=0.2,
-        weight=700,
-        color=INK_SOFT,
-        anchor=Anchor.BOTTOM,
+    quake_label = tag(
+        "Sismo", mid(QUAKE_TAIL, tip), (0, 0.14), INK_SOFT, 0.2, Anchor.BOTTOM
     )
-    x_label = t(
-        scene,
-        "X",
-        *_nudge(middle(QUAKE_TAIL, corner), -0.1, -0.1),
-        size=0.24,
-        weight=700,
-        color=BRICK,
-        anchor=Anchor.TOP_RIGHT,
+    x_label = tag(
+        "X", mid(QUAKE_TAIL, corner), (-0.1, -0.1), BRICK, 0.24, Anchor.TOP_RIGHT
     )
-    y_label = t(
-        scene,
-        "Y",
-        *_nudge(middle(corner, tip), 0.12, -0.1),
-        size=0.24,
-        weight=700,
-        color=STEEL,
-        anchor=Anchor.TOP_LEFT,
-    )
+    y_label = tag("Y", mid(corner, tip), (0.12, -0.1), STEEL, 0.24, Anchor.TOP_LEFT)
     exaggerated = t(
         scene,
         "Deformación exagerada",
@@ -958,6 +913,7 @@ def seismic(scene: Scene) -> None:
         [
             heading.animate.fade_out().duration(0.3),
             *[s.animate.fade_out().duration(0.3) for s in steps],
+            *rig.to(HOUSE_QUAKE, 1.4),
         ]
     )
     scene.play(
@@ -989,7 +945,7 @@ def seismic(scene: Scene) -> None:
     )
     scene.play(
         [
-            _sway(house, *iso.along(DRIFT, 0)),
+            house.sway(DRIFT, 0),
             notes[2]
             .animate.fade_in_from(Direction.LEFT, 0.06)
             .duration(0.35)
@@ -1005,7 +961,7 @@ def seismic(scene: Scene) -> None:
             notes[3].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
         ]
     )
-    scene.play(_sway(house, *iso.along(0, DRIFT)))
+    scene.play(house.sway(0, DRIFT))
     scene.play(
         [
             x_comp.animate.opacity(1).duration(0.3),
