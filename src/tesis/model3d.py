@@ -35,6 +35,7 @@ type P3 = tuple[float, float, float]
 FRAME_HEIGHT = 9.0  # alto del cuadro, en unidades de escena
 LENS = 0.42  # rad: campo de visión vertical, una perspectiva suave (≈ 24°)
 GLIDE = Easing.ease_in_out(EasingCurve.CUBIC)
+HOLD = 1 / 30  # s: la cámara 3D se suelta un cuadro después de la última pausa
 
 # Restricciones de cámara activas: se sueltan al entrar a la siguiente diapositiva.
 _ACTIVE: list[CameraConstraint] = []
@@ -46,9 +47,14 @@ def world(x: float, y: float, z: float) -> P3:
 
 
 def release_camera(scene: Scene) -> None:
-    """Suelta los rigs 3D activos y devuelve la cámara a la vista 2D de las diapositivas."""
+    """Suelta los rigs 3D activos y devuelve la cámara a la vista 2D de las diapositivas.
+
+    Se llama al entrar a la diapositiva siguiente, cuyo inicio coincide con la última
+    pausa de la anterior: espera un cuadro para que esa pausa conserve su cámara.
+    """
     if not _ACTIVE:
         return
+    scene.wait(HOLD)
     for constraint in _ACTIVE:
         constraint.disable()
     _ACTIVE.clear()

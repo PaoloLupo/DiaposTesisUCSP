@@ -2477,21 +2477,22 @@ SECTION = Section(
             transition=Transition.cross_fade(0.45),
             notes=(
                 "1.5 min. El MCT se arma en ETABS 22 siguiendo sus menús: Definir, Dibujar y "
-                "Asignar (§5.3.1). (1) Grillas en los ejes del plano y cuatro pisos: 2.46 m y "
-                "3 × 2.52 m. (2) Materiales: albañilería ALB65 tipo Masonry (Em = 500 f'm, "
+                "Asignar (§5.3.1). (1) Grillas en los ejes del plano, vistas en planta; la cámara "
+                "se inclina a la vista 3D y suben los cuatro pisos: 2.46 m y 3 × 2.52 m. (2) Materiales: albañilería ALB65 tipo Masonry (Em = 500 f'm, "
                 "ν = 0.25, γ = 1800 kgf/m³) y concreto C175 (Ec = 15 000√f'c, ν = 0.15). "
                 "(3) Secciones: columnas y vigas como frames; muros M13 y P13 como shell-thin "
                 "(membrana y placa); losa maciza LM12 como membrane (E.030, art. 30.8). (4) Se "
                 "dibuja de nodo a nodo; con Similar Stories cada elemento aparece en los cuatro "
                 "pisos, y los bordes de los shells caen sobre los frames. (5) Ocultando las losas "
-                "se ve la malla de 0.50 m (Wall Auto Mesh): sus nodos coinciden con los de "
-                "columnas y vigas; los brazos rígidos se asignaron a mano (End Length Offsets, "
-                "factor 0.5). (6) Diafragma rígido D1 en cada losa. (7) Etiquetas Pier: un nombre "
+                "se ve la malla de 0.50 m (Wall Auto Mesh); la cámara entra al nudo del eje 2 con "
+                "el A, en el piso 2: los nodos de la malla coinciden con los de columnas y vigas, "
+                "y los brazos rígidos se asignaron a mano (End Length Offsets, factor 0.5). (6) Diafragma rígido D1 en cada losa. (7) Etiquetas Pier: un nombre "
                 "por muro, igual en todos los pisos; con ellas ETABS integra los esfuerzos de la "
                 "malla en fuerzas por muro. (8) Load Sets: CM 0.10 y CV 0.20 tonf/m² (azotea "
-                "CV 0.10); masa = CM + 25 % CV: 121.3 tonf por piso típico y 87.8 en la azotea. "
-                "Al analizar, el modo 3 (T = 0.171 s) es la traslación pura en Y; la deformada "
-                "está exagerada. Dibujo esquemático: el orden de los clics es ilustrativo."
+                "CV 0.10); masa = CM + 25 % CV: 121.3 tonf por piso típico y 87.8 en la azotea; "
+                "los muros se aclaran y quedan las masas concentradas en cada diafragma. Al "
+                "analizar, el modo 3 (T = 0.171 s) es la traslación pura en Y; la deformada "
+                "está exagerada. Modelo esquemático: el orden de los clics es ilustrativo."
             ),
         ),
         SectionStep(
@@ -2508,14 +2509,16 @@ SECTION = Section(
                 "extremo; A1 = 1.038 m², A2 = L t = 0.403 m², I3 = 1.509 m⁴ (Tabla 26). (3) Método "
                 "del sobre: líneas a 45° reparten cada paño; X4 recibe 3.38 + 3.64 = 7.02 m², "
                 "CM = 2.72 y CV = 1.40 tonf por piso; en el modelo se escalan para sumar el peso "
-                "total de la losa (2.91 y 1.50 tonf). (4) En ETABS, una barra por muro en su "
-                "centroide, empotrada en la base. (5) Brazos rígidos (material rígido) del centroide "
-                "al borde del muro y dinteles T (interiores) o L (perimetrales): cada eje forma un "
-                "pórtico plano, como el del eje A. (6) Secciones General con las propiedades "
+                "total de la losa (2.91 y 1.50 tonf). (4) La cámara inclina la planta hasta la "
+                "vista 3D y en ETABS sube una barra por muro en su centroide, empotrada en la "
+                "base. (5) Brazos rígidos (material rígido) del centroide al borde del muro y "
+                "dinteles T (interiores) o L (perimetrales): cada eje forma un pórtico plano; la "
+                "cámara se pone de frente al del eje A, como se lo dibuja en elevación. (6) Secciones General con las propiedades "
                 "calculadas; rigidez casi nula fuera del plano (× 0.0001) y peso × A2/A1 para no "
                 "contar las alas. (7) Las cargas tributarias entran como fuerzas en cada barra y "
-                "piso. (8) El diafragma rígido D1 une los pórticos. Contraste con el MCT: aquí la "
-                "idealización y las cargas las decide el ingeniero fuera del programa."
+                "piso. (8) El diafragma rígido D1 une los pórticos; mientras se explica, la cámara "
+                "rodea el modelo. Contraste con el MCT: aquí la idealización y las cargas las "
+                "decide el ingeniero fuera del programa."
             ),
         ),
         SectionStep(

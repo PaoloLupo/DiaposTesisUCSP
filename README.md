@@ -64,6 +64,12 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
   geometría (`tesis.building`) con los muros y etiquetas Pier del modelo de ETABS. Se reutiliza
   en la portada, la densidad, el caso de estudio, la resistencia global
   y el cierre.
+- **Modelos en 3D real:** la vivienda de Problemática, el modelo completo (MCT) y los pórticos
+  planos (MSTA) viven en el mundo 3D de Gaanim, en metros y con los colores planos del deck.
+  Una cámara en perspectiva (`tesis.model3d.CameraRig`) los encuadra a la izquierda del panel
+  de pasos: va de la planta a la vista 3D, entra a un nudo, pone de frente un pórtico o rodea
+  el modelo. Con la cámara en perspectiva la capa 2D no se mueve, y al entrar a la diapositiva
+  siguiente la cámara vuelve a la vista 2D (`release_camera`, en `section_index.py`).
 
 ## Dónde editar
 
@@ -71,10 +77,13 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
 | --- | --- |
 | Orden de los bloques | `main.py` |
 | Colores, tipografías y tema | `src/tesis/theme.py` |
-| Encabezado, fuentes, chips de estado, cotas | `src/tesis/kit.py` |
+| Encabezado, fuentes, chips de estado, cotas, isométrica de los íconos | `src/tesis/kit.py` |
 | Símbolos de diagramas de flujo | `src/tesis/diagram.py` |
 | Dibujo de la planta del caso | `src/tesis/building.py` |
-| Modelo de ETABS (MCT) en isométrica | `src/tesis/etabs_model.py` |
+| Mundo 3D: coordenadas, tomas y rig de cámara, rótulos sobre puntos 3D | `src/tesis/model3d.py` |
+| Modelo de ETABS (MCT) en 3D: áreas, frames, malla y deformada | `src/tesis/etabs_model.py` |
+| Tomas de cámara del MCT y del MSTA (`MCT_*`, `MSTA_*`) | `src/tesis/sections/manual.py` |
+| Vivienda confinada en 3D, hilada por hilada | `src/tesis/vivienda.py` |
 | Bloque de la subducción (Nazca bajo la Sudamericana) | `src/tesis/subduccion.py` |
 | Pórticos planos (MSTA): barras, brazos y dinteles | `src/tesis/data/porticos.py` |
 | Muros, longitudes y densidad del caso | `src/tesis/data/planta.py` |
@@ -127,6 +136,10 @@ Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) 
 `snapshots/DiaposTesisUCSP/current/`. Las pausas se numeran desde 1.
 
 ## Actualizar Gaanim
+
+Los modelos 3D necesitan Gaanim 0.17 (en desarrollo: `main` desde `f611c3e`): copias de una
+malla (`instances`), nubes de puntos (`points_3d`), `camera.project` y `covers_on_purpose`.
+Con 0.16.0 el guion falla al construir la vivienda.
 
 El proyecto usa el wheel de `C:/Tools/gaanim` (0.10.2), fijado en `[tool.uv.sources]` de
 `pyproject.toml`. Al cambiar de versión, actualiza esa ruta; si el wheel se reconstruye con el

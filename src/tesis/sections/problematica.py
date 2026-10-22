@@ -1875,8 +1875,9 @@ SECTION = Section(
             notes=(
                 "60 s. La albañilería confinada llegó tras el terremoto de Lima de 1940. (1) Seguir "
                 "la obra en orden: cimiento y sobrecimiento; el acero de las columnas se ancla "
-                "antes del muro; el muro se asienta con los extremos dentados; luego se vacían las "
-                "columnas contra el dentado y, al final, la viga solera junto con la losa "
+                "antes del muro; el muro se asienta hilada por hilada con los extremos dentados (la "
+                "cámara rodea la esquina para mostrarlos); luego se vacían las columnas contra el "
+                "dentado y, al final, la viga solera junto con la losa "
                 "(Gonzales, 1992; San Bartolomé, 2018). Puerta y ventana llevan columnas a los "
                 "lados y dintel. (2) El sismo llega en cualquier dirección; para el análisis se "
                 "descompone en sus componentes X e Y (triángulo sobre el terreno). (3) En cada "
