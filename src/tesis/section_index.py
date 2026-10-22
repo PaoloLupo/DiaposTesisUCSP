@@ -25,6 +25,7 @@ from gaanim import (
 )
 
 from tesis.kit import LEFT_EDGE, RIGHT_EDGE, t
+from tesis.model3d import release_camera
 from tesis.theme import (
     BRICK,
     DISPLAY,
@@ -250,7 +251,11 @@ class SectionIndex:
         return rail
 
     def _advance(self, scene: Scene, progress: SectionProgress) -> None:
-        """Al entrar a cada escena el riel avanza y aparece su número (el divisor no cuenta)."""
+        """Al entrar a cada escena el riel avanza y aparece su número (el divisor no cuenta).
+
+        Antes, la cámara 3D de la diapositiva anterior (si la hubo) vuelve a la vista 2D.
+        """
+        release_camera(scene)
         if progress.index == 1 or self._rail is None:
             return
         numbered = progress.step.name not in UNNUMBERED
