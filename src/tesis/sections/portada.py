@@ -52,8 +52,7 @@ def build(scene: Scene) -> None:
         scene,
         # Seis líneas por unidades de sentido: el título llena el alto de la
         # columna, desde el rótulo hasta los créditos, sin invadir la planta.
-        "Marco de trabajo para\nla automatización\ndel diseño de la\n"
-        "distribución de muros\nen planta para edificios\nde albañilería confinada",
+        "Marco de trabajo para\nla automatización\ndel diseño de la\ndistribución de muros\nen planta para edificios\nde albañilería confinada",
         LEFT_EDGE,
         2.2,
         font=DISPLAY,
@@ -103,7 +102,7 @@ def build(scene: Scene) -> None:
     ]
     caption = t(
         scene,
-        "Caso de estudio · San Bartolomé (2006) · planta típica, 4 pisos",
+        "Caso de estudio · San Bartolomé (2006) · Ejemplo de aplicación Norma E.070",
         ox + WIDTH * s / 2,
         -1.95,
         font=MONO,

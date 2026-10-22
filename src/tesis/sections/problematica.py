@@ -85,7 +85,7 @@ def materials(scene: Scene) -> None:
     counter = scene.viz.rolling_number(
         0,
         decimals=1,
-        suffix=" %",
+        suffix="%",
         font_family=DISPLAY,
         weight=700,
         font_size=0.72,
@@ -339,7 +339,7 @@ def _graticule(scene: Scene) -> tuple[list[Drawable], list[Drawable]]:
 
 
 def plates(scene: Scene) -> None:
-    header(scene, KICKER, "El Perú está sobre el choque de dos placas tectónicas")
+    header(scene, KICKER, "El Perú se encuentra en una zona con alta actividad sísmica")
 
     # El Perú resalta sobre sus vecinos: ellos toman el tono de la placa (tierra y mar
     # son la misma placa Sudamericana) y se recortan al marco.
@@ -710,8 +710,7 @@ def plates(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · §1.1 Problemática, p. 1 (Tavera, 2014). Fosa y epicentros aproximados "
-        f"(USGS); contornos: {OUTLINES_SOURCE}; mapa esquemático.",
+        "Tesis · §1.1 Problemática, p. 1 (Tavera, 2014)",
     )
     scene.stop("pais-sismico")
 
