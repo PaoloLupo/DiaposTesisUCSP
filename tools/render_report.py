@@ -9,7 +9,7 @@ en la diapositiva, a 200 dpi). Se corre a mano si cambia el anexo:
 
 from pathlib import Path
 
-import pymupdf
+import pymupdf  # pyright: ignore[reportMissingImports]  # solo con --with pymupdf
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "TesisUCSP/archivos/anexos/EjemploBartolome.pdf"

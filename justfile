@@ -19,8 +19,13 @@ fmt:
     uv run ruff format .
     uv run ruff check --fix .
 
+# Paquete completo en exports/ (no se versiona): sirve para exportar video y para check.
 export:
     gaanim export . -o exports/DiaposTesisUCSP.gaanim
+
+# Exporta, aligera con gaanim pack --web y sube a la rama publicar (un solo commit).
+publish *args:
+    uv run python tools/publish.py {{args}}
 
 # Una imagen por pausa en snapshots/DiaposTesisUCSP/current (p. ej. just capture --stops 12,30).
 capture *args:

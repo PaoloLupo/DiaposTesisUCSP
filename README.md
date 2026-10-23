@@ -175,12 +175,23 @@ Gaanim llega en dos piezas:
 ## Exportar
 
 ```powershell
-just export                                                      # exports/DiaposTesisUCSP.gaanim
+just publish                                                     # para el navegador
+just export                                                      # paquete completo
 gaanim export . --output exports/tesis.mp4 --quality production  # video
 ```
 
-La exportación ignora las pausas y genera una secuencia continua de unos 6.3 minutos de
-animación (380.7 s).
+`just publish` exporta el paquete completo a `exports/` (que no se versiona), lo aligera con
+`gaanim pack --web` (de unos 47 a 20 MB) y lo deja como único commit de la rama `publicar`.
+Cada publicación reemplaza ese commit, así que el historial no crece. Sale de un commit: con
+cambios sin commit se niega, salvo `just publish --dirty`; `--no-push` arma la rama sin subirla.
+El reproductor web lo abre desde `raw.githubusercontent.com`, que envía CORS (las descargas de
+GitHub Releases no):
+
+<https://paololupo.github.io/gaanim/reproductor/?src=https://raw.githubusercontent.com/PaoloLupo/DiaposTesisUCSP/publicar/DiaposTesisUCSP.gaanim>
+
+El paquete completo de `exports/` sirve para exportar video y para `gaanim check`. La
+exportación ignora las pausas y genera una secuencia continua de unos 6.3 minutos de animación
+(380.7 s).
 
 ## Bugs y mejoras de Gaanim
 

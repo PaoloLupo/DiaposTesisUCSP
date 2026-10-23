@@ -7,7 +7,7 @@ dependencies = [
 ]
 
 [tool.pyright]
-include = ["src", "main.py"]
+include = ["src", "tools", "main.py"]
 extraPaths = ["src"]
 venvPath = "."
 venv = ".venv"
