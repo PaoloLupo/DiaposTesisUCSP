@@ -3,7 +3,7 @@
 Sustentación animada en Gaanim de la tesis *Marco de trabajo para la automatización del
 diseño de la distribución de muros en planta para edificios de albañilería confinada*
 (UCSP). Pensada para **30 minutos**: 8 bloques, 34 diapositivas de contenido, 8 divisores
-de agenda y una portada (43 segmentos, 95 pausas).
+de agenda y una portada (43 segmentos, 101 pausas).
 
 ## Ejecutar
 
