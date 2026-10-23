@@ -8,6 +8,8 @@ Unidades de diseño: el fotograma mide 1080 px de alto = 9 unidades de escena, e
 decir 120 px por unidad.
 """
 
+from typing import Any
+
 from gaanim import (
     Anchor,
     Box,
@@ -291,7 +293,7 @@ def stage(
     ``width`` la etapa tiene ancho fijo; sin él, crece con su fila.
     """
     L = scene.layout
-    size = {"width": width} if width else {}
+    size: dict[str, Any] = {"width": width} if width else {}
     column = L.column(
         hairline(scene),
         L.row(
@@ -526,7 +528,7 @@ def chip(
     width: str | None = None,
 ) -> Box:
     """Etiqueta compacta de esquinas rectas, en tipografía técnica."""
-    props: dict[str, str] = {"border": border, "border_width": "2px"} if border else {}
+    props: dict[str, Any] = {"border": border, "border_width": "2px"} if border else {}
     if width:
         props["width"] = width
     return scene.layout.box(

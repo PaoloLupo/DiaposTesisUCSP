@@ -9,6 +9,7 @@ from typing import Literal
 
 from gaanim import (
     Anchor,
+    Anim,
     Box,
     Color,
     Direction,
@@ -159,7 +160,7 @@ def density_check(scene: Scene) -> None:
 
     legend_y = 2.65
 
-    def legend(x: float, color: str, text: str) -> list[Drawable]:
+    def legend(x: float, color: Color, text: str) -> list[Drawable]:
         swatch = (
             scene.geometry.rect(0.3, 0.09)
             .fill(color)
@@ -352,7 +353,7 @@ def density_check(scene: Scene) -> None:
             left: float = track_left,
             per_m2: float = per_m2,
             counter: RollingNumber = counter,
-        ) -> list[Playable]:
+        ) -> list[Anim]:
             """Suma un muro: se marca en planta, crece su bloque y avanza el total."""
             nonlocal cumulative
             wall = next(w for w in WALLS if w.name == name.split("_")[0])
@@ -619,7 +620,6 @@ def _check_drawing(
 
 def strength_checks(scene: Scene) -> None:
     header(scene, KICKER, "Tres verificaciones de resistencia, por muro y por piso")
-    w, gap = 4.6, 0.25
     axial = AXIAL_STRESS_FLOOR1["MCT"] / 10  # tonf/m² → kgf/cm²
     limit = min(AXIAL_LIMITS)
     ve, cap = CRACKING_FLOOR1["MCT"]["X1"]

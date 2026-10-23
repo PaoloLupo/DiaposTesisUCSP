@@ -8,9 +8,10 @@ de agenda y una portada (43 segmentos, 101 pausas).
 ## Ejecutar
 
 ```powershell
+uv sync          # wheel de Gaanim para autocompletado, ruff y pyright
 gaanim .
 gaanim --present .
-gaanim check . --strict
+just check       # estilo, tipos, pruebas de datos y gaanim check
 ```
 
 En presentación: espacio o flecha derecha para avanzar, izquierda para volver, `O` para buscar
@@ -78,10 +79,11 @@ basta quitarlas de la lista de `SectionStep` de su bloque.
 | --- | --- |
 | Orden de los bloques | `main.py` |
 | Colores, tipografías y tema | `src/tesis/theme.py` |
-| Encabezado, fuentes, chips de estado, cotas, isométrica de los íconos | `src/tesis/kit.py` |
+| Encabezado, fuente, frase final y demás componentes de layout | `src/tesis/components.py` |
+| Texto por coordenadas, chips de estado, numerales y cotas | `src/tesis/kit.py` |
 | Símbolos de diagramas de flujo | `src/tesis/diagram.py` |
 | Dibujo de la planta del caso | `src/tesis/building.py` |
-| Mundo 3D: coordenadas, tomas y rig de cámara, rótulos sobre puntos 3D | `src/tesis/model3d.py` |
+| Mundo 3D (z hacia arriba, en metros): tomas, órbitas, rótulos sobre puntos 3D | `src/tesis/model3d.py` |
 | Modelo de ETABS (MCT) en 3D: áreas, frames, malla y deformada | `src/tesis/etabs_model.py` |
 | Tomas de cámara del MCT y del MSTA (`MCT_*`, `MSTA_*`) | `src/tesis/sections/manual.py` |
 | Vivienda confinada en 3D, hilada por hilada | `src/tesis/vivienda.py` |
@@ -107,7 +109,7 @@ de la distribución de muros…» (la portada usa ese título).
 
 ```powershell
 git submodule update --init --recursive
-python -m unittest discover -s tests -v
+uv run python -m unittest discover -s tests -v
 ```
 
 Las pruebas leen las tablas Typst reales y verifican pesos por nivel, fuerzas en altura,
@@ -122,43 +124,68 @@ Matices que conviene respetar al exponer (también están en las notas):
 - El dato INEI 2025 es el material de las paredes exteriores; no acredita confinamiento.
 - La deriva animada y el ciclo manual son esquemas; sus valores del caso se citan aparte.
 
-## Revisión por capturas
+## Revisión
 
-`gaanim --diff --capture-stops` captura sin ventana el estado de cada pausa, sin código de
-revisión en el guion:
+`just check` corre ruff (estilo), pyright (tipos, modo estándar), las pruebas de datos y
+`gaanim check`. Las versiones de ruff y pyright están fijadas en el grupo `dev` de
+`pyproject.toml` y `uv sync` las instala; `just fmt` formatea y aplica los arreglos seguros.
 
-```powershell
-gaanim --diff --example . --capture-stops --capture-only --tests-root snapshots
-gaanim --diff --example . --capture-stops --capture-only --stops 12,30 --tests-root snapshots
-gaanim --diff --example . --capture-stops --capture-only --sections resultados --tests-root snapshots
-```
+`gaanim check` corre sin `--strict` porque los ocho rótulos del riel de avance están a
+propósito en el margen y Gaanim todavía no permite marcarlos (gaanim #728). Fuera de esos
+avisos, el guion no debe tener ninguno.
 
-Las imágenes (`stop_0001.png`, …) y `stops.json` (pausa, instante, segmento) quedan en
-`snapshots/DiaposTesisUCSP/current/`. Las pausas se numeran desde 1.
+### Capturas
 
-## Actualizar Gaanim
-
-Los modelos 3D necesitan Gaanim 0.17 (en desarrollo: `main` desde `f611c3e`): copias de una
-malla (`instances`), nubes de puntos (`points_3d`), `camera.project` y `covers_on_purpose`.
-Con 0.16.0 el guion falla al construir la vivienda.
-
-El proyecto usa el wheel de `C:/Tools/gaanim` (0.10.2), fijado en `[tool.uv.sources]` de
-`pyproject.toml`. Al cambiar de versión, actualiza esa ruta; si el wheel se reconstruye con el
-mismo número de versión, fuerza la reinstalación:
+Cada pausa se captura sin ventana y se compara con una referencia aprobada (`gaanim --diff`):
 
 ```powershell
-just reinstall
+just baseline                 # antes de un cambio: aprueba las pausas actuales
+just diff                     # después: compara; informe en snapshots/report/index.html
+just diff --stops 80-86       # solo algunas pausas (o --sections resultados)
+just capture --stops 12,30    # captura sin comparar, en snapshots/DiaposTesisUCSP/current
 ```
+
+Las pausas se numeran desde 1. Tras actualizar Gaanim, los bordes de líneas y textos cambian
+por antialiasing; `just diff --pixel-threshold 24` deja solo los cambios visibles.
+
+Las capturas saltan a cada pausa y no muestran lo que pasa entre una y otra. Las transiciones
+(el índice que se despliega, el sismo, el vuelo de una página) se revisan exportando el tramo
+en orden, como se reproduce:
+
+```powershell
+just sequence reporte-parte-1 reporte-parte-2   # nombres de pausa o segundos
+```
+
+Los cuadros quedan en `snapshots/sequence/`, 30 por segundo.
+
+## Gaanim
+
+El guion necesita Gaanim 0.17.0 con los arreglos de los PR #725 y #727 (cambios de layout
+simultáneos, recorte de imágenes al reproducir en orden y `deform` en copias). Están en `main`
+pero no en la release v0.17.0: con esa release el deck compila y sus pausas se ven bien, pero
+el índice de *Alba · partes del reporte* y su lector de páginas fallan al reproducir.
+
+Gaanim llega en dos piezas:
+
+- **El motor** (`gaanim.exe`, en `C:/Tools/gaanim`) ejecuta, presenta, captura y exporta. Se
+  actualiza con `gaanim update` (última release) o copiando un build de `main`.
+- **El wheel** (`gaanim` en `pyproject.toml`, desde PyPI) solo aporta los stubs para el
+  autocompletado y pyright. Se actualiza con `just upgrade`.
 
 ## Exportar
 
 ```powershell
-gaanim export . --output exports/tesis.mp4 --quality production
+just export                                                      # exports/DiaposTesisUCSP.gaanim
+gaanim export . --output exports/tesis.mp4 --quality production  # video
 ```
 
-La exportación ignora las pausas y genera una secuencia continua de ~3.5 minutos de animación.
+La exportación ignora las pausas y genera una secuencia continua de unos 6.3 minutos de
+animación (380.7 s).
 
-## Notas para Gaanim
+## Bugs y mejoras de Gaanim
 
-`GAANIM_NOTAS.md` recoge el estado de los bugs y mejoras de Gaanim encontrados durante el
-rediseño: qué ya se resolvió, qué sigue abierto, cómo reproducirlo y el rodeo aplicado aquí.
+Los bugs y mejoras de Gaanim que aparecen al trabajar en el deck se registran como issues en
+[PaoloLupo/gaanim](https://github.com/PaoloLupo/gaanim/issues). Cada rodeo del guion lleva un
+comentario «gaanim #NNN»; al cerrarse la issue se quita el rodeo y se compara con `just diff`.
+Quedan dos: #706 (marco de mapa con proyección, en `problematica.py`) y #728 (texto fuera del
+área segura a propósito, en `section_index.py`).

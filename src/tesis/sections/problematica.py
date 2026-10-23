@@ -32,7 +32,6 @@ from tesis.data.sudamerica import COUNTRIES, Ring
 from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
 from tesis.data.thesis import CRACKING_FLOOR1
 from tesis.kit import (
-    dash,
     label,
     numeral,
     t,
@@ -96,13 +95,9 @@ def materials(scene: Scene) -> None:
         color=INK,
     ).move_to(-4.55, -0.35, Anchor.CENTER)
     level = computed(lambda value: value / 100 - 0.1, inputs=[counter.parameter])
-    fill = (
-        scene.geometry.fill_level(
-            outline, BRICK_SOFT, direction="up", keep_outline=False
-        )
-        .z_index(-1)
-        .set_fill_level(level)
-    )
+    scene.geometry.fill_level(
+        outline, BRICK_SOFT, direction="up", keep_outline=False
+    ).z_index(-1).set_fill_level(level)
     caption = t(
         scene,
         "de las viviendas del Perú tienen paredes\nde ladrillo o bloque de concreto",

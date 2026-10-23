@@ -49,23 +49,31 @@ KICKER = "08 · Conclusiones"
 OBJECTIVES = [
     (
         "Identificar",
-        "La extracción de resultados, la clasificación de muros y la transcripción\n"
-        "a plantillas son actividades críticas y automatizables.",
+        (
+            "La extracción de resultados, la clasificación de muros y la transcripción\n"
+            "a plantillas son actividades críticas y automatizables."
+        ),
     ),
     (
         "Desarrollar",
-        "Se especificaron procesos, diagramas de flujo y trazabilidad para densidad,\n"
-        "esfuerzo axial, fisuración, resistencia al corte y derivas.",
+        (
+            "Se especificaron procesos, diagramas de flujo y trazabilidad para densidad,\n"
+            "esfuerzo axial, fisuración, resistencia al corte y derivas."
+        ),
     ),
     (
         "Aplicar",
-        "Alba se conecta con ETABS mediante su API, ejecuta las verificaciones y\n"
-        "entrega diagnósticos visuales y reportes técnicos automáticos.",
+        (
+            "Alba se conecta con ETABS mediante su API, ejecuta las verificaciones y\n"
+            "entrega diagnósticos visuales y reportes técnicos automáticos."
+        ),
     ),
     (
         "Evaluar",
-        "En el caso, el modelo completo permitió extraer y organizar fuerzas y\n"
-        "deformaciones; la idealización cambia resultados y diagnósticos.",
+        (
+            "En el caso, el modelo completo permitió extraer y organizar fuerzas y\n"
+            "deformaciones; la idealización cambia resultados y diagnósticos."
+        ),
     ),
 ]
 

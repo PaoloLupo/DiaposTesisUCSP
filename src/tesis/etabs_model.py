@@ -191,7 +191,9 @@ class EtabsModel:
                 anims.append(ease(wall.group.animate.orient_3d((1, 0, 0), up)))
             else:
                 # En su plano: cada punto avanza lo que avanza su altura.
-                def sheared(u: float, h: float, w: Wall = wall) -> P2:
+                def sheared(
+                    u: float, h: float, w: Wall = wall, d0: float = d0, d1: float = d1
+                ) -> P2:
                     s = (h - w.z0) / (w.z1 - w.z0)
                     return u + d0 + (d1 - d0) * s, h
 

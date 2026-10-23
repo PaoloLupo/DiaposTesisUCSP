@@ -360,7 +360,7 @@ def interface(scene: Scene) -> None:
         cy,
         width + 0.12,
         height + 0.12,
-        fill="#FFFFFF",
+        fill=Color.from_hex("#FFFFFF"),
         border=RULE,
     )
     shot = scene.media.image(
@@ -522,7 +522,7 @@ def report(scene: Scene) -> None:
         2.4,
         7.4,
         3.9,
-        fill="#FFFFFF",
+        fill=Color.from_hex("#FFFFFF"),
         border=RULE,
         anchor=Anchor.TOP_LEFT,
     )
@@ -547,7 +547,7 @@ def report(scene: Scene) -> None:
         2.4,
         6.75,
         3.9,
-        fill="#23262E",
+        fill=Color.from_hex("#23262E"),
         border=None,
         anchor=Anchor.TOP_LEFT,
     )

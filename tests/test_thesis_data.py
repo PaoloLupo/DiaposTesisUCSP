@@ -12,9 +12,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from tesis.data.planta import FLOOR_AREA, density, wall_area_sum  # noqa: E402
-from tesis.data.porticos import BARS, X4, X4_START  # noqa: E402
-from tesis.data.thesis import (  # noqa: E402
+from tesis.data.planta import FLOOR_AREA, density, wall_area_sum
+from tesis.data.porticos import BARS, X4, X4_START
+from tesis.data.thesis import (
     AXIAL_LIMITS,
     AXIAL_STRESS_FLOOR1,
     AXIAL_WALL,

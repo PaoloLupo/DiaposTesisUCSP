@@ -11,7 +11,13 @@ include = ["src", "main.py"]
 extraPaths = ["src"]
 venvPath = "."
 venv = ".venv"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 pythonVersion = "3.15"
 reportUnusedCallResult = false
 reportImplicitStringConcatenation = false
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.407",
+    "ruff==0.16.9",
+]

@@ -45,7 +45,7 @@ class Shot:
     focus: P3  # punto del modelo, m
     at: P2  # dónde queda el foco en la pantalla, en unidades de escena
 
-    def turned(self, azimuth: float, elevation: float | None = None) -> "Shot":
+    def turned(self, azimuth: float, elevation: float | None = None) -> Shot:
         return replace(
             self,
             azimuth=azimuth,
