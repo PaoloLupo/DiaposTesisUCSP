@@ -70,7 +70,6 @@ from tesis.theme import (
     INK_SOFT,
     MONO,
     MUTED,
-    PAPER,
     PASS,
     RULE,
     STEEL,
@@ -949,7 +948,7 @@ def drift(scene: Scene) -> None:
 
 
 # Estado del arte (cap. 3): dos líneas de investigación que la tesis une.
-# (año, autores, tema, carril). Arriba la albañilería confinada; abajo, la
+# (año, autores, tema, línea). Arriba la albañilería confinada; abajo, la
 # automatización con Python y la API de ETABS.
 TIMELINE = [
     (1982, "Primera norma", "diseño por esfuerzos admisibles", "alba"),
@@ -967,13 +966,8 @@ TIMELINE = [
     (2025, "Le et al. · Burga Mori", "API ETABS + VBA o Python", "auto"),
 ]
 AXIS_Y = -0.25
+LANE = 0.6
 BREAK = 2016  # antes de este año el eje se comprime
-
-
-def _year_x(year: float) -> float:
-    if year <= BREAK:
-        return -6.5 + (year - 1980) * 5.3 / (BREAK - 1980)
-    return -1.2 + (year - BREAK) * 7.8 / (2026 - BREAK)
 
 
 def state_of_art(scene: Scene) -> None:
@@ -1002,35 +996,22 @@ def state_of_art(scene: Scene) -> None:
             anchor=Anchor.LEFT,
         ),
     ]
-    x0, x_break, x1 = _year_x(1980), _year_x(BREAK), _year_x(2026)
-    axis_old = g.line(x0, AXIS_Y, x_break - 0.08, AXIS_Y).stroke(INK_SOFT, 0.025)
-    axis_new = (
-        g.arrow(
-            x_break + 0.08,
-            AXIS_Y,
-            x1 + 0.45,
-            AXIS_Y,
-            head_length=0.16,
-            head_width=0.16,
-            body_width=0.025,
-        )
-        .fill(INK_SOFT)
-        .no_stroke()
+    # Los 36 años hasta 2016 ocupan el 40 % del eje; los diez siguientes, el resto.
+    line = scene.viz.timeline(
+        1980,
+        2026,
+        x_range=(-6.5, 6.6),
+        y=AXIS_Y,
+        breaks=[(BREAK, 5.3 / 13.1)],
+        lane_height=LANE,
     )
-    # Corte del eje: dos barras inclinadas donde cambia la escala.
-    cut = g.group(
-        [
-            g.line(
-                x_break - 0.14 + d, AXIS_Y - 0.12, x_break - 0.02 + d, AXIS_Y + 0.12
-            ).stroke(INK_SOFT, 0.025)
-            for d in (0.0, 0.12)
-        ]
-    )
+    line.axis.stroke(INK_SOFT, 0.025)
+    x0, x_break, x1 = line.x(1980), line.x(BREAK), line.x(2026)
     ticks = [
         t(
             scene,
             f"{year}",
-            _year_x(year),
+            line.x(year),
             AXIS_Y - 0.16,
             font=MONO,
             size=0.13,
@@ -1039,88 +1020,35 @@ def state_of_art(scene: Scene) -> None:
         )
         for year in (1980, 1990, 2000, 2020)
     ]
+    # El eje se descubre con el cursor: hasta el corte y, después, hasta 2026.
+    drawn = scene.viz.parameter(0.0)
+    line.axis.wipe(drawn)
+    before_break = (x_break - 0.12 - x0) / (x1 - x0)
 
-    # Cada hito: punto en el eje, tallo y rótulo de dos líneas en el primer nivel
-    # libre de su lado; cerca del final del eje el rótulo crece hacia la izquierda.
     # Desde 2016 la albañilería va arriba y la automatización abajo; antes solo hay
-    # albañilería y alterna de lado para no amontonarse (gaanim #705).
-    levels = (0.6, 1.2, 1.8, 2.4)
-    taken: dict[tuple[int, int], list[tuple[float, float]]] = {}
-    # La tesis se queda con el tercer nivel de arriba, junto al final del eje.
-    taken[(1, 2)] = [(x1 - 2.9, x1 + 0.2)]
+    # albañilería y cada hito toma el lado más libre. La tesis se queda con el
+    # tercer carril de arriba, junto al final del eje.
+    line.reserve(2022, 2026, side="above", lane=2)
     events: list[tuple[float, list[Drawable]]] = []
-    old = 0
     for year, who, topic, lane in sorted(TIMELINE, key=lambda e: (e[0], e[3])):
-        color = lanes[lane]
-        if year < BREAK:
-            side = 1 if old % 2 == 0 else -1
-            old += 1
-        else:
-            side = 1 if lane == "alba" else -1
-        x = _year_x(year)
-        head = t(scene, f"{year} · {who}", 0, 0, size=0.165, weight=700, color=color)
-        body = t(scene, topic, 0, 0, size=0.15, color=INK_SOFT)
-        width = max(head.bounds().width, body.bounds().width)
-        # Nada cruza la columna de la tesis, al final del eje.
-        right = x + 0.05 + width > _year_x(2026) - 0.2
-        span = (x - width - 0.05, x + 0.05) if right else (x - 0.05, x + width + 0.05)
-        level = next(
-            k
-            for k in range(len(levels))
-            if all(
-                span[1] + 0.12 < a or span[0] - 0.12 > b
-                for a, b in taken.get((side, k), [])
-            )
-        )
-        taken.setdefault((side, level), []).append(span)
-        stem_end = AXIS_Y + side * levels[level]
-        anchor = (
-            (Anchor.BOTTOM_RIGHT if right else Anchor.BOTTOM_LEFT)
-            if side > 0
-            else (Anchor.TOP_RIGHT if right else Anchor.TOP_LEFT)
-        )
-        tx = x + 0.06 if right else x - 0.06
-        # Cada caja se mide una vez ya colocada: el que se coloca primero no se mueve.
-        if side > 0:
-            body.move_to(tx, stem_end + 0.04, anchor)
-            bb = body.bounds()
-            head.move_to(tx, bb.top + 0.04, anchor)
-            hb = head.bounds()
-        else:
-            head.move_to(tx, stem_end - 0.04, anchor)
-            hb = head.bounds()
-            body.move_to(tx, hb.bottom - 0.04, anchor)
-            bb = body.bounds()
-        # Fondo del color del papel: los tallos que pasan detrás del rótulo se cortan.
-        top_y = max(hb.top, bb.top) + 0.04
-        bottom_y = min(hb.bottom, bb.bottom) - 0.04
-        left_x = min(hb.left, bb.left) - 0.06
-        right_x = max(hb.right, bb.right) + 0.06
-        knockout = (
-            g.rect(right_x - left_x, top_y - bottom_y)
-            .fill(PAPER)
-            .no_stroke()
-            .move_to((left_x + right_x) / 2, (top_y + bottom_y) / 2)
-            .z_index(1)
-        )
-        head.z_index(2)
-        body.z_index(2)
-        stem = g.line(x, AXIS_Y, x, stem_end).stroke(RULE, 0.018)
-        dot = g.circle(0.075).fill(color).no_stroke().move_to(x, AXIS_Y).z_index(3)
-        events.append((x, [dot, stem, knockout, head, body]))
+        side = "auto" if year < BREAK else "above" if lane == "alba" else "below"
+        event = line.event(year, f"{year} · {who}", topic, side=side, color=lanes[lane])
+        event.title.fill(lanes[lane])
+        if event.body is not None:
+            event.body.fill(INK_SOFT)
+        event.stem.stroke(RULE, 0.018)
+        events.append((line.x(year), event.parts))
 
     def reveal(lo: float, hi: float, duration: float) -> list[Playable]:
         """Barrido de lo a hi: cada hito aparece cuando el cursor pasa por su año."""
         out: list[Playable] = []
-        for x, (dot, stem, knockout, head, body) in events:
+        for x, (dot, stem, tag) in events:
             if lo <= x < hi:
                 at = (x - lo) / (hi - lo) * duration
                 out += [
                     dot.animate.fade_in().duration(0.2).delay(at),
                     stem.animate.create().duration(0.25).delay(at),
-                    knockout.animate.fade_in().duration(0.2).delay(at + 0.05),
-                    head.animate.fade_in().duration(0.3).delay(at + 0.1),
-                    body.animate.fade_in().duration(0.3).delay(at + 0.15),
+                    tag.animate.fade_in().duration(0.3).delay(at + 0.1),
                 ]
         return out
 
@@ -1130,7 +1058,7 @@ def state_of_art(scene: Scene) -> None:
     scene.play(
         [
             *[item.animate.fade_in().duration(0.4) for item in legend],
-            axis_old.animate.create().duration(0.6),
+            drawn.animate.set(before_break).duration(0.6),
             *[tick.animate.fade_in().duration(0.3) for tick in ticks[:3]],
         ]
     )
@@ -1148,8 +1076,7 @@ def state_of_art(scene: Scene) -> None:
 
     scene.play(
         [
-            cut.animate.fade_in().duration(0.3),
-            axis_new.animate.grow_arrow().duration(0.6),
+            drawn.animate.set(1).duration(0.6),
             ticks[3].animate.fade_in().duration(0.3),
             cursor.animate.move_to(x1 - 0.3, AXIS_Y)
             .duration(sweep)
@@ -1160,7 +1087,7 @@ def state_of_art(scene: Scene) -> None:
     scene.stop("estado-automatizacion")
 
     # La tesis cruza los dos carriles al final del eje.
-    top = AXIS_Y + levels[2]
+    top = AXIS_Y + 3 * LANE
     bridge = g.line(x1, AXIS_Y - 0.75, x1, top).stroke(BRICK, 0.04)
     mark = g.circle(0.14).fill(BRICK).no_stroke().move_to(x1, AXIS_Y).z_index(3)
     thesis_body = t(

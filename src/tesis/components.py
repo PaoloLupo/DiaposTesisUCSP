@@ -604,10 +604,7 @@ def compare_table(
     return L.column(head, *body, gap="12px", width="fill")
 
 
-# Una raíz de layout solo cabe en el área segura o el encuadre: para empezar a una
-# altura de la escena se rellena desde arriba (gaanim #701).
 PX = 120.0  # px de diseño por unidad de escena
-SAFE_TOP = 60.0  # el área segura empieza a 60 px del borde del fotograma
 
 
 @component
@@ -649,11 +646,11 @@ def source_block(scene: Scene, *, reference: str) -> Box:
     """Fuente de la diapositiva, sobre el riel de avance (a y = -3.72)."""
     return scene.layout.column(
         scene.text(reference, style=CAPTION, wrap=False),
-        within="safe",
+        within=scene.layout.safe.crop(top=-3.72 + 3 / PX),
         width="fill",
         height="fill",
         justify="start",
-        padding=(f"{(4.5 + 3.72) * PX - SAFE_TOP - 3:.1f}px", SIDE, "0px", SIDE),
+        padding=("0px", SIDE),
     )
 
 
@@ -672,11 +669,11 @@ def takeaway_block(scene: Scene, *, text: str, y: float, color: Color = INK) -> 
         hairline(scene, thickness="2px"),
         scene.text(text, font=DISPLAY, size=0.3, weight=700, color=color),
         gap="18px",
-        within="safe",
+        within=L.safe.crop(top=rule_y + 1 / PX),
         width="fill",
         height="fill",
         justify="start",
-        padding=(f"{(4.5 - rule_y) * PX - SAFE_TOP - 1:.1f}px", SIDE, "0px", SIDE),
+        padding=("0px", SIDE),
     )
 
 

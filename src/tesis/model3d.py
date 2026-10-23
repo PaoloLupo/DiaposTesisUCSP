@@ -1,9 +1,9 @@
-"""Mundo 3D de los modelos de ETABS: coordenadas, tomas de cámara y rótulos de pantalla.
+"""Mundo 3D de los modelos de ETABS: tomas de cámara y rótulos de pantalla.
 
 Los modelos se escriben en metros, como en ETABS: x a lo largo de la fachada (ejes
-1–7), y en profundidad (ejes A–D) y z hacia arriba. Gaanim usa y hacia arriba y z
-hacia el espectador, así que ``world`` lleva (x, y, z) a (x, z, −y): la fachada del
-eje A mira a la cámara.
+1–7), y en profundidad (ejes A–D) y z hacia arriba. La escena tiene z hacia arriba
+(``Scene(up="z")`` en ``tesis.app``), así que esas coordenadas son las del mundo: la
+fachada del eje A mira a la cámara.
 
 Una toma (``Shot``) encuadra el modelo con una cámara en perspectiva que mira a un
 foco: dice desde dónde se mira (azimut y elevación), cuánto mide un metro del plano del
@@ -17,21 +17,22 @@ Cada diapositiva empieza en la vista 2D (``camera="reset"`` en ``section_index``
 import math
 from dataclasses import dataclass, replace
 
-from gaanim import Anchor, Anim, CameraState, Drawable, Easing, EasingCurve, Scene
+from gaanim import (
+    Anchor,
+    Anim,
+    CameraState,
+    Drawable,
+    Easing,
+    EasingCurve,
+    Parameter,
+    Scene,
+)
 
 type P2 = tuple[float, float]
 type P3 = tuple[float, float, float]
 
 LENS = 0.42  # rad: campo de visión vertical, una perspectiva suave (≈ 24°)
 GLIDE = Easing.ease_in_out(EasingCurve.CUBIC)
-
-
-def world(x: float, y: float, z: float) -> P3:
-    """Punto del modelo (m, z hacia arriba) en el mundo de Gaanim (y hacia arriba).
-
-    Gaanim no tiene un mundo con z hacia arriba (gaanim #703).
-    """
-    return x, z, -y
 
 
 @dataclass(frozen=True)
@@ -54,10 +55,10 @@ class Shot:
     def state(self, scene: Scene) -> CameraState:
         """La pose de la toma: una órbita en perspectiva alrededor del foco.
 
-        El azimut de Gaanim parte del lado +z del mundo, que es la fachada A.
+        Con z hacia arriba, el azimut de Gaanim parte del lado −y, que es la fachada A.
         """
         return scene.camera.state_orbit(
-            world(*self.focus),
+            self.focus,
             math.radians(self.azimuth),
             math.radians(self.elevation),
             scale=self.scale,
@@ -67,7 +68,7 @@ class Shot:
 
     def project(self, scene: Scene, point: P3) -> P2:
         """Dónde dibuja la toma un punto del modelo, en unidades de la pantalla."""
-        return scene.camera.project(world(*point), self.state(scene))
+        return scene.camera.project(point, self.state(scene))
 
 
 def orbit_to(
@@ -86,16 +87,28 @@ def orbit_to(
 
 def anchor(scene: Scene, point: P3) -> Drawable:
     """Punto invisible del modelo: extremo de frames y ancla de rótulos que se mueven."""
-    return scene.geometry.dot(0.001).no_fill().no_stroke().move_to_3d(*world(*point))
+    return scene.geometry.dot(0.001).no_fill().no_stroke().move_to_3d(*point)
+
+
+def carry(drawable: Drawable, offset: P3, amount: Parameter) -> Drawable:
+    """Traslada ``drawable`` ``offset`` veces ``amount`` desde el cursor, sin deformarlo.
+
+    Es ``deform`` con un campo igual en todo punto, que se suma a los movimientos
+    propios del objeto. Ese campo no depende de la rejilla: se le da una región para
+    que ``deform`` no mida el objeto.
+    """
+    return drawable.deform(
+        lambda x, y, z: offset, amount=amount, samples=2, region=((0, 0, 0), (1, 1, 1))
+    )
 
 
 def lay_flat(drawable: Drawable, z: float = 0.0) -> Drawable:
     """Tiende en el nivel ``z`` un objeto 2D dibujado en planta (x, y en metros).
 
-    El objeto debe agruparse con ``origin=(0, 0)``: así el origen de la planta cae
-    en el origen del modelo y sus coordenadas son las de ETABS (gaanim #703).
+    Su pivote queda en el origen de la planta: con ``origin=(0, 0)`` en el grupo,
+    ``move_to_3d(0, 0, z)`` lo lleva a otro nivel.
     """
-    return drawable.in_3d().rotate_to_3d(-math.pi / 2, 0, 0).move_to_3d(*world(0, 0, z))
+    return drawable.in_3d(plane="xy", origin=(0.0, 0.0, z))
 
 
 def pinned(
@@ -111,8 +124,4 @@ def pinned(
     sobre el punto (su origen si se omite) y ``offset`` lo corre en unidades de
     pantalla. Se mueve con ``move_to_3d``.
     """
-    return (
-        drawable.move_to_3d(*world(*at))
-        .billboard(offset=offset, anchor=anchor)
-        .hidden()
-    )
+    return drawable.move_to_3d(*at).billboard(offset=offset, anchor=anchor).hidden()

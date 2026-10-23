@@ -52,6 +52,9 @@ BODY = TextStyle(font=SANS, size=0.30, color=INK)
 SMALL = TextStyle(font=SANS, size=0.23, color=INK_SOFT)
 CAPTION = TextStyle(font=SANS, size=0.17, color=MUTED)
 TAG = TextStyle(font=MONO, size=0.19, color=INK_SOFT)
+# Rótulos de gráficos y de la línea de tiempo: título y nota bajo él.
+LABEL = TextStyle(font=SANS, size=0.165, color=INK)
+NOTE = TextStyle(font=SANS, size=0.15, color=INK_SOFT)
 
 
 def build_theme() -> Theme:
@@ -72,6 +75,7 @@ def build_theme() -> Theme:
             "rule": RULE,
         },
         fonts={"text": SANS, "code": MONO},
+        text={"label": LABEL, "caption": NOTE},
         font_dir=FONTS_DIR,
         text_markup=False,
     )

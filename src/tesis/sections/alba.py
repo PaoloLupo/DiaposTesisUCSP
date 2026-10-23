@@ -80,12 +80,10 @@ def architecture(scene: Scene) -> None:
     scene.layout.column(
         *cards,
         gap=gap,
-        within="safe",
+        within=scene.layout.safe.crop(top=top, left=x0, right=x0 + w),
         width="fill",
         height="fill",
         justify="start",
-        # La columna empieza a y = top (gaanim #701).
-        padding=(f"{(4.5 - top) * 120 - 60:.1f}px", "558px", "0px", "594px"),
     )
     # Los módulos los coloca el layout; el resto del diagrama (llaves, flechas,
     # externos) se ancla a sus posiciones medidas.
@@ -778,9 +776,15 @@ def report_parts(scene: Scene) -> None:
             )
         )
     reader_left = -1.1
-    toc = L.column(*entries, gap="12px", width=reader_left - 0.4 - LEFT_EDGE)
-    # El índice empieza bajo la tira, a y = bottom (gaanim #701).
-    page_column(scene, body=[toc], top=f"{(4.5 - bottom) * 120 - 60:.0f}px")
+    # El índice empieza bajo la tira, a y = bottom.
+    L.column(
+        *entries,
+        gap="12px",
+        within=L.safe.crop(top=bottom, left=LEFT_EDGE, right=reader_left - 0.4),
+        width="fill",
+        height="fill",
+        justify="start",
+    )
 
     def detail(part: ReportPart) -> Box:
         return L.column(
@@ -864,17 +868,14 @@ def report_parts(scene: Scene) -> None:
     scene.stop("reporte-partes")
 
     shown: Box | None = None
-    lines: list[Drawable] = []
     for i, part in enumerate(REPORT_PARTS):
         first, last = part.pages
-        # El detalle sale desvanecido antes de que su entrada se cierre, y el nuevo
-        # entra oculto y aparece cuando la suya ya se abrió (gaanim #704).
-        leaving = [line.animate.fade_out().duration(0.12) for line in lines]
+        # El detalle de la parte anterior se pliega y después se despliega el nuevo:
+        # dos cambios de layout que se solapan no deslizan a los demás (gaanim #722).
         if shown is not None:
-            entries[i - 1].remove(shown, duration=0.45, advance=False)
+            entries[i - 1].remove(shown, duration=0.3, exit="fold")
         shown = detail(part)
-        lines = [line.hidden() for line in shown.children]
-        entries[i].add(shown, at=1, duration=0.45, advance=False)
+        entries[i].add(shown, at=1, duration=0.45, advance=False, enter="unfold")
         page, flight = lift(part.read, part.region)
         scene.play(
             [
@@ -892,8 +893,6 @@ def report_parts(scene: Scene) -> None:
                     e.animate.opacity(1 if j == i else 0.45).duration(0.4)
                     for j, e in enumerate(entries)
                 ],
-                *leaving,
-                *[line.animate.fade_in().duration(0.3).delay(0.4) for line in lines],
                 current.animate.fade_out().duration(0.3),
                 *flight,
             ]

@@ -8,23 +8,35 @@ que tienen delante, sin orden del pintor. Los frames son líneas 3D entre anclas
 invisibles en los nodos: al mover un ancla, sus frames la siguen.
 
 Las coordenadas van en metros (``tesis.model3d``). ``sway`` lleva el modelo a la
-deformada en Y: cada nivel se desplaza ``amplitud · modo(z)``; los muros en X giran
-fuera de su plano y los muros en Y se distorsionan en el suyo, de nivel a nivel.
+deformada en Y: cada nivel se desplaza ``amplitud · modo(z)``. Nodos, losas y lo que
+acompaña al modelo se deforman con ``deform`` y siguen a un solo parámetro; los muros
+son dibujos 2D, que ``deform`` solo traslada, así que los muros en X giran fuera de su
+plano y los muros en Y se distorsionan en el suyo, de nivel a nivel.
 """
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import pairwise
 from typing import Literal
 
-from gaanim import Anchor, Anim, Color, Drawable, Easing, EasingCurve, Material3D, Scene
+from gaanim import (
+    Anchor,
+    Anim,
+    Color,
+    Drawable,
+    Easing,
+    EasingCurve,
+    Material3D,
+    Parameter,
+    Scene,
+)
 
 from tesis.building import AXIS_X, AXIS_Y, DEPTH, STAIR, WIDTH, wall_segments
 from tesis.data.planta import STORIES
 from tesis.data.thesis import MESH_STEP
 from tesis.kit import t
-from tesis.model3d import P2, P3, anchor, lay_flat, pinned, world
+from tesis.model3d import P2, P3, anchor, carry, lay_flat, pinned
 from tesis.theme import CONCRETE, INK_SOFT, MONO, MUTED
 
 SNAP = 0.07  # m: un extremo a menos de medio espesor de un eje cae sobre el eje
@@ -133,9 +145,7 @@ class EtabsModel:
     grid: Drawable  # grupo de las grillas, tendido en la base
     grid_lines: list[Drawable]
     bubbles: list[Drawable]
-    # Objetos que viajan con el modelo sin deformarse, con la altura que siguen.
-    riders: list[tuple[Drawable, float]] = field(default_factory=list)
-    amplitude: float = 0.0
+    drift: Parameter  # m en la azotea: cuánto de la deformada se aplica
 
     @property
     def height(self) -> float:
@@ -149,9 +159,8 @@ class EtabsModel:
         return [w for s in self.stories for w in s.walls.values()]
 
     def ride(self, drawable: Drawable, z: float) -> Drawable:
-        """Registra un objeto 3D que acompaña a la deformada a la altura ``z``."""
-        self.riders.append((drawable, z))
-        return drawable
+        """Lleva ``drawable`` con la deformada a la altura ``z``, sin deformarlo."""
+        return carry(drawable, (0.0, self.mode(z), 0.0), self.drift)
 
     def mode(self, z: float) -> float:
         """Forma esquemática del modo de traslación: un cuarto de seno en altura."""
@@ -160,7 +169,8 @@ class EtabsModel:
     def sway(self, amplitude: float, duration: float) -> list[Anim]:
         """Lleva el modelo a la deformada en Y con ``amplitude`` metros en la azotea.
 
-        Cada tipo de pieza se mueve a su manera (gaanim #702).
+        Lo que acompaña al modelo (``ride``) sigue a ``drift``; los muros se mueven
+        aparte, con la misma duración y curva.
         """
 
         def ease(anim: Anim) -> Anim:
@@ -169,45 +179,29 @@ class EtabsModel:
         def shift(z: float) -> float:
             return amplitude * self.mode(z)
 
-        def change(z: float) -> P3:
-            """Desplazamiento desde la deformada anterior, en el mundo."""
-            return world(0, shift(z) - self.amplitude * self.mode(z), 0)
-
-        anims: list[Anim] = []
-        levels = self.levels
-        for ((x, y), level), point in self.anchors.items():
-            if level:
-                z = levels[level]
-                anims.append(ease(point.animate.move_to_3d(*world(x, y + shift(z), z))))
+        anims = [ease(self.drift.animate.set(amplitude))]
         for wall in self.walls():
             d0, d1 = shift(wall.z0), shift(wall.z1)
             if wall.line.direction == "X":
                 # Fuera de su plano: el muro se corre y se inclina entre los dos niveles.
                 x, y, zc = wall.center
-                tilt = -math.asin((d1 - d0) / (wall.z1 - wall.z0))
-                anims.append(
-                    ease(wall.group.animate.move_to_3d(*world(x, y + shift(zc), zc)))
-                )
-                anims.append(ease(wall.group.animate.rotate_to_3d(tilt, 0, 0)))
+                lean = (d1 - d0) / (wall.z1 - wall.z0)
+                up = (0.0, lean, math.sqrt(1 - lean * lean))
+                anims.append(ease(wall.group.animate.move_to_3d(x, y + shift(zc), zc)))
+                anims.append(ease(wall.group.animate.orient_3d((1, 0, 0), up)))
             else:
                 # En su plano: cada punto avanza lo que avanza su altura.
-                def drift(u: float, h: float, w: Wall = wall) -> P2:
+                def sheared(u: float, h: float, w: Wall = wall) -> P2:
                     s = (h - w.z0) / (w.z1 - w.z0)
                     return u + d0 + (d1 - d0) * s, h
 
                 anims.append(
-                    ease(wall.outline.animate.points([drift(*p) for p in wall.corners]))
+                    ease(
+                        wall.outline.animate.points([sheared(*p) for p in wall.corners])
+                    )
                 )
                 for part, pts in zip(wall.mesh, wall.mesh_points, strict=True):
-                    anims.append(ease(part.animate.points([drift(*p) for p in pts])))
-        for story in self.stories:
-            slab = world(0, shift(story.z1), story.z1)
-            anims.append(ease(story.slab.group.animate.move_to_3d(*slab)))
-        # Los acompañantes se corren desde la deformada anterior: aquí solo se conoce
-        # su altura, no su posición.
-        for drawable, z in self.riders:
-            anims.append(ease(drawable.animate.shift_by_3d(*change(z))))
-        self.amplitude = amplitude
+                    anims.append(ease(part.animate.points([sheared(*p) for p in pts])))
         return anims
 
 
@@ -289,13 +283,10 @@ def stand(drawable: Drawable, line: WallLine, z: float) -> Drawable:
 
     u es x para un muro en X e y para un muro en Y; el grupo debe tener su origen en
     el centro del muro, (u_c, z), que queda sobre el punto medio del eje a la altura z
-    (gaanim #703).
+    y es el pivote de su giro.
     """
-    x, y = line.middle
-    drawable.in_3d().move_to_3d(*world(x, y, z))
-    if line.direction == "Y":
-        drawable.rotate_to_3d(0, math.pi / 2, 0)
-    return drawable
+    along = (1, 0, 0) if line.direction == "X" else (0, 1, 0)
+    return drawable.in_3d().orient_3d(along, (0, 0, 1)).move_to_3d(*line.middle, z)
 
 
 def _wall(scene: Scene, line: WallLine, z0: float, z1: float) -> Wall:
@@ -404,7 +395,15 @@ def build_model(scene: Scene) -> EtabsModel:
         grid_lines.append(_dashed(scene, (-GRID_EXT + 0.12, gy), (WIDTH + 0.5, gy)))
         bubbles.append(_bubble(scene, name, (-GRID_EXT, gy, 0)))
     grid = lay_flat(scene.geometry.group(grid_lines, origin=(0, 0)), -0.01)
-    return EtabsModel(lines, nodes, stories, anchors, grid, grid_lines, bubbles)
+    drift = scene.viz.parameter(0.0)
+    model = EtabsModel(lines, nodes, stories, anchors, grid, grid_lines, bubbles, drift)
+    # Los nodos de los pisos y las losas siguen a la deformada; los frames, a sus nodos.
+    for (_, k), point in anchors.items():
+        if k:
+            model.ride(point, levels[k])
+    for story in stories:
+        model.ride(story.slab.group, story.z1)
+    return model
 
 
 def _dashed(scene: Scene, a: P2, b: P2) -> Drawable:

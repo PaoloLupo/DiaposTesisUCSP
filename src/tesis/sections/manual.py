@@ -16,6 +16,7 @@ from gaanim import (
     Easing,
     Material3D,
     Playable,
+    Pointer,
     Scene,
     Section,
     SectionStep,
@@ -92,7 +93,7 @@ from tesis.etabs_model import (
     wall_lines,
 )
 from tesis.kit import RIGHT_EDGE, dimension, label, t
-from tesis.model3d import P2, P3, Shot, lay_flat, orbit_to, pinned, world
+from tesis.model3d import P2, P3, Shot, lay_flat, orbit_to, pinned
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -345,61 +346,15 @@ def _steps_panel(scene: Scene, phases: Phases) -> StepList:
     return steps
 
 
-@dataclass
-class Pointer:
-    """Puntero del ratón sobre el modelo: un billboard cuya punta está en un punto 3D.
+def _pointer(scene: Scene, at: P3) -> Pointer:
+    """Puntero del ratón sobre el modelo, oculto hasta que entra.
 
-    Moverlo es moverlo en el modelo, así que recorre el modelo en perspectiva y no
-    se despega de lo que señala aunque la cámara gire. Gaanim no tiene puntero
-    (gaanim #707).
+    Es un billboard con la punta en un punto 3D: recorre el modelo en perspectiva y no
+    se despega de lo que señala aunque la cámara gire.
     """
-
-    scene: Scene
-    arrow: Drawable
-    point: P3
-
-    @classmethod
-    def over(cls, scene: Scene, point: P3) -> "Pointer":
-        tip = [
-            (0.0, 0.0),
-            (0.0, -0.3),
-            (0.072, -0.232),
-            (0.118, -0.335),
-            (0.158, -0.318),
-            (0.113, -0.217),
-            (0.205, -0.212),
-        ]
-        shape = scene.geometry.polygon(tip).fill(INK).stroke(CARD, 0.016)
-        return cls(scene, pinned(shape, point), point)
-
-    def jump(self, point: P3) -> None:
-        self.arrow.move_to_3d(*world(*point))
-        self.point = point
-
-    def to(
-        self, point: P3, duration: float = 0.4, easing: Easing = Easing.SMOOTH
-    ) -> Anim:
-        self.point = point
-        return (
-            self.arrow.animate.move_to_3d(*world(*point))
-            .duration(duration)
-            .easing(easing)
-        )
-
-    def click(self) -> Composition:
-        """Onda de clic en la punta del puntero."""
-        ring = pinned(
-            self.scene.geometry.circle(0.05).no_fill().stroke(BRICK, 0.012),
-            self.point,
-            anchor=Anchor.CENTER,
-        )
-        return sequence(
-            ring.animate.fade_in().duration(0.04),
-            parallel(
-                ring.animate.scale_to(3.2).duration(0.4),
-                ring.animate.fade_out().duration(0.4),
-            ),
-        )
+    pointer = scene.ui.pointer(at=at)
+    pointer.drawable.hidden()
+    return pointer
 
 
 def _define_window(
@@ -514,8 +469,8 @@ def _triad(scene: Scene, origin: P3, length: float = 1.5) -> list[Drawable]:
         tip = (ox + 1.3 * length * dx, oy + 1.3 * length * dy, oz + 1.3 * length * dz)
         parts.append(
             scene.geometry.arrow_3d(
-                world(*origin),
-                world(*end),
+                origin,
+                end,
                 shaft_radius=0.045,
                 head_radius=0.13,
                 head_length=0.32,
@@ -533,7 +488,7 @@ def _triad(scene: Scene, origin: P3, length: float = 1.5) -> list[Drawable]:
                 color=color,
                 anchor=Anchor.CENTER,
             )
-            .move_to_3d(*world(*tip))
+            .move_to_3d(*tip)
             .billboard()
             .hidden()
         )
@@ -560,8 +515,8 @@ def full_model(scene: Scene) -> None:
     ]
     triad = _triad(scene, (WIDTH + 2.4, 1.2, 0.0), 1.3)
     for story, lab in zip(model.stories, level_labels[1:], strict=True):
-        story.slab.group.move_to_3d(*world(0, 0, 0))
-        lab.move_to_3d(*world(0, 0, 0))
+        story.slab.group.move_to_3d(0, 0, 0)
+        lab.move_to_3d(0, 0, 0)
     scene.play(
         [
             *step(0),
@@ -586,10 +541,10 @@ def full_model(scene: Scene) -> None:
                 *[
                     parallel(
                         story.slab.edge.animate.fade_in().duration(0.2),
-                        story.slab.group.animate.move_to_3d(*world(0, 0, story.z1))
+                        story.slab.group.animate.move_to_3d(0, 0, story.z1)
                         .duration(0.8)
                         .easing(Easing.SMOOTH),
-                        lab.animate.move_to_3d(*world(0, 0, story.z1))
+                        lab.animate.move_to_3d(0, 0, story.z1)
                         .duration(0.8)
                         .easing(Easing.SMOOTH),
                         lab.animate.fade_in().duration(0.2),
@@ -672,7 +627,7 @@ def full_model(scene: Scene) -> None:
     def near(origin: P2) -> Callable[[P2], float]:
         return lambda p: math.dist(p, origin)
 
-    pointer = Pointer.over(scene, at_top(6.0, 4.0))
+    pointer = _pointer(scene, at_top(6.0, 4.0))
     windows = [
         *materials,
         *material_texts,
@@ -685,15 +640,17 @@ def full_model(scene: Scene) -> None:
         [
             *step(3),
             *[w.animate.fade_out().duration(0.3) for w in windows],
-            pointer.arrow.animate.fade_in().duration(0.3).delay(0.2),
+            pointer.drawable.animate.fade_in().duration(0.3).delay(0.2),
         ]
     )
     first = [(0.0, 0.0), JUNCTION]
     for node in first:
-        scene.play(pointer.to(at_top(*node)))
+        scene.play(
+            pointer.animate.to(at_top(*node)).duration(0.4).easing(Easing.SMOOTH)
+        )
         scene.play(
             [
-                pointer.click(),
+                pointer.animate.click(radius=0.16),
                 *[
                     s.columns[node].animate.create().duration(0.4)
                     for s in model.stories
@@ -719,10 +676,10 @@ def full_model(scene: Scene) -> None:
     )
     # Viga X1: se arrastra de nodo a nodo.
     span = ((0.0, 0.0), JUNCTION)
-    scene.play(pointer.to(at_top(*span[0])))
+    scene.play(pointer.animate.to(at_top(*span[0])).duration(0.4).easing(Easing.SMOOTH))
     scene.play(
         [
-            pointer.to(at_top(*span[1]), 0.6, Easing.LINEAR),
+            pointer.animate.to(at_top(*span[1])).duration(0.6).easing(Easing.LINEAR),
             *[
                 s.beams[span].animate.create().duration(0.6).easing(Easing.LINEAR)
                 for s in model.stories
@@ -748,14 +705,14 @@ def full_model(scene: Scene) -> None:
         )
     )
     # Muro X1: «Draw Walls» de un nodo al otro; el shell se extiende tras el cursor.
-    scene.play(pointer.to(at_top(*span[0])))
+    scene.play(pointer.animate.to(at_top(*span[0])).duration(0.4).easing(Easing.SMOOTH))
     for s in model.stories:
         x1 = s.walls["X1"]
         (u0, z0), _, _, (_, z1) = x1.corners
         x1.outline.points([(u0, z0), (u0, z0), (u0, z1), (u0, z1)])
     scene.play(
         [
-            pointer.to(at_top(*span[1]), 0.7, Easing.LINEAR),
+            pointer.animate.to(at_top(*span[1])).duration(0.7).easing(Easing.LINEAR),
             *[
                 s.walls["X1"]
                 .outline.animate.points(s.walls["X1"].corners)
@@ -788,19 +745,21 @@ def full_model(scene: Scene) -> None:
     band = scene.geometry.polygon(full).no_fill().stroke(INK_SOFT, 0.05).hidden()
     lay_flat(scene.geometry.group([band], origin=(0, 0)), top + 0.04)
     band.points([(0.0, 0.0)] * 4)
-    scene.play(pointer.to(at_top(0, 0)))
+    scene.play(pointer.animate.to(at_top(0, 0)).duration(0.4).easing(Easing.SMOOTH))
     scene.play(
         [
-            pointer.click(),
+            pointer.animate.click(radius=0.16),
             band.animate.fade_in().duration(0.05),
             band.animate.points(full).duration(0.9).easing(Easing.SMOOTH),
-            pointer.to(at_top(WIDTH, DEPTH), 0.9),
+            pointer.animate.to(at_top(WIDTH, DEPTH))
+            .duration(0.9)
+            .easing(Easing.SMOOTH),
         ]
     )
     scene.play(
         [
             band.animate.fade_out().duration(0.3),
-            pointer.arrow.animate.fade_out().duration(0.3),
+            pointer.drawable.animate.fade_out().duration(0.3),
             stagger(
                 *[
                     parallel(
@@ -865,7 +824,7 @@ def full_model(scene: Scene) -> None:
         )
         dot = model.ride(
             scene.geometry.sphere(0.16, material=Material3D.matte(INK))
-            .move_to_3d(*world(*DIAPHRAGM_CENTER, s.z1))
+            .move_to_3d(*DIAPHRAGM_CENTER, s.z1)
             .hidden(),
             s.z1,
         )
@@ -917,7 +876,7 @@ def full_model(scene: Scene) -> None:
                 color=color,
                 anchor=Anchor.CENTER,
             )
-            .move_to_3d(*world(*at))
+            .move_to_3d(*at)
             .billboard()
             .hidden()
         )
@@ -943,11 +902,11 @@ def full_model(scene: Scene) -> None:
     pick = (1.5, 0.0, (model.stories[-1].z0 + top) / 2)
     pointer.jump(at_top(5.0, 2.0))
     x1_walls = [s.walls["X1"].outline for s in model.stories]
-    scene.play([*step(6), pointer.arrow.animate.fade_in().duration(0.3)])
-    scene.play(pointer.to(pick, 0.5))
+    scene.play([*step(6), pointer.drawable.animate.fade_in().duration(0.3)])
+    scene.play(pointer.animate.to(pick).duration(0.5).easing(Easing.SMOOTH))
     scene.play(
         [
-            pointer.click(),
+            pointer.animate.click(radius=0.16),
             *[w.animate.fill(SELECTED).duration(0.25) for w in x1_walls],
         ]
     )
@@ -961,7 +920,7 @@ def full_model(scene: Scene) -> None:
                 each=0.12,
             ),
             *[w.animate.fill(WALL_X).duration(0.4).delay(0.6) for w in x1_walls],
-            pointer.arrow.animate.fade_out().duration(0.3).delay(0.6),
+            pointer.drawable.animate.fade_out().duration(0.3).delay(0.6),
         ]
     )
     scene.play(stagger(*[x.animate.fade_in().duration(0.25) for x in tags], total=1.0))
@@ -971,8 +930,8 @@ def full_model(scene: Scene) -> None:
     arrows = [
         model.ride(
             scene.geometry.arrow_3d(
-                world(x, y, top + 1.5),
-                world(x, y, top + 0.02),
+                (x, y, top + 1.5),
+                (x, y, top + 0.02),
                 shaft_radius=0.035,
                 head_radius=0.11,
                 head_length=0.3,
@@ -1012,7 +971,7 @@ def full_model(scene: Scene) -> None:
         masses.append(
             model.ride(
                 scene.geometry.sphere(r, material=Material3D.matte(BRICK))
-                .move_to_3d(*world(*DIAPHRAGM_CENTER, s.z1))
+                .move_to_3d(*DIAPHRAGM_CENTER, s.z1)
                 .hidden(),
                 s.z1,
             )
@@ -1146,17 +1105,17 @@ def _junction_detail(scene: Scene, model: EtabsModel, story: Story) -> list[Draw
     shared = sorted(set(shared))
     parts: list[Drawable] = [
         scene.geometry.points_3d(
-            [world(*p) for p in inner],
+            inner,
             radius=0.028,
             material=Material3D.matte(INK_SOFT),
         ).hidden(),
         scene.geometry.points_3d(
-            [world(*p) for p in shared], radius=0.04, material=Material3D.matte(BRICK)
+            shared, radius=0.04, material=Material3D.matte(BRICK)
         ).hidden(),
         # Brazo rígido al extremo de la viga X1, en la cara de la columna (End Length Offset).
         scene.geometry.line_3d(
-            world(x_node - 0.3, y_node, z1),
-            world(x_node, y_node, z1),
+            (x_node - 0.3, y_node, z1),
+            (x_node, y_node, z1),
             0.14,
             material=Material3D.matte(INK),
         ).hidden(),
@@ -1649,7 +1608,7 @@ def plane_frames(scene: Scene) -> None:
         name: scene.geometry.circle(0.045)
         .fill(STEEL)
         .stroke(CARD, 0.01)
-        .move_to_3d(*world(x, y, 0.02))
+        .move_to_3d(x, y, 0.02)
         .billboard()
         .hidden()
         for name, x, y in BARS
@@ -1743,8 +1702,8 @@ def plane_frames(scene: Scene) -> None:
     levels = [STORY_HEIGHT * (k + 1) for k in range(STORY_COUNT)]
     bars = {
         name: scene.geometry.line_3d(
-            world(x, y, 0),
-            world(x, y, top),
+            (x, y, 0),
+            (x, y, top),
             0.1,
             segments=10,
             material=Material3D.matte(STEEL),
@@ -1798,8 +1757,8 @@ def plane_frames(scene: Scene) -> None:
                 a, b = b, a  # el brazo nace en la barra
             rigid = kind == "rigid"
             line = scene.geometry.line_3d(
-                world(*a, z),
-                world(*b, z),
+                (*a, z),
+                (*b, z),
                 0.17 if rigid else 0.07,
                 segments=10,
                 material=Material3D.matte(INK if rigid else STEEL),
@@ -1870,7 +1829,7 @@ def plane_frames(scene: Scene) -> None:
         ]
     )
     x4_line = WallLine("X4", "X", False, (X4_START, 5.03), (X4_START + length, 5.03))
-    pointer = Pointer.over(scene, (10.0, 4.0, top))
+    pointer = _pointer(scene, (10.0, 4.0, top))
     pick = (X4_START + X4["cg"], 5.03, levels[2] - 1.0)
     ghost: list[Drawable] = []
     for z in levels:
@@ -1894,18 +1853,18 @@ def plane_frames(scene: Scene) -> None:
     window, window_texts, _ = _define_window(
         scene, "Define › Frame Properties · X4", FRAME_WINDOW, -1.55, head=False
     )
-    scene.play([*step(5), pointer.arrow.animate.fade_in().duration(0.3)])
-    scene.play(pointer.to(pick, 0.6))
+    scene.play([*step(5), pointer.drawable.animate.fade_in().duration(0.3)])
+    scene.play(pointer.animate.to(pick).duration(0.6).easing(Easing.SMOOTH))
     scene.play(
         [
-            pointer.click(),
+            pointer.animate.click(radius=0.16),
             stagger(*[g.animate.fade_in().duration(0.3) for g in ghost], each=0.08),
             *[
                 w.animate.fade_in_from(Direction.UP, 0.06).duration(0.35).delay(0.3)
                 for w in window
             ],
             sequence(*[typed(x, 70).delay(0.1) for x in window_texts]).delay(0.6),
-            pointer.arrow.animate.fade_out().duration(0.3).delay(0.6),
+            pointer.drawable.animate.fade_out().duration(0.3).delay(0.6),
         ]
     )
     scene.wait(0.2)
@@ -1914,8 +1873,8 @@ def plane_frames(scene: Scene) -> None:
     # 7 · Las cargas tributarias entran como fuerzas en el nudo de cada barra y piso.
     arrows = [
         scene.geometry.arrow_3d(
-            world(x, y, z + 0.75),
-            world(x, y, z + 0.06),
+            (x, y, z + 0.75),
+            (x, y, z + 0.06),
             shaft_radius=0.025,
             head_radius=0.075,
             head_length=0.2,
@@ -1971,7 +1930,7 @@ def plane_frames(scene: Scene) -> None:
         lay_flat(scene.geometry.group(lines, origin=(0, 0)), z + 0.03)
         dot = (
             scene.geometry.sphere(0.16, material=Material3D.matte(INK))
-            .move_to_3d(*world(*DIAPHRAGM_CENTER, z))
+            .move_to_3d(*DIAPHRAGM_CENTER, z)
             .hidden()
         )
         spokes += lines

@@ -28,7 +28,7 @@ from gaanim import (
     sequence,
 )
 
-from tesis.model3d import P3, lay_flat, world
+from tesis.model3d import P3, lay_flat
 from tesis.theme import BRICK, PAPER_DEEP, RULE
 
 LX, LY = 6.0, 4.2  # planta, m
@@ -151,12 +151,10 @@ class House:
         """La losa se vacía de izquierda a derecha, de una viga a la otra."""
         x0, x1 = T, LX - T
         return [
-            self.slab.animate.scale_to_3d(x1 - x0, SLAB, LY - 2 * T)
+            self.slab.animate.scale_to_3d(x1 - x0, LY - 2 * T, SLAB)
             .duration(duration)
             .easing(Easing.LINEAR),
-            self.slab.animate.move_to_3d(
-                *world((x0 + x1) / 2, LY / 2, Z_ROOF - SLAB / 2)
-            )
+            self.slab.animate.move_to_3d((x0 + x1) / 2, LY / 2, Z_ROOF - SLAB / 2)
             .duration(duration)
             .easing(Easing.LINEAR),
         ]
@@ -164,7 +162,8 @@ class House:
     def sway(self, dx: float, dy: float) -> Composition:
         """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura.
 
-        Un desplazamiento por hilada y por vaivén (gaanim #702).
+        Un desplazamiento por hilada y por vaivén: las hiladas son copias de un cubo,
+        y ``deform`` las mueve según la escala de cada copia (gaanim #724).
         """
         swings: list[Composition] = []
         previous = 0.0
@@ -174,7 +173,7 @@ class House:
                 parallel(
                     *[
                         layer.animate.shift_by_3d(
-                            *world(step * dx * share, step * dy * share, 0)
+                            step * dx * share, step * dy * share, 0
                         )
                         .duration(0.36)
                         .easing(SINE)
@@ -189,9 +188,9 @@ class House:
 def _box(
     x0: float, x1: float, y0: float, y1: float, z0: float, z1: float
 ) -> tuple[P3, P3]:
-    """Centro (mundo) y escala de una caja del modelo, para una copia de un cubo."""
-    center = world((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
-    return center, (x1 - x0, z1 - z0, y1 - y0)
+    """Centro y escala de una caja del modelo, para una copia de un cubo."""
+    center = (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2
+    return center, (x1 - x0, y1 - y0, z1 - z0)
 
 
 def _solid(scene: Scene, box: tuple[P3, P3], color: Color) -> Drawable:
@@ -316,7 +315,7 @@ def _steel(scene: Scene, column: Column) -> list[Drawable]:
     """
     top = Z_ROOF - 0.03
     parts = [
-        scene.geometry.polyline_3d([world(x, y, 0.05), world(x, y, top)])
+        scene.geometry.polyline_3d([(x, y, 0.05), (x, y, top)])
         .stroke(STEEL_BAR, 0.014)
         .hidden()
         for x, y in column.bars
@@ -327,11 +326,11 @@ def _steel(scene: Scene, column: Column) -> list[Drawable]:
     for i in range(12):
         z = Z_BASE + 0.1 + 0.2 * i
         rings += [
-            world(a0, b0, z),
-            world(a1, b0, z),
-            world(a1, b1, z),
-            world(a0, b1, z),
-            world(a0, b0, z),
+            (a0, b0, z),
+            (a1, b0, z),
+            (a1, b1, z),
+            (a0, b1, z),
+            (a0, b0, z),
         ]
     parts.append(scene.geometry.polyline_3d(rings).stroke(STEEL_BAR, 0.009).hidden())
     return parts

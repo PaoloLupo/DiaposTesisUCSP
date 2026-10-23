@@ -15,6 +15,9 @@ def thesis_image(relative: str) -> str:
 
 
 def create_scene() -> Scene:
-    scene = Scene(frame=(16, 9), theme=build_theme(), background=PAPER, margin=0.5)
+    # El mundo 3D tiene z hacia arriba, como los modelos de ETABS.
+    scene = Scene(
+        frame=(16, 9), theme=build_theme(), background=PAPER, margin=0.5, up="z"
+    )
     scene.assets.load_project(str(PROJECT_MANIFEST))
     return scene
