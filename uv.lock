@@ -11,16 +11,12 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "gaanim", path = "C:/Tools/gaanim/gaanim-0.17.0-py3-none-any.whl" }]
+requires-dist = [{ name = "gaanim" }]
 
 [[package]]
 name = "gaanim"
 version = "0.17.0"
-source = { path = "C:/Tools/gaanim/gaanim-0.17.0-py3-none-any.whl" }
+source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { filename = "gaanim-0.17.0-py3-none-any.whl", hash = "sha256:559819aa8fbc459ea0e2d5f4468a77a810a7b0489d8748ba0b9545574581c574" },
+    { url = "https://files.pythonhosted.org/packages/66/bf/1f7a4ab2440538b78ddffcdd962f83c09e91ead3569d5136fa808ce18cdf/gaanim-0.17.0-py3-none-any.whl", hash = "sha256:1cc8cfca60831018477b70f00fec3bedf5f9edeb9caff709c26dc0a7371e2979", size = 772061, upload-time = "2026-10-23T21:13:02.958Z" },
 ]
-
-[package.metadata]
-requires-dist = [{ name = "sympy", marker = "extra == 'algebra'", specifier = ">=1.14,<2" }]
-provides-extras = ["algebra"]

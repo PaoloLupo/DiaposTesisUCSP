@@ -15,6 +15,3 @@ typeCheckingMode = "strict"
 pythonVersion = "3.15"
 reportUnusedCallResult = false
 reportImplicitStringConcatenation = false
-
-[tool.uv.sources]
-gaanim = { path = "C:/Tools/gaanim/gaanim-0.17.0-py3-none-any.whl" }
