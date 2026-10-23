@@ -27,7 +27,10 @@ GLIDE = Easing.ease_in_out(EasingCurve.CUBIC)
 
 
 def world(x: float, y: float, z: float) -> P3:
-    """Punto del modelo (m, z hacia arriba) en el mundo de Gaanim (y hacia arriba)."""
+    """Punto del modelo (m, z hacia arriba) en el mundo de Gaanim (y hacia arriba).
+
+    Gaanim no tiene un mundo con z hacia arriba (gaanim #703).
+    """
     return x, z, -y
 
 
@@ -90,7 +93,7 @@ def lay_flat(drawable: Drawable, z: float = 0.0) -> Drawable:
     """Tiende en el nivel ``z`` un objeto 2D dibujado en planta (x, y en metros).
 
     El objeto debe agruparse con ``origin=(0, 0)``: así el origen de la planta cae
-    en el origen del modelo y sus coordenadas son las de ETABS.
+    en el origen del modelo y sus coordenadas son las de ETABS (gaanim #703).
     """
     return drawable.in_3d().rotate_to_3d(-math.pi / 2, 0, 0).move_to_3d(*world(0, 0, z))
 

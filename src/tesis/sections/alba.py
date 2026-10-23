@@ -73,17 +73,18 @@ def architecture(scene: Scene) -> None:
             tag=tech,
             core=i >= 2,
             highlight=i == 4,
-            height=f"{h * 120:.0f}px",
+            height=h,
         )
         for i, (name, tech) in enumerate(MODULES)
     ]
     scene.layout.column(
         *cards,
-        gap=f"{gap * 120:.1f}px",
+        gap=gap,
         within="safe",
         width="fill",
         height="fill",
         justify="start",
+        # La columna empieza a y = top (gaanim #701).
         padding=(f"{(4.5 - top) * 120 - 60:.1f}px", "558px", "0px", "594px"),
     )
     # Los módulos los coloca el layout; el resto del diagrama (llaves, flechas,
@@ -777,9 +778,8 @@ def report_parts(scene: Scene) -> None:
             )
         )
     reader_left = -1.1
-    toc = L.column(
-        *entries, gap="12px", width=f"{(reader_left - 0.4 - LEFT_EDGE) * 120:.0f}px"
-    )
+    toc = L.column(*entries, gap="12px", width=reader_left - 0.4 - LEFT_EDGE)
+    # El índice empieza bajo la tira, a y = bottom (gaanim #701).
     page_column(scene, body=[toc], top=f"{(4.5 - bottom) * 120 - 60:.0f}px")
 
     def detail(part: ReportPart) -> Box:
@@ -868,7 +868,7 @@ def report_parts(scene: Scene) -> None:
     for i, part in enumerate(REPORT_PARTS):
         first, last = part.pages
         # El detalle sale desvanecido antes de que su entrada se cierre, y el nuevo
-        # entra oculto y aparece cuando la suya ya se abrió.
+        # entra oculto y aparece cuando la suya ya se abrió (gaanim #704).
         leaving = [line.animate.fade_out().duration(0.12) for line in lines]
         if shown is not None:
             entries[i - 1].remove(shown, duration=0.45, advance=False)

@@ -604,12 +604,10 @@ def compare_table(
     return L.column(head, *body, gap="12px", width="fill")
 
 
+# Una raíz de layout solo cabe en el área segura o el encuadre: para empezar a una
+# altura de la escena se rellena desde arriba (gaanim #701).
 PX = 120.0  # px de diseño por unidad de escena
 SAFE_TOP = 60.0  # el área segura empieza a 60 px del borde del fotograma
-
-
-def _px(units: float) -> str:
-    return f"{units * PX:.1f}px"
 
 
 @component
@@ -715,13 +713,13 @@ def pill_box(
     return scene.layout.box(
         text,
         font=font,
-        font_size=_px(size),
+        font_size=size,
         weight=weight,
         color=color,
         background=background,
         border=border if border is not None else background,
         border_width="2px",
-        padding=(_px(pad[1]), _px(pad[0])),
+        padding=(pad[1], pad[0]),
     )
 
 
@@ -759,8 +757,8 @@ def panel_box(
     scene: Scene, *, w: float, h: float, fill: Color, border: Color | None
 ) -> Box:
     return scene.layout.box(
-        width=_px(w),
-        height=_px(h),
+        width=w,
+        height=h,
         background=fill,
         border=border,
         border_width="2px" if border is not None else "0px",
@@ -791,7 +789,7 @@ def module_card(
     tag: str,
     core: bool = True,
     highlight: bool = False,
-    height: str = "72px",
+    height: float | str = "72px",
 ) -> Box:
     """Módulo de la arquitectura: número, nombre y tecnología en tipografía técnica."""
     L = scene.layout

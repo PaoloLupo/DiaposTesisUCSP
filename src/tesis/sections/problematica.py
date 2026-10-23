@@ -2,11 +2,13 @@
 
 import math
 from dataclasses import dataclass
+from itertools import pairwise
 
 from gaanim import (
     Anchor,
     Color,
     Direction,
+    Distribution,
     Drawable,
     Easing,
     EasingCurve,
@@ -203,6 +205,7 @@ def materials(scene: Scene) -> None:
 # Mapa de placas en Mercator, a todo el ancho útil y del título a la fuente. El alto
 # del marco va de 1° N a 19° S y fija la escala; MAP_LON es la longitud que cae en x = 0, de modo que la
 # fosa quede cerca del centro: Nazca a la izquierda, la Sudamericana a la derecha.
+# La proyección y la retícula son propias (gaanim #706).
 MAP_LEFT, MAP_RIGHT, MAP_TOP, MAP_BOTTOM = -7.3, 7.3, 2.73, -3.5
 MAP_NORTH, MAP_SOUTH = 1.0, -19.0
 MAP_LON = -80.8
@@ -256,32 +259,32 @@ def _intensity(mw: float) -> float:
 
 def _trench_teeth(
     scene: Scene, points: list[tuple[float, float]], step: float
-) -> list[Drawable]:
-    """Triángulos de subducción sobre la placa que cabalga, a intervalos regulares."""
-    teeth: list[Drawable] = []
-    carry = step / 2
-    for (x0, y0), (x1, y1) in zip(points, points[1:]):
-        seg = math.hypot(x1 - x0, y1 - y0)
-        ux, uy = (x1 - x0) / seg, (y1 - y0) / seg
-        nx, ny = (-uy, ux) if -uy > 0 else (uy, -ux)  # normal hacia el este
-        d = carry
-        while d < seg:
-            bx, by = x0 + ux * d, y0 + uy * d
-            half, tall = 0.055, 0.1
-            teeth.append(
-                scene.geometry.polygon(
-                    [
-                        (bx - ux * half, by - uy * half),
-                        (bx + ux * half, by + uy * half),
-                        (bx + nx * tall, by + ny * tall),
-                    ]
-                )
-                .fill(INK)
-                .no_stroke()
-            )
-            d += step
-        carry = d - seg
-    return teeth
+) -> tuple[Drawable, int]:
+    """Triángulos de subducción sobre la placa que cabalga, cada ``step`` por la fosa.
+
+    La fosa va de norte a sur y cada diente apunta a la izquierda de su avance: al
+    este. Lleva su reflejo invisible porque ``duplicate`` centra la caja de cada
+    copia en su punto; así la base cae sobre la fosa. Los extremos quedan a medio
+    paso de los bordes del mapa. Devuelve las copias, todavía ocultas, y cuántas son.
+    """
+
+    def inward(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+        t = step / 2 / math.dist(a, b)
+        return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+
+    path = [inward(points[0], points[1]), *points[1:-1], inward(points[-1], points[-2])]
+    g = scene.geometry
+    half, tall = 0.055, 0.1
+    tooth = g.group(
+        [
+            g.polygon([(-half, 0), (half, 0), (0, tall)]).fill(INK).no_stroke(),
+            g.polygon([(-half, 0), (half, 0), (0, -tall)]).no_fill().no_stroke(),
+        ]
+    )
+    length = sum(math.dist(a, b) for a, b in pairwise(path))
+    count = round(length / step) + 1
+    copies = g.duplicate(tooth, Distribution.along(path, count, orient=True))
+    return copies.count(0), count
 
 
 def _outline(
@@ -441,7 +444,7 @@ def plates(scene: Scene) -> None:
         anchor=Anchor.RIGHT,
     )
     line = scene.geometry.polyline(trench).no_fill().stroke(INK, 0.025)
-    teeth = _trench_teeth(scene, trench, 0.28)
+    teeth, tooth_count = _trench_teeth(scene, trench, 0.28)
     tx, ty = _geo(-82.4, -3.2)
     trench_label = t(
         scene,
@@ -472,10 +475,7 @@ def plates(scene: Scene) -> None:
     scene.play(
         [
             line.animate.create().duration(0.9),
-            stagger(
-                *[p.animate.grow_from_center().duration(0.2) for p in teeth],
-                each=0.9 / len(teeth),
-            ),
+            teeth.animate.count(tooth_count).duration(0.9),
             trench_label.animate.fade_in().duration(0.5),
         ]
     )

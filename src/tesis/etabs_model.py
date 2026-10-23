@@ -158,7 +158,10 @@ class EtabsModel:
         return math.sin(math.pi * z / (2 * self.height))
 
     def sway(self, amplitude: float, duration: float) -> list[Anim]:
-        """Lleva el modelo a la deformada en Y con ``amplitude`` metros en la azotea."""
+        """Lleva el modelo a la deformada en Y con ``amplitude`` metros en la azotea.
+
+        Cada tipo de pieza se mueve a su manera (gaanim #702).
+        """
 
         def ease(anim: Anim) -> Anim:
             return anim.duration(duration).easing(SINE)
@@ -285,7 +288,8 @@ def stand(drawable: Drawable, line: WallLine, z: float) -> Drawable:
     """Levanta sobre el eje de ``line`` un objeto 2D dibujado en (u, z), en metros.
 
     u es x para un muro en X e y para un muro en Y; el grupo debe tener su origen en
-    el centro del muro, (u_c, z), que queda sobre el punto medio del eje a la altura z.
+    el centro del muro, (u_c, z), que queda sobre el punto medio del eje a la altura z
+    (gaanim #703).
     """
     x, y = line.middle
     drawable.in_3d().move_to_3d(*world(x, y, z))

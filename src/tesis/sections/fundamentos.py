@@ -1043,7 +1043,7 @@ def state_of_art(scene: Scene) -> None:
     # Cada hito: punto en el eje, tallo y rótulo de dos líneas en el primer nivel
     # libre de su lado; cerca del final del eje el rótulo crece hacia la izquierda.
     # Desde 2016 la albañilería va arriba y la automatización abajo; antes solo hay
-    # albañilería y alterna de lado para no amontonarse.
+    # albañilería y alterna de lado para no amontonarse (gaanim #705).
     levels = (0.6, 1.2, 1.8, 2.4)
     taken: dict[tuple[int, int], list[tuple[float, float]]] = {}
     # La tesis se queda con el tercer nivel de arriba, junto al final del eje.

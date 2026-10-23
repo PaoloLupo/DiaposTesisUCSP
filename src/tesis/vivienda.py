@@ -162,7 +162,10 @@ class House:
         ]
 
     def sway(self, dx: float, dy: float) -> Composition:
-        """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura."""
+        """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura.
+
+        Un desplazamiento por hilada y por vaivén (gaanim #702).
+        """
         swings: list[Composition] = []
         previous = 0.0
         for amplitude in (1.0, -0.75, 0.5, -0.3, 0.12, 0.0):

@@ -91,7 +91,7 @@ from tesis.etabs_model import (
     stand,
     wall_lines,
 )
-from tesis.kit import RIGHT_EDGE, Iso, dimension, label, t
+from tesis.kit import RIGHT_EDGE, dimension, label, t
 from tesis.model3d import P2, P3, Shot, lay_flat, orbit_to, pinned, world
 from tesis.theme import (
     BRICK,
@@ -350,7 +350,8 @@ class Pointer:
     """Puntero del ratón sobre el modelo: un billboard cuya punta está en un punto 3D.
 
     Moverlo es moverlo en el modelo, así que recorre el modelo en perspectiva y no
-    se despega de lo que señala aunque la cámara gire.
+    se despega de lo que señala aunque la cámara gire. Gaanim no tiene puntero
+    (gaanim #707).
     """
 
     scene: Scene
@@ -465,19 +466,15 @@ def _section_icons(scene: Scene, x: float, ys: Sequence[float]) -> list[Drawable
             .move_to(x, frame_y + 0.1),
         ]
     )
-    mini = Iso((x - 0.12, wall_y - 0.06), 0.075)
+    mini = scene.geometry.axonometric(origin=(x - 0.12, wall_y - 0.06), scale=0.075)
     wall = (
-        scene.geometry.polygon(
-            [mini(0, 0, 0), mini(3, 0, 0), mini(3, 0, 2), mini(0, 0, 2)]
-        )
+        mini.polygon([(0, 0, 0), (3, 0, 0), (3, 0, 2), (0, 0, 2)])
         .fill(WALL_X)
         .stroke(BRICK, 0.008)
     )
-    flat = Iso((x - 0.15, slab_y), 0.06)
+    flat = scene.geometry.axonometric(origin=(x - 0.15, slab_y), scale=0.06)
     slab = (
-        scene.geometry.polygon(
-            [flat(0, 0, 0), flat(3, 0, 0), flat(3, 2, 0), flat(0, 2, 0)]
-        )
+        flat.polygon([(0, 0, 0), (3, 0, 0), (3, 2, 0), (0, 2, 0)])
         .fill(SLAB)
         .stroke(CONCRETE, 0.008)
     )
