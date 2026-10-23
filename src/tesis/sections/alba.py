@@ -870,10 +870,9 @@ def report_parts(scene: Scene) -> None:
     shown: Box | None = None
     for i, part in enumerate(REPORT_PARTS):
         first, last = part.pages
-        # El detalle de la parte anterior se pliega y después se despliega el nuevo:
-        # dos cambios de layout que se solapan no deslizan a los demás (gaanim #722).
+        # El detalle de la parte anterior se pliega mientras el nuevo se despliega.
         if shown is not None:
-            entries[i - 1].remove(shown, duration=0.3, exit="fold")
+            entries[i - 1].remove(shown, duration=0.45, advance=False, exit="fold")
         shown = detail(part)
         entries[i].add(shown, at=1, duration=0.45, advance=False, enter="unfold")
         page, flight = lift(part.read, part.region)

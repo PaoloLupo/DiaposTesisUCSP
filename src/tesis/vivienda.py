@@ -23,12 +23,12 @@ from gaanim import (
     Easing,
     EasingCurve,
     Material3D,
+    Parameter,
     Scene,
-    parallel,
     sequence,
 )
 
-from tesis.model3d import P3, lay_flat
+from tesis.model3d import P3, carry, lay_flat
 from tesis.theme import BRICK, PAPER_DEEP, RULE
 
 LX, LY = 6.0, 4.2  # planta, m
@@ -144,6 +144,7 @@ class House:
     concrete: list[Drawable]  # columnas, un objeto por hilada
     beams: list[Drawable]
     slab: Drawable
+    drift: Parameter  # cuánto de la deriva se aplica: 1 en el primer vaivén
     # Grupos que se desplazan juntos en el sismo, con su fracción de la deriva.
     layers: list[tuple[Drawable, float]] = field(default_factory=list)
 
@@ -162,27 +163,17 @@ class House:
     def sway(self, dx: float, dy: float) -> Composition:
         """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura.
 
-        Un desplazamiento por hilada y por vaivén: las hiladas son copias de un cubo,
-        y ``deform`` las mueve según la escala de cada copia (gaanim #724).
+        Cada grupo se deforma desde el cursor con un desplazamiento uniforme, su
+        fracción de ``(dx, dy)``, y el vaivén anima cuánto se aplica.
         """
-        swings: list[Composition] = []
-        previous = 0.0
-        for amplitude in (1.0, -0.75, 0.5, -0.3, 0.12, 0.0):
-            step = amplitude - previous
-            swings.append(
-                parallel(
-                    *[
-                        layer.animate.shift_by_3d(
-                            step * dx * share, step * dy * share, 0
-                        )
-                        .duration(0.36)
-                        .easing(SINE)
-                        for layer, share in self.layers
-                    ]
-                )
-            )
-            previous = amplitude
-        return sequence(*swings)
+        for layer, share in self.layers:
+            carry(layer, (share * dx, share * dy, 0.0), self.drift)
+        return sequence(
+            *[
+                self.drift.animate.set(amplitude).duration(0.36).easing(SINE)
+                for amplitude in (1.0, -0.75, 0.5, -0.3, 0.12, 0.0)
+            ]
+        )
 
 
 def _box(
@@ -402,8 +393,19 @@ def build_house(scene: Scene, *, margin: float = 0.45) -> House:
     slab = _solid(scene, _box(T, T + 0.001, T, LY - T, Z_ROOF - SLAB, Z_ROOF), CONCRETE)
     layers += [(b, 1.0) for b in beams]
     layers.append((slab, 1.0))
+    drift = scene.viz.parameter(0.0)
     return House(
-        ground, footing, plinth, steel, bricks, mortar, concrete, beams, slab, layers
+        ground,
+        footing,
+        plinth,
+        steel,
+        bricks,
+        mortar,
+        concrete,
+        beams,
+        slab,
+        drift,
+        layers,
     )
 
 
