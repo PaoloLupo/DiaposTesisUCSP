@@ -4,15 +4,13 @@ set shell := ["powershell.exe", "-NoLogo", "-Command"]
 play:
     gaanim .
 
-# Revisión antes de un commit: estilo, tipos, datos de la tesis y el guion. Sin
-# --strict mientras los rótulos del riel avisen por estar en el margen (gaanim #728);
-# fuera de esos 8 avisos, el guion no debe tener ninguno.
+# Revisión antes de un commit: estilo, tipos, datos de la tesis y el guion, sin avisos.
 check:
     uv run ruff check .
     uv run ruff format --check .
     uv run pyright
     uv run python -m unittest discover -s tests
-    gaanim check .
+    gaanim check . --strict
 
 # Formatea y aplica los arreglos seguros de ruff.
 fmt:

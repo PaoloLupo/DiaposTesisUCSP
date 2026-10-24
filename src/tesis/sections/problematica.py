@@ -28,7 +28,7 @@ from tesis.data.materiales_inei import (
     SOURCE_LABEL,
     TOTAL_VIVIENDAS,
 )
-from tesis.data.sudamerica import COUNTRIES, Ring
+from tesis.data.sudamerica import COUNTRIES
 from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
 from tesis.data.thesis import CRACKING_FLOOR1
 from tesis.kit import (
@@ -198,25 +198,11 @@ def materials(scene: Scene) -> None:
 
 
 # Mapa de placas en Mercator, a todo el ancho útil y del título a la fuente. El alto
-# del marco va de 1° N a 19° S y fija la escala; MAP_LON es la longitud que cae en x = 0, de modo que la
-# fosa quede cerca del centro: Nazca a la izquierda, la Sudamericana a la derecha.
-# La proyección y la retícula son propias (gaanim #706).
+# del marco va de 1° N a 19° S y fija la escala; MAP_LON cae en el centro, de modo que
+# la fosa quede cerca del centro: Nazca a la izquierda, la Sudamericana a la derecha.
 MAP_LEFT, MAP_RIGHT, MAP_TOP, MAP_BOTTOM = -7.3, 7.3, 2.73, -3.5
 MAP_NORTH, MAP_SOUTH = 1.0, -19.0
 MAP_LON = -80.8
-
-
-def _merc(lat: float) -> float:
-    """Ordenada de Mercator en grados, en la misma escala que la longitud."""
-    return math.degrees(math.log(math.tan(math.pi / 4 + math.radians(lat) / 2)))
-
-
-MAP_K = (MAP_TOP - MAP_BOTTOM) / (_merc(MAP_NORTH) - _merc(MAP_SOUTH))
-
-
-def _geo(lon: float, lat: float) -> tuple[float, float]:
-    """Longitud y latitud a coordenadas de escena."""
-    return (lon - MAP_LON) * MAP_K, MAP_TOP - (_merc(MAP_NORTH) - _merc(lat)) * MAP_K
 
 
 # Traza aproximada de la fosa Perú-Chile (borde entre placas), de norte a sur.
@@ -282,99 +268,42 @@ def _trench_teeth(
     return copies.count(0), count
 
 
-def _outline(
-    scene: Scene, rings: list[Ring], fill: Color, stroke: Color, width: float
-) -> list[Drawable]:
-    return [
-        scene.geometry.polygon([_geo(lon, lat) for lon, lat in ring])
-        .fill(fill)
-        .stroke(stroke, width)
-        for ring in rings
-    ]
-
-
-def _graticule(scene: Scene) -> tuple[list[Drawable], list[Drawable]]:
-    """Paralelos y meridianos cada 5°, con rótulos en el borde izquierdo e inferior."""
-    lines: list[Drawable] = []
-    marks: list[Drawable] = []
-    for lat in (0, -5, -10, -15):
-        _, y = _geo(MAP_LON, lat)
-        lines.append(
-            scene.geometry.line(MAP_LEFT, y, MAP_RIGHT, y).stroke(MUTED, 0.008)
-        )
-        marks.append(
-            t(
-                scene,
-                f"{-lat}° S" if lat else "0°",
-                MAP_LEFT + 0.08,
-                y + 0.03,
-                font=MONO,
-                size=0.11,
-                color=MUTED,
-                anchor=Anchor.BOTTOM_LEFT,
-            )
-        )
-    for lon in range(-105, -50, 5):
-        x, _ = _geo(lon, 0)
-        if not MAP_LEFT < x < MAP_RIGHT:
-            continue
-        lines.append(
-            scene.geometry.line(x, MAP_BOTTOM, x, MAP_TOP).stroke(MUTED, 0.008)
-        )
-        if lon % 10 == 0 and lon < -80:
-            marks.append(
-                t(
-                    scene,
-                    f"{-lon}° O",
-                    x + 0.05,
-                    MAP_BOTTOM + 0.05,
-                    font=MONO,
-                    size=0.11,
-                    color=MUTED,
-                    anchor=Anchor.BOTTOM_LEFT,
-                )
-            )
-    return [line.opacity(0.3).z_index(-2) for line in lines], marks
-
-
 def plates(scene: Scene) -> None:
     header(scene, KICKER, "El Perú está sobre el choque de dos placas tectónicas")
+    atlas = scene.viz.map(
+        lat=(MAP_SOUTH, MAP_NORTH),
+        center_lon=MAP_LON,
+        within=scene.layout.safe.crop(
+            top=MAP_TOP, bottom=MAP_BOTTOM, left=MAP_LEFT, right=MAP_RIGHT
+        ),
+    )
 
     # El Perú resalta sobre sus vecinos: ellos toman el tono de la placa (tierra y mar
-    # son la misma placa Sudamericana) y se recortan al marco.
-    frame = (
-        scene.geometry.rect(MAP_RIGHT - MAP_LEFT, MAP_TOP - MAP_BOTTOM)
-        .fill(CARD)
-        .no_stroke()
-        .opacity(0)
-        .move_to(0, (MAP_TOP + MAP_BOTTOM) / 2)
-    )
-    peru = scene.geometry.group(
-        _outline(scene, COUNTRIES["PER"], CARD, INK_SOFT, 0.014)
-    )
-    neighbors = (
-        scene.geometry.group(
-            [
-                shape
-                for code, rings in COUNTRIES.items()
-                if code != "PER"
-                for shape in _outline(scene, rings, PAPER_DEEP, RULE, 0.012)
-            ]
-        )
-        .z_index(-1)
-        .clip(frame)
-    )
+    # son la misma placa Sudamericana). El mapa recorta lo que dibuja a su marco.
+    peru = atlas.polygon(COUNTRIES["PER"]).fill(CARD).stroke(INK_SOFT, 0.014)
+    neighbors = scene.geometry.group(
+        [
+            atlas.polygon(rings).fill(PAPER_DEEP).stroke(RULE, 0.012)
+            for code, rings in COUNTRIES.items()
+            if code != "PER"
+        ]
+    ).z_index(-1)
     peru_name = label(
         scene,
         "Perú",
-        *_geo(-74.4, -4.9),
+        *atlas.point(-74.4, -4.9),
         size=0.2,
         color=INK_SOFT,
         anchor=Anchor.CENTER,
     )
     places = [
         label(
-            scene, name, *_geo(lon, lat), size=0.12, color=MUTED, anchor=Anchor.CENTER
+            scene,
+            name,
+            *atlas.point(lon, lat),
+            size=0.12,
+            color=MUTED,
+            anchor=Anchor.CENTER,
         )
         for name, lon, lat in (
             ("Ecuador", -78.4, -1.4),
@@ -387,7 +316,7 @@ def plates(scene: Scene) -> None:
         t(
             scene,
             "Galápagos",
-            *_geo(-91.9, -0.8),
+            *atlas.point(-91.9, -0.8),
             size=0.12,
             color=MUTED,
             anchor=Anchor.RIGHT,
@@ -401,20 +330,22 @@ def plates(scene: Scene) -> None:
     )
 
     # Dos placas: el Perú entero está sobre la Sudamericana; la fosa marca el contacto.
-    trench = [_geo(lon, lat) for lon, lat in TRENCH]
+    west, east = atlas.lon
     nazca = (
-        scene.geometry.polygon([(MAP_LEFT, MAP_TOP), *trench, (MAP_LEFT, MAP_BOTTOM)])
+        atlas.polygon([(west, MAP_NORTH), *TRENCH, (west, MAP_SOUTH)])
         .fill(STEEL_SOFT)
         .no_stroke()
         .z_index(-3)
     )
     southam = (
-        scene.geometry.polygon([*trench, (MAP_RIGHT, MAP_BOTTOM), (MAP_RIGHT, MAP_TOP)])
+        atlas.polygon([*TRENCH, (east, MAP_SOUTH), (east, MAP_NORTH)])
         .fill(PAPER_DEEP)
         .no_stroke()
         .z_index(-3)
     )
-    grid, grid_marks = _graticule(scene)
+    # Paralelos y meridianos cada 5°, rotulados cada 5° de latitud y 10° de longitud.
+    grid = atlas.graticule(5, every=(10, 5), hemispheres="NSEO")
+    grid.lines.stroke(MUTED, 0.008).opacity(0.3).z_index(-2)
     # Rótulos de placa en dos líneas y altos: quedan fuera de las vistas del recorrido.
     nazca_label = t(
         scene,
@@ -438,9 +369,10 @@ def plates(scene: Scene) -> None:
         color=INK_SOFT,
         anchor=Anchor.RIGHT,
     )
-    line = scene.geometry.polyline(trench).no_fill().stroke(INK, 0.025)
+    line = atlas.polyline(TRENCH).no_fill().stroke(INK, 0.025)
+    trench = [atlas.point(lon, lat) for lon, lat in TRENCH]
     teeth, tooth_count = _trench_teeth(scene, trench, 0.28)
-    tx, ty = _geo(-82.4, -3.2)
+    tx, ty = atlas.point(-82.4, -3.2)
     trench_label = t(
         scene,
         "Fosa Perú-Chile",
@@ -455,7 +387,7 @@ def plates(scene: Scene) -> None:
         stagger(
             parallel(
                 nazca.animate.fade_in().duration(0.5),
-                *[g.animate.fade_in().duration(0.5) for g in grid + grid_marks],
+                grid.animate.fade_in().duration(0.5),
                 nazca_label.animate.fade_in_from(Direction.RIGHT, 0.1).duration(0.5),
             ),
             parallel(
@@ -485,7 +417,7 @@ def plates(scene: Scene) -> None:
     cycle, departures = 1.0, (0.0, 0.9, 1.8)
     flow = []
     for lane, lat in enumerate((-9.5, -15.0)):
-        x1, y1 = _geo(-83.2, lat)
+        x1, y1 = atlas.point(-83.2, lat)
         for k, departure in enumerate(departures):
             arrow = (
                 scene.geometry.arrow(
@@ -513,7 +445,7 @@ def plates(scene: Scene) -> None:
                     arrow.animate.fade_out().duration(0.35 * cycle).delay(0.65 * cycle)
                 )
             flow.append(parallel(*motion).delay(departure + 0.2 * lane))
-    ax, ay = _geo(-83.2, -15.0)
+    ax, ay = atlas.point(-83.2, -15.0)
     rate = t(
         scene,
         "≈ 7–8 cm/año",
@@ -538,7 +470,7 @@ def plates(scene: Scene) -> None:
     # Lo de adentro se diseña en unidades de la pantalla (origen en su centro) y se
     # lleva a la escena dividiendo por el aumento.
     lens = 3.5  # aumento de la pantalla del corte
-    cx, cy = _geo(-78.4, -12.0)
+    cx, cy = atlas.point(-78.4, -12.0)
     screen_w, screen_h = 6.4, 3.6
 
     def inside(sx: float, sy: float) -> tuple[float, float]:
@@ -618,7 +550,7 @@ def plates(scene: Scene) -> None:
     # Grandes sismos del último siglo: todos frente a la costa, sobre el contacto.
     marks = []
     for name, year, mw, lon, lat in QUAKES:
-        x, y = _geo(lon, lat)
+        x, y = atlas.point(lon, lat)
         dot = (
             scene.geometry.circle(0.07).fill(FAIL).no_stroke().move_to(x, y).z_index(5)
         )
@@ -682,7 +614,7 @@ def plates(scene: Scene) -> None:
     tour = []
     shake_time = 0.8
     for i, (mark, (*_, mw, lon, lat)) in enumerate(zip(marks, QUAKES, strict=True)):
-        x, y = _geo(lon, lat)
+        x, y = atlas.point(lon, lat)
         view = (
             min(x + 1.1, MAP_RIGHT - half_w),
             min(max(y, MAP_BOTTOM + half_h), MAP_TOP - half_h),

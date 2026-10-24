@@ -244,9 +244,8 @@ class SectionIndex:
             caption_style=TextStyle(font=SANS, size=0.13, weight=900),
             caption_colors={"done": MUTED, "current": BRICK, "upcoming": MUTED},
         )
-        # El riel va en el margen inferior, fuera del área segura: `gaanim check` avisa
-        # de cada rótulo y no hay forma de marcarlo como intencional (gaanim #728).
-        rail.root.shift_by(0, RAIL_Y).hud().z_index(100)
+        # El riel va en el margen inferior, fuera del área segura, a propósito.
+        rail.root.shift_by(0, RAIL_Y).hud().z_index(100).outside_safe_on_purpose()
         scene.persist(rail.root)
         scene.play(rail.root.animate.fade_in(), duration=0.35)
         self._rail = rail

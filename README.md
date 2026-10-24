@@ -130,9 +130,8 @@ Matices que conviene respetar al exponer (también están en las notas):
 `gaanim check`. Las versiones de ruff y pyright están fijadas en el grupo `dev` de
 `pyproject.toml` y `uv sync` las instala; `just fmt` formatea y aplica los arreglos seguros.
 
-`gaanim check` corre sin `--strict` porque los ocho rótulos del riel de avance están a
-propósito en el margen y Gaanim todavía no permite marcarlos (gaanim #728). Fuera de esos
-avisos, el guion no debe tener ninguno.
+`gaanim check` corre con `--strict`: cualquier aviso hace fallar la revisión. El riel de
+avance está en el margen a propósito y lo declara con `outside_safe_on_purpose()`.
 
 ### Capturas
 
@@ -160,17 +159,24 @@ Los cuadros quedan en `snapshots/sequence/`, 30 por segundo.
 
 ## Gaanim
 
-El guion necesita Gaanim 0.17.0 con los arreglos de los PR #725 y #727 (cambios de layout
-simultáneos, recorte de imágenes al reproducir en orden y `deform` en copias). Están en `main`
-pero no en la release v0.17.0: con esa release el deck compila y sus pausas se ven bien, pero
-el índice de *Alba · partes del reporte* y su lector de páginas fallan al reproducir.
+El guion necesita Gaanim 0.17.1. Lo que usa de esa versión:
+- los cambios de layout simultáneos;
+- el recorte de imágenes al reproducir en orden;
+- `deform` en copias;
+- la lectura de paquetes con muchas copias;
+- `scene.viz.map`;
+- `outside_safe_on_purpose()`.
+
+Con la release v0.17.0 el deck no carga. Mientras 0.17.1 no esté en PyPI, `pyproject.toml`
+toma el wheel de `C:/Tools/gaanim` (`[tool.uv.sources]`); al publicarse, se quita esa sección
+y se corre `uv lock`.
 
 Gaanim llega en dos piezas:
 
 - **El motor** (`gaanim.exe`, en `C:/Tools/gaanim`) ejecuta, presenta, captura y exporta. Se
   actualiza con `gaanim update` (última release) o copiando un build de `main`.
-- **El wheel** (`gaanim` en `pyproject.toml`, desde PyPI) solo aporta los stubs para el
-  autocompletado y pyright. Se actualiza con `just upgrade`.
+- **El wheel** (`gaanim` en `pyproject.toml`) solo aporta los stubs para el autocompletado y
+  pyright. Se actualiza con `just upgrade`.
 
 ## Exportar
 
@@ -181,7 +187,7 @@ gaanim export . --output exports/tesis.mp4 --quality production  # video
 ```
 
 `just publish` exporta el paquete completo a `exports/` (que no se versiona), lo aligera con
-`gaanim pack --web` (de unos 47 a 20 MB) y lo deja como único commit de la rama `publicar`.
+`gaanim pack --web` (de unos 54 a 25 MB) y lo deja como único commit de la rama `publicar`.
 Cada publicación reemplaza ese commit, así que el historial no crece. Sale de un commit: con
 cambios sin commit se niega, salvo `just publish --dirty`; `--no-push` arma la rama sin subirla.
 El reproductor web lo abre desde `raw.githubusercontent.com`, que envía CORS (las descargas de
@@ -198,5 +204,5 @@ exportación ignora las pausas y genera una secuencia continua de unos 6.3 minut
 Los bugs y mejoras de Gaanim que aparecen al trabajar en el deck se registran como issues en
 [PaoloLupo/gaanim](https://github.com/PaoloLupo/gaanim/issues). Cada rodeo del guion lleva un
 comentario «gaanim #NNN»; al cerrarse la issue se quita el rodeo y se compara con `just diff`.
-Quedan dos: #706 (marco de mapa con proyección, en `problematica.py`) y #728 (texto fuera del
-área segura a propósito, en `section_index.py`).
+Queda uno: #733 (los rótulos de la retícula del mapa no toman la fuente del tema, en
+`theme.py`).
