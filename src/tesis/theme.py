@@ -76,8 +76,7 @@ def build_theme() -> Theme:
         },
         fonts={"text": SANS, "code": MONO},
         text={"label": LABEL, "caption": NOTE},
-        # Rótulos de la retícula de los mapas, como las demás notas técnicas. Por ahora
-        # solo se aplica el tamaño; la fuente y el color, no (gaanim #733).
+        # Rótulos de la retícula de los mapas, como las demás notas técnicas.
         styles={"map/labels": Style(text=TextStyle(font=MONO, size=0.11, color=MUTED))},
         font_dir=FONTS_DIR,
         text_markup=False,
