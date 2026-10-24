@@ -290,9 +290,27 @@ Bloque 6 de 8: Implementación: Alba. Pregunta guía: ¿Cómo se conecta el marc
 
 ## alba · 1 · 6 · Alba · partes del reporte
 
-30 s. El reporte real del caso (anexo, 21 páginas) con sus seis secciones de la Tabla 48 (p. 124): datos de diseño, requisitos mínimos (espesor y densidad), carga vertical (esfuerzo axial), análisis sísmico (peso, modos, fuerzas y derivas), sismo moderado (fisuración y corte global) e información del modelo y la versión de Alba.
+30 s. El reporte real del caso (anexo, 21 páginas) con sus seis secciones de la Tabla 48 (p. 124). Arriba están sus páginas, agrupadas por sección; en cada pausa se abre una en el índice y se acerca una de sus páginas.
 
 [stop reporte-partes]
+Datos de diseño: geometría, niveles, materiales y parámetros sísmicos (pp. 3–5).
+
+[stop reporte-parte-1]
+Requisitos mínimos: espesor efectivo t = 0.12 m y densidad mínima de 0.032 en cada dirección (pp. 6–7).
+
+[stop reporte-parte-2]
+Carga vertical: esfuerzo axial por cargas de gravedad, muro por muro (pp. 8–10).
+
+[stop reporte-parte-3]
+Análisis sísmico: peso, modos, fuerzas y derivas; la página muestra la deriva en X (pp. 11–14).
+
+[stop reporte-parte-4]
+Sismo moderado: fisuración y resistencia al corte global, la parte más larga (pp. 15–20).
+
+[stop reporte-parte-5]
+Información del modelo: versión de la API, archivo y fecha de importación, la trazabilidad de la iteración (p. 21).
+
+[stop reporte-parte-6]
 
 ## resultados · 1 · 1 · Índice
 

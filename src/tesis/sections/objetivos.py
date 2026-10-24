@@ -1,6 +1,7 @@
 """Bloque 2 · Objetivos, hipótesis y método de la investigación."""
 
 import re
+from typing import cast
 
 from gaanim import (
     Anchor,
@@ -611,6 +612,8 @@ def _bracket(
 def _opening(item: Box) -> Playable:
     """Entrada de una etapa: el filete se traza, el nombre sube y el pie aparece."""
     rule, title, _picture, caption = item.children
+    # El título es la fila del número y el nombre.
+    title = cast(Box, title)
     return parallel(
         rule.animate.grow_from_edge(Direction.LEFT).duration(0.5),
         enter(title, direction=Direction.UP, duration=0.35, each=0.08),
@@ -651,7 +654,7 @@ def method(scene: Scene) -> None:
     ]
 
     # 3 · Programa, en U: ETABS ⇄ Alba por la API; Alba → Typst → reporte PDF.
-    etabs, etabs_slot = _tool(
+    etabs, _etabs_slot = _tool(
         scene, _svg(scene, "etabs", "150px", "37px"), "Modelo FEM"
     )
     alba, alba_slot = _tool(scene, _svg(scene, "python", "82px", "82px"), "Alba")
@@ -665,7 +668,7 @@ def method(scene: Scene) -> None:
         height="91px",
     )
     pdf_art = pdf.children[0]
-    report, report_slot = _tool(scene, pdf, "Reporte")
+    report, _report_slot = _tool(scene, pdf, "Reporte")
     api_arrow = (
         scene.geometry.double_arrow(0, 0, 1.0, 0, head_length=0.11, head_width=0.11)
         .fill(MUTED)

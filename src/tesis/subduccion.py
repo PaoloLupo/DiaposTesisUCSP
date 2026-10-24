@@ -13,9 +13,9 @@ superficie clara, corte medio y extremo oscuro.
 import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from gaanim import (
+    Axonometric,
     Color,
     Drawable,
     Easing,
@@ -29,9 +29,6 @@ from gaanim import (
 )
 
 from tesis.theme import CARD, FAIL, INK_SOFT, STEEL
-
-if TYPE_CHECKING:  # `gaanim` no reexporta el tipo; basta para las anotaciones
-    from gaanim.gaanim_core import Axonometric
 
 L, D, H = 10.0, 6.0, 3.0  # largo, fondo y alto del bloque
 SEA = 2.75  # superficie del mar

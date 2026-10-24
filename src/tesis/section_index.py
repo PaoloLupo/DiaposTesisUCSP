@@ -163,15 +163,16 @@ class SectionIndex:
                 f"Pregunta guía: {question} Transición breve, 5-10 s."
             ),
         )
-        Section(section.key, [divider, *section.steps], title=title).build(
-            self.scene, on_enter=self._advance
-        )
+        # Cada diapositiva empieza en la vista 2D: la cámara 3D de la anterior se
+        # suelta tras su última pausa y la acompaña mientras sale en la transición.
+        Section(
+            section.key, [divider, *section.steps], title=title, camera="reset"
+        ).build(self.scene, on_enter=self._advance)
         self._previous = active
 
     def _divider(self, scene: Scene, active: int) -> None:
         previous = self._previous
         _, title, question, _ = SECTIONS[active]
-        _ = scene.camera.reset()
         rail = self._rail or self._build_rail()
         self._set_seal(False)
 
@@ -243,7 +244,8 @@ class SectionIndex:
             caption_style=TextStyle(font=SANS, size=0.13, weight=900),
             caption_colors={"done": MUTED, "current": BRICK, "upcoming": MUTED},
         )
-        rail.root.shift_by(0, RAIL_Y).hud().z_index(100)
+        # El riel va en el margen inferior, fuera del área segura, a propósito.
+        rail.root.shift_by(0, RAIL_Y).hud().z_index(100).outside_safe_on_purpose()
         scene.persist(rail.root)
         scene.play(rail.root.animate.fade_in(), duration=0.35)
         self._rail = rail

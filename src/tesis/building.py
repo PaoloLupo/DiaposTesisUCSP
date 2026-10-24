@@ -67,7 +67,11 @@ class Plan:
         _, wall, ax, ay, bx, by = next(s for s in wall_segments() if s[0] == name)
         cx, cy = self.to_scene((ax + bx) / 2, (ay + by) / 2)
         length = (bx - ax + by - ay) * self.scale
-        w, h = (length, self.thickness) if wall.direction == "X" else (self.thickness, length)
+        w, h = (
+            (length, self.thickness)
+            if wall.direction == "X"
+            else (self.thickness, length)
+        )
         return cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2
 
     def by_direction(self, direction: str) -> list[Drawable]:
@@ -190,7 +194,7 @@ def draw_plan(
     if grid:
         ext = 0.55
         for label, gx in AXIS_X.items():
-            ax_, ay_ = p(gx, 0)
+            ax_, _ = p(gx, 0)
             top = oy + DEPTH * scale + ext
             grid_lines.append(
                 scene.geometry.dashed_line(

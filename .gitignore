@@ -1,3 +1,5 @@
+# Exportaciones: el paquete web se publica en la rama `publicar` (just publish).
+exports/*
 !exports/.gitkeep
 snapshots/
 __pycache__/

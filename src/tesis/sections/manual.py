@@ -14,8 +14,9 @@ from gaanim import (
     Direction,
     Drawable,
     Easing,
-    EasingCurve,
+    Material3D,
     Playable,
+    Pointer,
     Scene,
     Section,
     SectionStep,
@@ -79,15 +80,20 @@ from tesis.data.thesis import (
 from tesis.diagram import link
 from tesis.etabs_model import (
     FRAME,
-    OVERLAY,
+    SINE,
     SLAB,
     WALL_X,
     EtabsModel,
     Story,
+    WallLine,
     build_model,
+    rect,
+    slab_outline,
+    stand,
     wall_lines,
 )
 from tesis.kit import RIGHT_EDGE, dimension, label, t
+from tesis.model3d import P2, P3, Shot, lay_flat, orbit_to, pinned
 from tesis.theme import (
     BRICK,
     BRICK_DEEP,
@@ -107,7 +113,6 @@ from tesis.theme import (
     STEEL,
     STEEL_SOFT,
 )
-from tesis.vivienda import Iso
 
 KICKER = "04 · Proceso manual"
 
@@ -205,7 +210,6 @@ def case_study(scene: Scene) -> None:
 
 
 # La vista 3D de ETABS como la arma el ingeniero: Definir, Dibujar y Asignar.
-MODEL_ISO = Iso((-5.6, -0.995), 0.265)
 type Phases = tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...]
 MODEL_STEPS: Phases = (
     (
@@ -258,6 +262,17 @@ ROOF_ARROWS = (
     (15.1, 6),
 )
 SWAY = 1.1  # m en la azotea: deformada exagerada
+OVERLAY = 1000  # z_index de lo 2D que va sobre los rótulos del modelo
+# Tomas de la cámara. El foco se ve en ``at``, a la izquierda del panel de pasos.
+CENTER = (WIDTH / 2, DEPTH / 2)
+MODEL_AT = (-3.0, -0.45)
+MCT_PLAN = Shot(0, 84, 0.4, (*CENTER, 0.0), (-3.3, -0.15))
+MCT_VIEW = Shot(38, 26, 0.34, (*CENTER, 4.6), MODEL_AT)
+MCT_HIGH = Shot(28, 40, 0.33, (*CENTER, 4.6), MODEL_AT)
+MCT_SWAY = Shot(56, 20, 0.33, (*CENTER, 4.8), MODEL_AT)
+JUNCTION = (3.0, 0.0)  # nudo del eje 2 con el eje A: X1, Y3 y su columna
+# El nudo a pantalla completa, como al acercarse en ETABS: piso 2, entre X1 e Y3.
+MCT_JUNCTION = Shot(32, 16, 0.95, (*JUNCTION, 3.72), (1.4, -0.35))
 
 
 @dataclass
@@ -282,6 +297,26 @@ class StepList:
 
     def restore(self) -> list[Playable]:
         return [r.animate.opacity(1).duration(0.4) for r in self.rows]
+
+    def _shown(self, current: int) -> list[Box]:
+        """Fases y pasos visibles en el paso ``current``; los demás siguen ocultos."""
+        opened = sorted({g for g in self.opens[: current + 1] if g is not None})
+        return [*(self.heads[g] for g in opened), *self.rows[: current + 1]]
+
+    def hide(self, current: int, duration: float = 0.4) -> list[Playable]:
+        """Aparta el panel; animar un paso aún oculto lo haría aparecer."""
+        return [b.animate.opacity(0).duration(duration) for b in self._shown(current)]
+
+    def show(
+        self, current: int, duration: float = 0.4, delay: float = 0.0
+    ) -> list[Playable]:
+        """Vuelve el panel como estaba en el paso ``current``."""
+        return [
+            b.animate.opacity(0.4 if b in self.rows[:current] else 1)
+            .duration(duration)
+            .delay(delay)
+            for b in self._shown(current)
+        ]
 
 
 def _steps_panel(scene: Scene, phases: Phases) -> StepList:
@@ -311,42 +346,15 @@ def _steps_panel(scene: Scene, phases: Phases) -> StepList:
     return steps
 
 
-def _pointer(scene: Scene) -> Drawable:
-    """Puntero del ratón; su punta es la esquina superior izquierda."""
-    tip = [
-        (0.0, 0.0),
-        (0.0, -0.3),
-        (0.072, -0.232),
-        (0.118, -0.335),
-        (0.158, -0.318),
-        (0.113, -0.217),
-        (0.205, -0.212),
-    ]
-    return (
-        scene.geometry.polygon(tip)
-        .fill(INK)
-        .stroke(CARD, 0.016)
-        .z_index(OVERLAY + 15)
-        .hidden()
-    )
+def _pointer(scene: Scene, at: P3) -> Pointer:
+    """Puntero del ratón sobre el modelo, oculto hasta que entra.
 
-
-def _click(scene: Scene, x: float, y: float) -> Composition:
-    ring = (
-        scene.geometry.circle(0.05)
-        .no_fill()
-        .stroke(BRICK, 0.012)
-        .move_to(x, y)
-        .z_index(OVERLAY + 14)
-        .hidden()
-    )
-    return sequence(
-        ring.animate.fade_in().duration(0.04),
-        parallel(
-            ring.animate.scale_to(3.2).duration(0.4),
-            ring.animate.fade_out().duration(0.4),
-        ),
-    )
+    Es un billboard con la punta en un punto 3D: recorre el modelo en perspectiva y no
+    se despega de lo que señala aunque la cámara gire.
+    """
+    pointer = scene.ui.pointer(at=at)
+    pointer.drawable.hidden()
+    return pointer
 
 
 def _define_window(
@@ -356,12 +364,14 @@ def _define_window(
     left, width, pitch = -5.8, 5.25, 0.27
     first = top - 0.62
     height = 0.62 + pitch * len(rows) + 0.08
+    # Un diálogo sobre el modelo: tapa a propósito los rótulos que quedan debajo.
     frame = (
         scene.geometry.rect(width, height)
         .fill(CARD)
         .stroke(RULE, 0.016)
         .move_to(left + width / 2, top - height / 2)
         .z_index(OVERLAY)
+        .covers_on_purpose()
     )
     caption = t(
         scene,
@@ -411,108 +421,139 @@ def _section_icons(scene: Scene, x: float, ys: Sequence[float]) -> list[Drawable
             .move_to(x, frame_y + 0.1),
         ]
     )
-    mini = Iso((x - 0.12, wall_y - 0.06), 0.075)
+    mini = scene.geometry.axonometric(origin=(x - 0.12, wall_y - 0.06), scale=0.075)
     wall = (
-        scene.geometry.polygon(
-            [mini(0, 0, 0), mini(3, 0, 0), mini(3, 0, 2), mini(0, 0, 2)]
-        )
+        mini.polygon([(0, 0, 0), (3, 0, 0), (3, 0, 2), (0, 0, 2)])
         .fill(WALL_X)
         .stroke(BRICK, 0.008)
     )
-    flat = Iso((x - 0.15, slab_y), 0.06)
+    flat = scene.geometry.axonometric(origin=(x - 0.15, slab_y), scale=0.06)
     slab = (
-        scene.geometry.polygon(
-            [flat(0, 0, 0), flat(3, 0, 0), flat(3, 2, 0), flat(0, 2, 0)]
-        )
+        flat.polygon([(0, 0, 0), (3, 0, 0), (3, 2, 0), (0, 2, 0)])
         .fill(SLAB)
         .stroke(CONCRETE, 0.008)
     )
     return [g.z_index(OVERLAY + 2).hidden() for g in (frame, wall, slab)]
 
 
-def full_model(scene: Scene) -> None:
-    header(scene, KICKER, "El modelo completo se arma en ETABS en ocho pasos")
-    model = build_model(scene, MODEL_ISO)
-    iso = model.iso
-    top = model.height
-    steps = _steps_panel(scene, MODEL_STEPS)
-    step = steps.enter
-
-    # 1 · Grillas en la base y pisos que suben desde ella hasta su cota.
-    level_labels = [
-        t(
+def _level_labels(
+    scene: Scene, corners: Sequence[P3], levels: Sequence[tuple[str, float]]
+) -> list[Drawable]:
+    """Nombre y cota de cada nivel, a la izquierda de la esquina del eje 1 con el A."""
+    labels: list[Drawable] = []
+    for corner, (name, z) in zip(corners, levels, strict=True):
+        text = t(
             scene,
             f"{name:<7}{z:5.2f}",
-            iso(0, 0, z)[0] - 0.42,
-            iso(0, 0, z)[1],
+            0,
+            0,
             font=MONO,
             size=0.11,
             color=MUTED if z == 0 else INK_SOFT,
             anchor=Anchor.RIGHT,
-        ).hidden()
-        for name, z in STORIES
-    ]
-    tx, ty = -6.95, 2.2
-    triad: list[Drawable] = []
-    for (dx, dy), name, color in (
-        ((0.866, -0.5), "X", BRICK),
-        ((0.866, 0.5), "Y", STEEL),
-        ((0.0, 1.0), "Z", INK_SOFT),
-    ):
-        end = (tx + 0.4 * dx, ty + 0.4 * dy)
-        triad.append(
-            scene.geometry.arrow(
-                tx, ty, *end, head_length=0.08, head_width=0.08, body_width=0.016
-            )
-            .fill(color)
-            .no_stroke()
-            .hidden()
         )
-        triad.append(
+        labels.append(pinned(text, corner, offset=(-0.32, 0), anchor=Anchor.RIGHT))
+    return labels
+
+
+def _triad(scene: Scene, origin: P3, length: float = 1.5) -> list[Drawable]:
+    """Ejes globales X, Y y Z: flechas 3D que giran con el modelo."""
+    parts: list[Drawable] = []
+    ox, oy, oz = origin
+    for (dx, dy, dz), name, color in (
+        ((1, 0, 0), "X", BRICK),
+        ((0, 1, 0), "Y", STEEL),
+        ((0, 0, 1), "Z", INK_SOFT),
+    ):
+        end = (ox + length * dx, oy + length * dy, oz + length * dz)
+        tip = (ox + 1.3 * length * dx, oy + 1.3 * length * dy, oz + 1.3 * length * dz)
+        parts.append(
+            scene.geometry.arrow_3d(
+                origin,
+                end,
+                shaft_radius=0.045,
+                head_radius=0.13,
+                head_length=0.32,
+                material=Material3D.matte(color),
+            ).hidden()
+        )
+        parts.append(
             t(
                 scene,
                 name,
-                end[0] + 0.1 * dx + (0.05 if dx else 0),
-                end[1] + 0.1 * dy,
+                0,
+                0,
                 size=0.13,
                 weight=900,
                 color=color,
                 anchor=Anchor.CENTER,
-            ).hidden()
+            )
+            .move_to_3d(*tip)
+            .billboard()
+            .hidden()
         )
+    return parts
+
+
+def full_model(scene: Scene) -> None:
+    head = header(scene, KICKER, "El modelo completo se arma en ETABS en ocho pasos")
+    model = build_model(scene)
+    top = model.height
+    levels = model.levels
+    scene.camera.to(MCT_PLAN.state(scene))
+    steps = _steps_panel(scene, MODEL_STEPS)
+    step = steps.enter
+
+    # 1 · Grillas en la planta; la cámara se inclina y los pisos suben a su cota.
+    level_labels = [
+        model.ride(lab, z)
+        for lab, (_, z) in zip(
+            _level_labels(scene, [(0.0, 0.0, z) for z in levels], STORIES),
+            STORIES,
+            strict=True,
+        )
+    ]
+    triad = _triad(scene, (WIDTH + 2.4, 1.2, 0.0), 1.3)
     for story, lab in zip(model.stories, level_labels[1:], strict=True):
-        rise = story.z1 * iso.scale
-        story.edge.drawable.shift_by(0, -rise)
-        lab.shift_by(0, -rise)
+        story.slab.group.move_to_3d(0, 0, 0)
+        lab.move_to_3d(0, 0, 0)
     scene.play(
         [
             *step(0),
-            stagger(*[g.animate.create().duration(0.5) for g in model.grid], each=0.04),
+            stagger(
+                *[g.animate.create().duration(0.5) for g in model.grid_lines],
+                each=0.04,
+            ),
             stagger(
                 *[b.animate.fade_in().duration(0.25) for b in model.bubbles],
                 each=0.03,
             ).delay(0.3),
-            stagger(*[p.animate.fade_in().duration(0.3) for p in triad], each=0.05),
             level_labels[0].animate.fade_in().duration(0.3).delay(0.5),
         ]
     )
     scene.play(
-        stagger(
-            *[
-                parallel(
-                    story.edge.drawable.animate.fade_in().duration(0.2),
-                    story.edge.drawable.animate.shift_by(0, story.z1 * iso.scale)
-                    .duration(0.8)
-                    .easing(Easing.SMOOTH),
-                    lab.animate.fade_in().duration(0.2),
-                    lab.animate.shift_by(0, story.z1 * iso.scale)
-                    .duration(0.8)
-                    .easing(Easing.SMOOTH),
-                )
-                for story, lab in zip(model.stories, level_labels[1:], strict=True)
-            ],
-            each=0.22,
-        )
+        [
+            orbit_to(scene, MCT_VIEW, 1.6),
+            stagger(
+                *[p.animate.fade_in().duration(0.3) for p in triad], each=0.05
+            ).delay(0.8),
+            stagger(
+                *[
+                    parallel(
+                        story.slab.edge.animate.fade_in().duration(0.2),
+                        story.slab.group.animate.move_to_3d(0, 0, story.z1)
+                        .duration(0.8)
+                        .easing(Easing.SMOOTH),
+                        lab.animate.move_to_3d(0, 0, story.z1)
+                        .duration(0.8)
+                        .easing(Easing.SMOOTH),
+                        lab.animate.fade_in().duration(0.2),
+                    )
+                    for story, lab in zip(model.stories, level_labels[1:], strict=True)
+                ],
+                each=0.22,
+            ).delay(1.0),
+        ]
     )
     scene.stop("mct-grillas")
 
@@ -580,20 +621,13 @@ def full_model(scene: Scene) -> None:
     scene.stop("mct-propiedades")
 
     # 4 · Dibujo en Story4 con «Similar Stories»: cada clic aparece en los cuatro pisos.
-    def at_top(x: float, y: float) -> tuple[float, float]:
-        return iso(x, y, top)
+    def at_top(x: float, y: float) -> P3:
+        return x, y, top
 
-    pointer = _pointer(scene).move_to(*at_top(6.0, 4.0), Anchor.TOP_LEFT)
+    def near(origin: P2) -> Callable[[P2], float]:
+        return lambda p: math.dist(p, origin)
 
-    def point_to(
-        x: float, y: float, duration: float = 0.4, easing: Easing = Easing.SMOOTH
-    ) -> Anim:
-        return (
-            pointer.animate.move_to(*at_top(x, y), Anchor.TOP_LEFT)
-            .duration(duration)
-            .easing(easing)
-        )
-
+    pointer = _pointer(scene, at_top(6.0, 4.0))
     windows = [
         *materials,
         *material_texts,
@@ -606,124 +640,131 @@ def full_model(scene: Scene) -> None:
         [
             *step(3),
             *[w.animate.fade_out().duration(0.3) for w in windows],
-            pointer.animate.fade_in().duration(0.3).delay(0.2),
+            pointer.drawable.animate.fade_in().duration(0.3).delay(0.2),
         ]
     )
-    first = [(0.0, 0.0), (3.0, 0.0)]
+    first = [(0.0, 0.0), JUNCTION]
     for node in first:
-        scene.play(point_to(*node))
+        scene.play(
+            pointer.animate.to(at_top(*node)).duration(0.4).easing(Easing.SMOOTH)
+        )
         scene.play(
             [
-                _click(scene, *at_top(*node)),
+                pointer.animate.click(radius=0.16),
                 *[
-                    s.columns[node].drawable.animate.create().duration(0.4)
+                    s.columns[node].animate.create().duration(0.4)
                     for s in model.stories
                 ],
             ]
         )
-    others = [
-        shape.drawable
-        for s in model.stories
-        for node, shape in s.columns.items()
-        if node not in first
-    ]
+    others = sorted(
+        (node for node in model.nodes if node not in first), key=near(JUNCTION)
+    )
     scene.play(
         stagger(
-            *[c.animate.create().duration(0.3) for c in others],
+            *[
+                parallel(
+                    *[
+                        s.columns[node].animate.create().duration(0.3)
+                        for s in model.stories
+                    ]
+                )
+                for node in others
+            ],
             total=0.9,
-            origin=at_top(3, 0),
         )
     )
     # Viga X1: se arrastra de nodo a nodo.
-    span = ((0.0, 0.0), (3.0, 0.0))
-    scene.play(point_to(*span[0]))
+    span = ((0.0, 0.0), JUNCTION)
+    scene.play(pointer.animate.to(at_top(*span[0])).duration(0.4).easing(Easing.SMOOTH))
     scene.play(
         [
-            point_to(*span[1], 0.6, Easing.LINEAR),
+            pointer.animate.to(at_top(*span[1])).duration(0.6).easing(Easing.LINEAR),
             *[
-                s.beams[span]
-                .drawable.animate.create()
-                .duration(0.6)
-                .easing(Easing.LINEAR)
+                s.beams[span].animate.create().duration(0.6).easing(Easing.LINEAR)
                 for s in model.stories
             ],
         ]
     )
+    spans = sorted(
+        (key for key in model.stories[0].beams if key != span),
+        key=lambda key: near(JUNCTION)(key[0]),
+    )
     scene.play(
         stagger(
             *[
-                shape.drawable.animate.create().duration(0.3)
-                for s in model.stories
-                for key, shape in s.beams.items()
-                if key != span
+                parallel(
+                    *[
+                        s.beams[key].animate.create().duration(0.3)
+                        for s in model.stories
+                    ]
+                )
+                for key in spans
             ],
             total=0.9,
-            origin=at_top(3, 0),
         )
     )
     # Muro X1: «Draw Walls» de un nodo al otro; el shell se extiende tras el cursor.
-    scene.play(point_to(*span[0]))
+    scene.play(pointer.animate.to(at_top(*span[0])).duration(0.4).easing(Easing.SMOOTH))
     for s in model.stories:
         x1 = s.walls["X1"]
-        a0, _, _, a1 = x1.points
-        x1.drawable.points([iso(*a0), iso(*a0), iso(*a1), iso(*a1)])
+        (u0, z0), _, _, (_, z1) = x1.corners
+        x1.outline.points([(u0, z0), (u0, z0), (u0, z1), (u0, z1)])
     scene.play(
         [
-            point_to(*span[1], 0.7, Easing.LINEAR),
+            pointer.animate.to(at_top(*span[1])).duration(0.7).easing(Easing.LINEAR),
             *[
                 s.walls["X1"]
-                .drawable.animate.points([iso(*p) for p in s.walls["X1"].points])
+                .outline.animate.points(s.walls["X1"].corners)
                 .duration(0.7)
                 .easing(Easing.LINEAR)
                 for s in model.stories
             ],
         ]
     )
+    rest = sorted(
+        (line for line in model.lines if line.name != "X1"),
+        key=lambda line: near(JUNCTION)(line.middle),
+    )
     scene.play(
         stagger(
             *[
-                shape.drawable.animate.fade_in().duration(0.3)
-                for s in model.stories
-                for name, shape in s.walls.items()
-                if name != "X1"
+                parallel(
+                    *[
+                        s.walls[line.name].outline.animate.fade_in().duration(0.3)
+                        for s in model.stories
+                    ]
+                )
+                for line in rest
             ],
             total=1.1,
-            origin=at_top(3, 0),
         )
     )
     # Losas: rectángulo de esquina a esquina; el vacío de escalera ya está en la losa.
-    band = (
-        scene.geometry.polygon(
-            [at_top(0, 0), at_top(WIDTH, 0), at_top(WIDTH, DEPTH), at_top(0, DEPTH)]
-        )
-        .no_fill()
-        .stroke(INK_SOFT, 0.012)
-        .z_index(OVERLAY + 13)
-        .hidden()
-    )
-    band.points([at_top(0, 0)] * 4)
-    scene.play(point_to(0, 0))
+    full = rect(0, 0, WIDTH, DEPTH)
+    band = scene.geometry.polygon(full).no_fill().stroke(INK_SOFT, 0.05).hidden()
+    lay_flat(scene.geometry.group([band], origin=(0, 0)), top + 0.04)
+    band.points([(0.0, 0.0)] * 4)
+    scene.play(pointer.animate.to(at_top(0, 0)).duration(0.4).easing(Easing.SMOOTH))
     scene.play(
         [
-            _click(scene, *at_top(0, 0)),
+            pointer.animate.click(radius=0.16),
             band.animate.fade_in().duration(0.05),
-            band.animate.points(
-                [at_top(0, 0), at_top(WIDTH, 0), at_top(WIDTH, DEPTH), at_top(0, DEPTH)]
-            )
+            band.animate.points(full).duration(0.9).easing(Easing.SMOOTH),
+            pointer.animate.to(at_top(WIDTH, DEPTH))
             .duration(0.9)
             .easing(Easing.SMOOTH),
-            point_to(WIDTH, DEPTH, 0.9),
         ]
     )
     scene.play(
         [
             band.animate.fade_out().duration(0.3),
-            pointer.animate.fade_out().duration(0.3),
+            pointer.drawable.animate.fade_out().duration(0.3),
             stagger(
                 *[
                     parallel(
-                        s.slab.drawable.animate.fade_in().duration(0.4),
-                        s.void.drawable.animate.fade_in().duration(0.4),
+                        s.slab.fill.animate.fade_in().duration(0.4),
+                        s.slab.void.animate.fade_in().duration(0.4),
                     )
                     for s in model.stories
                 ],
@@ -733,49 +774,35 @@ def full_model(scene: Scene) -> None:
     )
     scene.stop("mct-dibujo")
 
-    # 5 · Se ocultan las losas, aparece la malla y la cámara entra a un nudo.
-    mesh = [
-        part.drawable
-        for s in model.stories
-        for parts in s.mesh.values()
-        for part in parts
-    ]
+    # 5 · Se aclaran las losas, aparece la malla y la cámara entra a un nudo.
+    mesh = [part for wall in model.walls() for part in wall.mesh]
     scene.play(
         [
             *step(4),
-            *[
-                s.slab.drawable.animate.opacity(0.16).duration(0.6)
-                for s in model.stories
-            ],
+            *[s.slab.fill.animate.opacity(0.16).duration(0.6) for s in model.stories],
         ]
     )
     scene.play(stagger(*[m.animate.create().duration(0.5) for m in mesh], total=1.6))
-    junction = (3.0, 0.0)
-    story2 = model.stories[1]
-    focus = iso(*junction, (story2.z0 + story2.z1) / 2)
-    detail = _junction_detail(scene, model, story2, junction)
+    # La cámara vuela al nudo; encabezado y pasos se apartan mientras tanto.
+    detail = _junction_detail(scene, model, model.stories[1])
+    chrome = [*head.children, *level_labels, *triad]
     scene.play(
         [
-            *[lab.animate.fade_out().duration(0.4) for lab in level_labels],
-            scene.camera.animate.to(
-                scene.camera.state_2d((focus[0] - 0.45, focus[1]), 3.2)
-            )
-            .duration(1.3)
-            .easing(Easing.ease_in_out(EasingCurve.CUBIC)),
+            *[c.animate.fade_out().duration(0.4) for c in chrome],
+            *steps.hide(4),
+            orbit_to(scene, MCT_JUNCTION, 1.8),
             stagger(
                 *[d.animate.fade_in().duration(0.3) for d in detail], each=0.02
-            ).delay(1.0),
+            ).delay(1.5),
         ]
     )
     scene.stop("mct-malla")
     scene.play(
         [
             *[d.animate.fade_out().duration(0.3) for d in detail],
-            scene.camera.animate.reset()
-            .duration(1.1)
-            .easing(Easing.ease_in_out(EasingCurve.CUBIC))
-            .delay(0.2),
-            *[lab.animate.fade_in().duration(0.4).delay(0.9) for lab in level_labels],
+            orbit_to(scene, MCT_HIGH, 1.6),
+            *[c.animate.fade_in().duration(0.4).delay(1.2) for c in chrome],
+            *steps.show(4, delay=1.2),
         ]
     )
 
@@ -784,22 +811,20 @@ def full_model(scene: Scene) -> None:
     spokes: list[Drawable] = []
     waves: list[Composition] = []
     for s in model.stories:
-        c = iso(*DIAPHRAGM_CENTER, s.z1)
         lines = [
             scene.geometry.dashed_line(
-                *c, *iso(*node, s.z1), dash_length=0.035, gap_length=0.03
+                *DIAPHRAGM_CENTER, *node, dash_length=0.14, gap_length=0.12
             )
-            .stroke(INK_SOFT, 0.007)
-            .z_index(s.overlay)
+            .stroke(INK_SOFT, 0.025)
             .hidden()
             for node in s.columns
         ]
+        model.ride(
+            lay_flat(scene.geometry.group(lines, origin=(0, 0)), s.z1 + 0.03), s.z1
+        )
         dot = model.ride(
-            scene.geometry.circle(0.04)
-            .fill(INK)
-            .stroke(CARD, 0.01)
-            .move_to(*c)
-            .z_index(OVERLAY + 10)
+            scene.geometry.sphere(0.16, material=Material3D.matte(INK))
+            .move_to_3d(*DIAPHRAGM_CENTER, s.z1)
             .hidden(),
             s.z1,
         )
@@ -808,30 +833,23 @@ def full_model(scene: Scene) -> None:
         # La losa se enciende mientras sus nudos quedan ligados al centro.
         waves.append(
             parallel(
-                dot.animate.grow_from_center().duration(0.25),
+                dot.animate.fade_in().duration(0.25),
                 stagger(
                     *[ln.animate.create().duration(0.45) for ln in lines], each=0.006
                 ),
                 sequence(
-                    s.slab.drawable.animate.opacity(0.55).duration(0.3),
-                    s.slab.drawable.animate.opacity(0.16).duration(0.5).delay(0.3),
+                    s.slab.fill.animate.opacity(0.55).duration(0.3),
+                    s.slab.fill.animate.opacity(0.16).duration(0.5).delay(0.3),
                 ),
             )
         )
     d1 = model.ride(
-        t(
-            scene,
-            "D1",
-            iso(*DIAPHRAGM_CENTER, top)[0] - 0.08,
-            iso(*DIAPHRAGM_CENTER, top)[1] - 0.05,
-            font=MONO,
-            size=0.11,
-            weight=700,
-            color=INK,
-            anchor=Anchor.TOP_RIGHT,
-        )
-        .z_index(OVERLAY + 11)
-        .hidden(),
+        pinned(
+            t(scene, "D1", 0, 0, font=MONO, size=0.11, weight=700, color=INK),
+            (*DIAPHRAGM_CENTER, top),
+            offset=(-0.22, 0.16),
+            anchor=Anchor.CENTER,
+        ),
         top,
     )
     scene.play(
@@ -845,60 +863,50 @@ def full_model(scene: Scene) -> None:
     scene.stop("mct-diafragma")
 
     # 7 · Etiquetas Pier: se elige X1 en un piso y la etiqueta llega a los cuatro.
-    x1_label_z = [(s.z0 + s.z1) / 2 for s in model.stories]
-    x1_labels = [
-        model.ride(
+    def tag(text: str, at: P3, color: Color, size: float = 0.1) -> Drawable:
+        label = (
             t(
                 scene,
-                "X1",
-                *iso(1.5, 0, z),
+                text,
+                0,
+                0,
                 font=MONO,
-                size=0.11,
+                size=size,
                 weight=700,
-                color=BRICK_DEEP,
+                color=color,
                 anchor=Anchor.CENTER,
             )
-            .z_index(OVERLAY + 11)
-            .hidden(),
-            z,
+            .move_to_3d(*at)
+            .billboard()
+            .hidden()
         )
-        for z in x1_label_z
+        return model.ride(label, at[2])
+
+    x1_labels = [
+        tag("X1", (1.5, -0.05, (s.z0 + s.z1) / 2), BRICK_DEEP, 0.11)
+        for s in model.stories
     ]
-    tags: list[Drawable] = []
-    for line in model.lines:
-        if line.name == "X1":
-            continue
-        x, y = iso(*line.middle, top)
-        tags.append(
-            model.ride(
-                t(
-                    scene,
-                    line.label,
-                    x,
-                    y + 0.03,
-                    font=MONO,
-                    size=0.1,
-                    weight=700,
-                    color=BRICK_DEEP if line.direction == "X" else STEEL,
-                    anchor=Anchor.BOTTOM,
-                )
-                .z_index(OVERLAY + 11)
-                .hidden(),
-                top,
-            )
-        )
-    pick = iso(1.5, 0, (model.stories[-1].z0 + top) / 2)
-    pointer.move_to(*at_top(5.0, 2.0), Anchor.TOP_LEFT)
-    x1_walls = [s.walls["X1"].drawable for s in model.stories]
-    scene.play([*step(6), pointer.animate.fade_in().duration(0.3)])
-    scene.play(
-        pointer.animate.move_to(*pick, Anchor.TOP_LEFT)
-        .duration(0.5)
-        .easing(Easing.SMOOTH)
+    # Las demás etiquetas llegan desde X1, de la más cercana a la más lejana.
+    tagged = sorted(
+        (line for line in model.lines if line.name != "X1"),
+        key=lambda line: near((1.5, 0.0))(line.middle),
     )
+    tags = [
+        tag(
+            line.label,
+            (*line.middle, top + 0.3),
+            BRICK_DEEP if line.direction == "X" else STEEL,
+        )
+        for line in tagged
+    ]
+    pick = (1.5, 0.0, (model.stories[-1].z0 + top) / 2)
+    pointer.jump(at_top(5.0, 2.0))
+    x1_walls = [s.walls["X1"].outline for s in model.stories]
+    scene.play([*step(6), pointer.drawable.animate.fade_in().duration(0.3)])
+    scene.play(pointer.animate.to(pick).duration(0.5).easing(Easing.SMOOTH))
     scene.play(
         [
-            _click(scene, *pick),
+            pointer.animate.click(radius=0.16),
             *[w.animate.fill(SELECTED).duration(0.25) for w in x1_walls],
         ]
     )
@@ -912,32 +920,23 @@ def full_model(scene: Scene) -> None:
                 each=0.12,
             ),
             *[w.animate.fill(WALL_X).duration(0.4).delay(0.6) for w in x1_walls],
-            pointer.animate.fade_out().duration(0.3).delay(0.6),
+            pointer.drawable.animate.fade_out().duration(0.3).delay(0.6),
         ]
     )
-    scene.play(
-        stagger(
-            *[tag.animate.fade_in().duration(0.25) for tag in tags],
-            total=1.0,
-            origin=pick,
-        )
-    )
+    scene.play(stagger(*[x.animate.fade_in().duration(0.25) for x in tags], total=1.0))
     scene.stop("mct-pier")
 
     # 8 · Cargas sobre las losas y masa sísmica concentrada en cada diafragma.
     arrows = [
         model.ride(
-            scene.geometry.arrow(
-                *iso(x, y, top + 1.5),
-                *iso(x, y, top),
-                head_length=0.07,
-                head_width=0.07,
-                body_width=0.012,
-            )
-            .fill(INK_SOFT)
-            .no_stroke()
-            .z_index(OVERLAY + 12)
-            .hidden(),
+            scene.geometry.arrow_3d(
+                (x, y, top + 1.5),
+                (x, y, top + 0.02),
+                shaft_radius=0.035,
+                head_radius=0.11,
+                head_length=0.3,
+                material=Material3D.matte(INK_SOFT),
+            ).hidden(),
             top,
         )
         for x, y in ROOF_ARROWS
@@ -948,7 +947,7 @@ def full_model(scene: Scene) -> None:
         t(
             scene,
             text,
-            -2.55,
+            -7.3,
             y,
             font=MONO,
             size=0.11,
@@ -956,10 +955,10 @@ def full_model(scene: Scene) -> None:
             anchor=Anchor.LEFT,
         ).hidden()
         for text, y, color in (
-            (f"Azotea     CM {roof_cm:.2f} · CV {roof_cv:.2f} tonf/m²", 2.5, INK),
+            (f"Azotea     CM {roof_cm:.2f} · CV {roof_cv:.2f} tonf/m²", 2.78, INK),
             (
                 f"Pisos 1–3  CM {typical_cm:.2f} · CV {typical_cv:.2f} tonf/m²",
-                2.27,
+                2.55,
                 INK_SOFT,
             ),
         )
@@ -968,56 +967,72 @@ def full_model(scene: Scene) -> None:
     masses: list[Drawable] = []
     mass_labels: list[Drawable] = []
     for s, w in zip(model.stories, weights, strict=True):
-        cx, cy = iso(*DIAPHRAGM_CENTER, s.z1)
-        r = 0.075 * math.sqrt(w / max(weights))
+        r = 0.42 * math.sqrt(w / max(weights))
         masses.append(
             model.ride(
-                scene.geometry.circle(r)
-                .fill(BRICK)
-                .stroke(CARD, 0.012)
-                .move_to(cx, cy)
-                .z_index(OVERLAY + 12)
+                scene.geometry.sphere(r, material=Material3D.matte(BRICK))
+                .move_to_3d(*DIAPHRAGM_CENTER, s.z1)
                 .hidden(),
                 s.z1,
             )
         )
+        tonf = pill(
+            scene,
+            f"{w:.1f} tonf",
+            0,
+            0,
+            size=0.1,
+            pad=(0.06, 0.025),
+            color=INK,
+            border=RULE,
+            anchor=Anchor.LEFT,
+        )
         mass_labels.append(
             model.ride(
-                pill(
-                    scene,
-                    f"{w:.1f} tonf",
-                    cx + 0.14,
-                    cy,
-                    size=0.1,
-                    pad=(0.06, 0.025),
-                    color=INK,
-                    border=RULE,
+                pinned(
+                    tonf,
+                    (*DIAPHRAGM_CENTER, s.z1),
+                    offset=(0.2, 0),
                     anchor=Anchor.LEFT,
-                ).z_index(OVERLAY + 12),
+                ),
                 s.z1,
             )
         )
+    # Para el análisis modal el edificio se lee como masas concentradas en cada
+    # diafragma: los muros se vuelven casi transparentes y quedan frames y masas.
+    see_through = [
+        part.animate.opacity(0.15).duration(0.6)
+        for wall in model.walls()
+        for part in (wall.outline, *wall.mesh)
+    ]
     scene.play(
         [
             *step(7),
             *[ln.animate.fade_out().duration(0.4) for ln in spokes],
-            stagger(*[a.animate.grow_arrow().duration(0.4) for a in arrows], each=0.05),
+            *[c.animate.fade_out().duration(0.3) for c in centers],
+            d1.animate.fade_out().duration(0.3),
+            *[p.animate.fade_out().duration(0.3) for p in triad],
+            orbit_to(scene, MCT_SWAY, 1.4),
+            stagger(*[a.animate.create().duration(0.4) for a in arrows], each=0.05),
             stagger(
                 *[x.animate.fade_in().duration(0.3) for x in loads], each=0.15
             ).delay(0.3),
         ]
     )
     scene.play(
-        stagger(
-            *[
-                parallel(
-                    m.animate.grow_from_center().duration(0.3),
-                    lab.animate.fade_in_from(Direction.LEFT, 0.05).duration(0.3),
-                )
-                for m, lab in zip(masses, mass_labels, strict=True)
-            ],
-            each=0.15,
-        )
+        [
+            *see_through,
+            stagger(
+                *[
+                    parallel(
+                        m.animate.fade_in().duration(0.3),
+                        lab.animate.fade_in_from(Direction.LEFT, 0.05).duration(0.3),
+                    )
+                    for m, lab in zip(masses, mass_labels, strict=True)
+                ],
+                each=0.15,
+            ),
+        ]
     )
     # Con el modelo completo, el análisis modal: el modo 3 es la traslación en Y.
     modal = [
@@ -1062,60 +1077,49 @@ def full_model(scene: Scene) -> None:
     )
 
 
-def _junction_detail(
-    scene: Scene, model: EtabsModel, story: Story, node: tuple[float, float]
-) -> list[Drawable]:
-    """Lo que se ve al acercarse a un nudo: nodos de la malla, frames y brazo rígido.
+def _junction_detail(scene: Scene, model: EtabsModel, story: Story) -> list[Drawable]:
+    """Lo que se ve al acercarse al nudo: nodos de la malla, frames y brazo rígido.
 
-    Todo mide lo que debe medir a 3.2 aumentos; fuera del acercamiento estaría oculto.
+    Los nodos son esferas en el plano de cada muro; los que comparten la malla con
+    vigas y columnas van en terracota. Las notas son de pantalla y apuntan a donde la
+    toma del nudo dibuja cada detalle.
     """
-    iso = model.iso
     z0, z1 = story.z0, story.z1
-    x_node, _ = node
-    parts: list[Drawable] = []
+    x_node, y_node = JUNCTION
+    columns = set(model.nodes)
     nz = math.ceil((z1 - z0) / MESH_STEP - 1e-6)
-    shared: list[tuple[float, float, float]] = []
+    inner: list[P3] = []
+    shared: list[P3] = []
     for name in ("X1", "Y3"):
         line = next(ln for ln in model.lines if ln.name == name)
         (ax, ay), (bx, by) = line.a, line.b
-        nu = math.ceil(math.hypot(bx - ax, by - ay) / MESH_STEP - 1e-6)
+        nu = math.ceil(line.length / MESH_STEP - 1e-6)
         for i in range(nu + 1):
             for j in range(nz + 1):
-                p = (
-                    ax + (bx - ax) * i / nu,
-                    ay + (by - ay) * i / nu,
-                    z0 + (z1 - z0) * j / nz,
-                )
-                on_frame = (
-                    j in (0, nz) or abs(p[0] - x_node) < 1e-6 and abs(p[1]) < 1e-6
-                )
-                if on_frame:
-                    shared.append(p)
-                    continue
-                parts.append(
-                    scene.geometry.circle(0.0065)
-                    .fill(INK_SOFT)
-                    .no_stroke()
-                    .move_to(*iso(*p))
-                    .z_index(OVERLAY + 8)
-                    .hidden()
-                )
-    parts += [
-        scene.geometry.circle(0.009)
-        .fill(BRICK)
-        .no_stroke()
-        .move_to(*iso(*p))
-        .z_index(OVERLAY + 8)
-        .hidden()
-        for p in shared
+                x, y = ax + (bx - ax) * i / nu, ay + (by - ay) * i / nu
+                p = (x, y, z0 + (z1 - z0) * j / nz)
+                on_frame = j in (0, nz) or (round(x, 3), round(y, 3)) in {
+                    (round(cx, 3), round(cy, 3)) for cx, cy in columns
+                }
+                (shared if on_frame else inner).append(p)
+    shared = sorted(set(shared))
+    parts: list[Drawable] = [
+        scene.geometry.points_3d(
+            inner,
+            radius=0.028,
+            material=Material3D.matte(INK_SOFT),
+        ).hidden(),
+        scene.geometry.points_3d(
+            shared, radius=0.04, material=Material3D.matte(BRICK)
+        ).hidden(),
+        # Brazo rígido al extremo de la viga X1, en la cara de la columna (End Length Offset).
+        scene.geometry.line_3d(
+            (x_node - 0.3, y_node, z1),
+            (x_node, y_node, z1),
+            0.14,
+            material=Material3D.matte(INK),
+        ).hidden(),
     ]
-    # Brazo rígido al extremo de la viga X1, en la cara de la columna (End Length Offset).
-    parts.append(
-        scene.geometry.line(*iso(x_node - 0.3, 0, z1), *iso(x_node, 0, z1))
-        .stroke(INK, 0.014)
-        .z_index(OVERLAY + 8)
-        .hidden()
-    )
     rows = nz  # filas de la malla en el piso
     notes = (
         ("Brazo rígido en la cara de la columna", (x_node - 0.15, 0, z1)),
@@ -1124,32 +1128,30 @@ def _junction_detail(
         ("Frame · columna de confinamiento", (x_node, 0, z0 + 0.25)),
     )
     for i, (text, target) in enumerate(notes):
-        tx, ty = iso(*target)
-        y = 0.55 - i * 0.3
+        tx, ty = MCT_JUNCTION.project(scene, target)
+        y = 2.3 - i * 0.7
+        card = pill(
+            scene,
+            text,
+            -7.3,
+            y,
+            size=0.15,
+            pad=(0.12, 0.06),
+            color=INK,
+            border=RULE,
+            anchor=Anchor.LEFT,
+        )
+        parts.append(card.z_index(OVERLAY + 10).hidden())
         parts.append(
-            t(
-                scene,
-                text,
-                -7.18,
-                y,
-                font=MONO,
-                size=0.052,
-                color=INK,
-                anchor=Anchor.LEFT,
-            )
+            scene.geometry.line(-4.2, y, tx, ty)
+            .stroke(INK, 0.014)
             .z_index(OVERLAY + 9)
             .hidden()
         )
         parts.append(
-            scene.geometry.line(-6.0, y, tx, ty)
-            .stroke(INK_SOFT, 0.004)
-            .z_index(OVERLAY + 9)
-            .hidden()
-        )
-        parts.append(
-            scene.geometry.circle(0.011)
-            .no_fill()
-            .stroke(INK, 0.004)
+            scene.geometry.circle(0.045)
+            .fill(CARD)
+            .stroke(INK, 0.016)
             .move_to(tx, ty)
             .z_index(OVERLAY + 9)
             .hidden()
@@ -1221,6 +1223,11 @@ FRAME_WINDOW = (
     "Fuera del plano: As3, I22 y J × 0.0001",
     f"Masa y peso × {WEIGHT_FACTOR_X4:.3f}  (= As2 / A1)",
 )
+# Tomas: la planta cenital ocupa el lugar de la planta dibujada; luego la vista 3D y
+# el pórtico del eje A de frente, en elevación.
+MSTA_PLAN = Shot(0, 89, PLAN_WIDTH / WIDTH, (*CENTER, 0.0), PLAN_CENTER)
+MSTA_VIEW = Shot(38, 26, 0.34, (*CENTER, 5.0), MODEL_AT)
+MSTA_FRAME_A = Shot(0, 7, 0.4, (WIDTH / 2, 0.0, 5.0), (-3.2, -0.35))
 
 
 def _rect(x0: float, y0: float, x1: float, y1: float) -> list[tuple[float, float]]:
@@ -1256,79 +1263,81 @@ def _cg_symbol(scene: Scene, x: float, y: float, r: float) -> Drawable:
 
 @dataclass
 class Ground:
-    """Planta hecha de polígonos con vértices en metros: puede inclinarse a la isométrica."""
+    """Planta del caso tendida en la base del modelo: losa, grillas, muros y reparto.
 
-    shapes: list[tuple[Drawable, list[tuple[float, float]]]]
-    walls: list[Drawable]
+    Es un solo grupo 2D en metros llevado al mundo con ``in_3d()``. Desde arriba se ve
+    como la planta dibujada; cuando la cámara se inclina, la misma planta se vuelve la
+    base de los pórticos, sin mover un vértice.
+    """
+
+    group: Drawable
+    base: list[Drawable]  # losa y contornos
     grid: list[Drawable]
     bubbles: list[Drawable]
-
-    def tilt(self, iso: Iso, duration: float, delay: float = 0.0) -> list[Playable]:
-        """Lleva cada vértice de la planta a su lugar en la base de la isométrica."""
-        return [
-            d.animate.points([iso(x, y, 0) for x, y in pts])
-            .duration(duration)
-            .easing(Easing.ease_in_out(EasingCurve.CUBIC))
-            .delay(delay)
-            for d, pts in self.shapes
-        ]
+    walls: list[Drawable]
+    envelope: list[Drawable]  # líneas a 45° del método del sobre
+    shares: list[Drawable]  # áreas tributarias de X4
+    share_labels: list[Drawable]
 
 
-def _ground(
-    scene: Scene, to_scene: Callable[[float, float], tuple[float, float]], scale: float
-) -> Ground:
-    """Losa, muros y grillas de la planta, en polígonos y polilíneas en metros."""
-    shapes: list[tuple[Drawable, list[tuple[float, float]]]] = []
-
-    def add(d: Drawable, pts: list[tuple[float, float]]) -> Drawable:
-        shapes.append((d, pts))
-        return d
-
+def _ground(scene: Scene) -> Ground:
+    """Planta en metros, todo oculto; los pasos de la diapositiva la van mostrando."""
     x0, y0, x1, y1 = STAIR
-    slab_pts: list[tuple[float, float]] = [
-        (0, 0),
-        (x0, 0),
-        (x0, y0),
-        (x0, y1),
-        (x1, y1),
-        (x1, y0),
-        (x0, y0),
-        (x0, 0),
-        (WIDTH, 0),
-        (WIDTH, DEPTH),
-        (0, DEPTH),
+    base = [
+        scene.geometry.polygon(slab_outline()).fill("#EFEBE3").no_stroke().hidden(),
+        *[
+            scene.geometry.polygon(pts).no_fill().stroke(RULE, 0.033).hidden()
+            for pts in (_rect(0, 0, WIDTH, DEPTH), _rect(x0, y0, x1, y1))
+        ],
     ]
-    add(
-        scene.geometry.polygon([to_scene(*q) for q in slab_pts])
-        .fill("#EFEBE3")
-        .no_stroke()
-        .z_index(1)
-        .hidden(),
-        slab_pts,
-    )
-    for pts in (_rect(0, 0, WIDTH, DEPTH), _rect(x0, y0, x1, y1)):
-        add(
-            scene.geometry.polygon([to_scene(*q) for q in pts])
-            .no_fill()
-            .stroke(RULE, 0.014)
-            .z_index(2)
-            .hidden(),
-            pts,
+    ax0, ay0, ax1, ay1 = SLAB_ABOVE
+    bx0, _, bx1, by1 = SLAB_BELOW
+    above_half = (ay1 - ay0) / 2
+    below_half = (bx1 - bx0) / 2
+    shares = [
+        scene.geometry.polygon(pts).fill(TRIBUTARY).no_stroke().hidden()
+        for pts in (
+            [
+                (ax0, ay0),
+                (ax1, ay0),
+                (ax1 - above_half, ay0 + above_half),
+                (ax0 + above_half, ay0 + above_half),
+            ],
+            [(bx0, by1), (bx1, by1), (bx0 + below_half, by1 - below_half)],
         )
+    ]
     grid: list[Drawable] = []
     bubbles: list[Drawable] = []
     reach = 1.3  # m: las burbujas quedan fuera de la planta
-    for name, gx in AXIS_X.items():
-        pts = [(gx, -0.3), (gx, DEPTH + reach - 0.4)]
-        line = scene.geometry.polyline([to_scene(*q) for q in pts]).no_fill()
-        grid.append(add(line.stroke(MUTED, 0.008).z_index(2).hidden(), pts))
-        bubbles.append(_grid_bubble(scene, name, *to_scene(gx, DEPTH + reach)))
-    for name, gy in AXIS_Y.items():
-        pts = [(-reach + 0.4, gy), (WIDTH + 0.3, gy)]
-        line = scene.geometry.polyline([to_scene(*q) for q in pts]).no_fill()
-        grid.append(add(line.stroke(MUTED, 0.008).z_index(2).hidden(), pts))
-        bubbles.append(_grid_bubble(scene, name, *to_scene(-reach, gy)))
-    half = 0.07 / scale / 2  # medio espesor dibujado, en metros
+    for name, at in [*AXIS_X.items(), *AXIS_Y.items()]:
+        along_x = name in AXIS_X
+        pts = (
+            [(at, -0.3), (at, DEPTH + reach - 0.4)]
+            if along_x
+            else [(-reach + 0.4, at), (WIDTH + 0.3, at)]
+        )
+        grid.append(
+            scene.geometry.polyline(pts).no_fill().stroke(MUTED, 0.019).hidden()
+        )
+        cx, cy = (at, DEPTH + reach) if along_x else (-reach, at)
+        ring = (
+            scene.geometry.circle(0.33)
+            .fill("#F9F7F2")
+            .stroke(MUTED, 0.028)
+            .move_to(cx, cy)
+        )
+        text = t(
+            scene,
+            name,
+            cx,
+            cy,
+            font=MONO,
+            size=0.28,
+            color=INK_SOFT,
+            anchor=Anchor.CENTER,
+        )
+        bubbles.append(scene.geometry.group([ring, text]).hidden())
+    half = 0.083  # m: medio espesor dibujado, como en las plantas del resto de la tesis
     walls: list[Drawable] = []
     for wall in wall_lines():
         (ax, ay), (bx, by) = wall.a, wall.b
@@ -1339,19 +1348,32 @@ def _ground(
         color = (
             CONCRETE if wall.concrete else (BRICK if wall.direction == "X" else STEEL)
         )
-        shape = scene.geometry.polygon([to_scene(*q) for q in pts]).fill(color)
-        walls.append(add(shape.no_stroke().z_index(4).hidden(), pts))
-    return Ground(shapes, walls, grid, bubbles)
-
-
-def _grid_bubble(scene: Scene, name: str, x: float, y: float) -> Drawable:
-    ring = (
-        scene.geometry.circle(0.14).fill("#F9F7F2").stroke(MUTED, 0.012).move_to(x, y)
-    )
-    text = t(
-        scene, name, x, y, font=MONO, size=0.12, color=INK_SOFT, anchor=Anchor.CENTER
-    )
-    return scene.geometry.group([ring, text]).z_index(3).hidden()
+        walls.append(scene.geometry.polygon(pts).fill(color).no_stroke().hidden())
+    envelope: list[Drawable] = []
+    for panel_box in (SLAB_ABOVE, SLAB_BELOW):
+        lines, _ = _envelope(*panel_box)
+        envelope += [
+            scene.geometry.line(*a, *b).stroke(INK_SOFT, 0.028).hidden()
+            for a, b in lines
+        ]
+    upper, lower = X4_TRIBUTARY
+    share_labels: list[Drawable] = [
+        t(
+            scene,
+            f"{area:.2f} m²",
+            x,
+            y,
+            font=MONO,
+            size=0.26,
+            weight=700,
+            color=BRICK_DEEP,
+            anchor=Anchor.CENTER,
+        ).hidden()
+        for area, x, y in ((upper, 5.0, 5.55), (lower, 5.0, 4.3))
+    ]
+    members = [*base, *shares, *grid, *walls, *envelope, *share_labels, *bubbles]
+    group = lay_flat(scene.geometry.group(members, origin=(0, 0)))
+    return Ground(group, base, grid, bubbles, walls, envelope, shares, share_labels)
 
 
 def plane_frames(scene: Scene) -> None:
@@ -1573,30 +1595,25 @@ def plane_frames(scene: Scene) -> None:
     scene.stop("pp-seccion")
 
     # 3 · La sección vuelve a su lugar en la planta; ahí se reparte la losa (método del sobre).
-    plan_scale = PLAN_WIDTH / WIDTH
-    plan_origin = (
-        PLAN_CENTER[0] - WIDTH * plan_scale / 2,
-        PLAN_CENTER[1] - DEPTH * plan_scale / 2,
-    )
-
-    def pl(x: float, y: float) -> tuple[float, float]:
-        return plan_origin[0] + x * plan_scale, plan_origin[1] + y * plan_scale
-
-    plan = _ground(scene, pl, plan_scale)
-
+    # La planta ya es la base del modelo: una cámara cenital la muestra donde estaba
+    # la planta dibujada, a la misma escala.
+    scene.camera.to(MSTA_PLAN.state(scene))
+    plan = _ground(scene)
     bbox_center = ((0 + length) / 2, (-stretched + FLANGE) / 2)
-    land = pl(X4_START + bbox_center[0], 5.0 + bbox_center[1])
-    shrink = plan_scale / SEC_K
-    dots = [
-        scene.geometry.circle(0.045)
+    land = MSTA_PLAN.project(
+        scene, (X4_START + bbox_center[0], 5.0 + bbox_center[1], 0.0)
+    )
+    shrink = MSTA_PLAN.scale / SEC_K
+    dots = {
+        name: scene.geometry.circle(0.045)
         .fill(STEEL)
         .stroke(CARD, 0.01)
-        .move_to(*pl(x, y))
-        .z_index(6)
+        .move_to_3d(x, y, 0.02)
+        .billboard()
         .hidden()
-        for _, x, y in BARS
-    ]
-    x4_dot = next(d for d, (name, _, _) in zip(dots, BARS, strict=True) if name == "X4")
+        for name, x, y in BARS
+    }
+    x4_dot = dots["X4"]
     scene.play(
         [
             *step(2),
@@ -1608,7 +1625,7 @@ def plane_frames(scene: Scene) -> None:
             stagger(
                 *[b.animate.fade_in().duration(0.2) for b in plan.bubbles], each=0.015
             ),
-            *[d.animate.fade_in().duration(0.4) for d, _ in plan.shapes[:3]],
+            *[d.animate.fade_in().duration(0.4) for d in plan.base],
             *[w.animate.fade_in().duration(0.4).delay(0.3) for w in plan.walls],
             region.animate.scale_to(shrink)
             .duration(1.0)
@@ -1618,7 +1635,7 @@ def plane_frames(scene: Scene) -> None:
             .duration(1.0)
             .easing(Easing.SMOOTH)
             .delay(0.2),
-            symbol.animate.move_to(*pl(X4_START + cg, 5.0))
+            symbol.animate.move_to(*MSTA_PLAN.project(scene, (X4_START + cg, 5.0, 0.0)))
             .duration(1.0)
             .easing(Easing.SMOOTH)
             .delay(0.2),
@@ -1636,7 +1653,7 @@ def plane_frames(scene: Scene) -> None:
             stagger(
                 *[
                     d.animate.grow_from_center().duration(0.25)
-                    for d in dots
+                    for d in dots.values()
                     if d is not x4_dot
                 ],
                 total=0.8,
@@ -1644,52 +1661,7 @@ def plane_frames(scene: Scene) -> None:
         ]
     )
     # Las líneas a 45° parten cada paño; X4 recibe un trapecio arriba y un triángulo abajo.
-    envelope_lines: list[Drawable] = []
-    for panel_box in (SLAB_ABOVE, SLAB_BELOW):
-        lines, _ = _envelope(*panel_box)
-        envelope_lines += [
-            scene.geometry.line(*pl(*a), *pl(*b))
-            .stroke(INK_SOFT, 0.012)
-            .z_index(5)
-            .hidden()
-            for a, b in lines
-        ]
-    ax0, ay0, ax1, ay1 = SLAB_ABOVE
-    bx0, _, bx1, by1 = SLAB_BELOW
-    above_half = (ay1 - ay0) / 2
-    below_half = (bx1 - bx0) / 2
-    shares = [
-        scene.geometry.polygon([pl(*p) for p in pts])
-        .fill(TRIBUTARY)
-        .no_stroke()
-        .z_index(3)
-        .hidden()
-        for pts in (
-            [
-                (ax0, ay0),
-                (ax1, ay0),
-                (ax1 - above_half, ay0 + above_half),
-                (ax0 + above_half, ay0 + above_half),
-            ],
-            [(bx0, by1), (bx1, by1), (bx0 + below_half, by1 - below_half)],
-        )
-    ]
     upper, lower = X4_TRIBUTARY
-    share_labels = [
-        t(
-            scene,
-            f"{area:.2f} m²",
-            *pl(x, y),
-            font=MONO,
-            size=0.11,
-            weight=700,
-            color=BRICK_DEEP,
-            anchor=Anchor.CENTER,
-        )
-        .z_index(7)
-        .hidden()
-        for area, x, y in ((upper, 5.0, 5.55), (lower, 5.0, 4.3))
-    ]
     area = tributary_x4()
     sums = [
         t(
@@ -1710,13 +1682,14 @@ def plane_frames(scene: Scene) -> None:
     scene.play(
         [
             stagger(
-                *[ln.animate.create().duration(0.5) for ln in envelope_lines], each=0.05
+                *[ln.animate.create().duration(0.5) for ln in plan.envelope], each=0.05
             ),
             stagger(
-                *[s.animate.fade_in().duration(0.4) for s in shares], each=0.2
+                *[s.animate.fade_in().duration(0.4) for s in plan.shares], each=0.2
             ).delay(0.6),
             stagger(
-                *[x.animate.fade_in().duration(0.3) for x in share_labels], each=0.2
+                *[x.animate.fade_in().duration(0.3) for x in plan.share_labels],
+                each=0.2,
             ).delay(0.8),
             sequence(*[typed(x) for x in sums]).delay(1.0),
         ]
@@ -1724,55 +1697,47 @@ def plane_frames(scene: Scene) -> None:
     scene.wait(0.2)
     scene.stop("pp-tributarias")
 
-    # 4 · La planta se inclina hasta la isométrica y desde cada centroide sube una barra.
-    iso = MODEL_ISO
+    # 4 · La cámara se inclina hasta la vista 3D y desde cada centroide sube una barra.
     top = STORY_HEIGHT * STORY_COUNT
     levels = [STORY_HEIGHT * (k + 1) for k in range(STORY_COUNT)]
-    bars = [
-        scene.geometry.polyline([iso(x, y, 0), iso(x, y, top)])
-        .no_fill()
-        .stroke(STEEL, 0.022)
-        .z_index(20)
-        .hidden()
-        for _, x, y in BARS
-    ]
-    level_labels = [
-        t(
-            scene,
-            f"Story{k + 1}  {z:5.2f}",
-            iso(0, 0, z)[0] - 0.42,
-            iso(0, 0, z)[1],
-            font=MONO,
-            size=0.11,
-            color=INK_SOFT,
-            anchor=Anchor.RIGHT,
+    bars = {
+        name: scene.geometry.line_3d(
+            (x, y, 0),
+            (x, y, top),
+            0.1,
+            segments=10,
+            material=Material3D.matte(STEEL),
         ).hidden()
-        for k, z in enumerate(levels)
-    ]
+        for name, x, y in BARS
+    }
+    level_labels = _level_labels(
+        scene,
+        [(0.0, 0.0, z) for z in levels],
+        [(f"Story{k + 1}", z) for k, z in enumerate(levels)],
+    )
     scene.play(
         [
             *step(3),
             *[
                 x.animate.fade_out().duration(0.3)
-                for x in (*envelope_lines, *shares, *share_labels, *sums, *plan.bubbles)
+                for x in (
+                    *plan.envelope,
+                    *plan.shares,
+                    *plan.share_labels,
+                    *sums,
+                    *plan.bubbles,
+                )
             ],
-            *plan.tilt(iso, 1.4, 0.3),
-            *[
-                d.animate.move_to(*iso(x, y, 0))
-                .duration(1.4)
-                .easing(Easing.ease_in_out(EasingCurve.CUBIC))
-                .delay(0.3)
-                for d, (_, x, y) in zip(dots, BARS, strict=True)
-            ],
+            orbit_to(scene, MSTA_VIEW, 1.8),
             *[w.animate.opacity(0.45).duration(0.6).delay(1.2) for w in plan.walls],
         ]
     )
+    rising = sorted(BARS, key=lambda bar: math.dist(bar[1:], CENTER))
     scene.play(
         [
             stagger(
-                *[b.animate.create().duration(0.7) for b in bars],
+                *[bars[name].animate.create().duration(0.7) for name, _, _ in rising],
                 total=1.2,
-                origin="center",
             ),
             stagger(
                 *[x.animate.fade_in().duration(0.3) for x in level_labels], each=0.1
@@ -1783,26 +1748,22 @@ def plane_frames(scene: Scene) -> None:
     # 5 · En cada nivel: brazos rígidos desde el centroide y dinteles entre sus extremos.
     bar_points = {(round(x, 3), round(y, 3)) for _, x, y in BARS}
     by_level: list[tuple[list[Drawable], list[Drawable]]] = []
-    frame_a: list[Drawable] = [
-        b for b, (_, _, y) in zip(bars, BARS, strict=True) if abs(y) < 1e-6
-    ]
+    frame_a: list[Drawable] = [bars[name] for name, _, y in BARS if abs(y) < 1e-6]
     for z in levels:
         arms: list[Drawable] = []
         lintels: list[Drawable] = []
         for kind, a, b in BEAMS:
             if kind == "rigid" and (round(b[0], 3), round(b[1], 3)) in bar_points:
                 a, b = b, a  # el brazo nace en la barra
-            line = (
-                scene.geometry.polyline([iso(*a, z), iso(*b, z)])
-                .no_fill()
-                .stroke(
-                    INK if kind == "rigid" else STEEL,
-                    0.034 if kind == "rigid" else 0.012,
-                )
-                .z_index(22 if kind == "rigid" else 21)
-                .hidden()
-            )
-            (arms if kind == "rigid" else lintels).append(line)
+            rigid = kind == "rigid"
+            line = scene.geometry.line_3d(
+                (*a, z),
+                (*b, z),
+                0.17 if rigid else 0.07,
+                segments=10,
+                material=Material3D.matte(INK if rigid else STEEL),
+            ).hidden()
+            (arms if rigid else lintels).append(line)
             if abs(a[1]) < 1e-6 and abs(b[1]) < 1e-6:
                 frame_a.append(line)
         by_level.append((arms, lintels))
@@ -1827,12 +1788,13 @@ def plane_frames(scene: Scene) -> None:
             ),
         ]
     )
-    # Un pórtico plano: las barras, brazos y dinteles de un mismo eje (eje A).
+    # Un pórtico plano: las barras, brazos y dinteles de un mismo eje (eje A). La
+    # cámara se pone de frente, en elevación, como se lo dibuja en el papel.
     in_frame = {id(x) for x in frame_a}
     others = [
         x
         for x in [
-            *bars,
+            *bars.values(),
             *[ln for arms, lintels in by_level for ln in (*arms, *lintels)],
         ]
         if id(x) not in in_frame
@@ -1840,16 +1802,19 @@ def plane_frames(scene: Scene) -> None:
     frame_label = t(
         scene,
         "Pórtico plano del eje A",
-        *iso(WIDTH, -1.0, 0),
-        size=0.17,
+        -3.2,
+        -3.0,
+        size=0.19,
         weight=700,
         color=STEEL,
-        anchor=Anchor.TOP_LEFT,
+        anchor=Anchor.CENTER,
     ).hidden()
     scene.play(
         [
-            *[x.animate.opacity(0.15).duration(0.5) for x in others],
-            frame_label.animate.fade_in().duration(0.4).delay(0.2),
+            *[x.animate.opacity(0.12).duration(0.5) for x in others],
+            *[w.animate.opacity(0.2).duration(0.5) for w in plan.walls],
+            orbit_to(scene, MSTA_FRAME_A, 1.6),
+            frame_label.animate.fade_in().duration(0.4).delay(1.2),
         ]
     )
     scene.stop("pp-porticos")
@@ -1858,46 +1823,48 @@ def plane_frames(scene: Scene) -> None:
     scene.play(
         [
             *[x.animate.opacity(1).duration(0.5) for x in others],
+            *[w.animate.opacity(0.45).duration(0.5) for w in plan.walls],
+            orbit_to(scene, MSTA_VIEW, 1.4),
             frame_label.animate.fade_out().duration(0.3),
         ]
     )
-    pointer = _pointer(scene).move_to(*iso(10.0, 4.0, top), Anchor.TOP_LEFT)
-    pick = iso(X4_START + X4["cg"], 5.03, levels[2] - 1.0)
-    ghost = [
-        scene.geometry.polygon(
-            [
-                iso(X4_START, 5.03, z - STORY_HEIGHT),
-                iso(X4_START + length, 5.03, z - STORY_HEIGHT),
-                iso(X4_START + length, 5.03, z),
-                iso(X4_START, 5.03, z),
-            ]
+    x4_line = WallLine("X4", "X", False, (X4_START, 5.03), (X4_START + length, 5.03))
+    pointer = _pointer(scene, (10.0, 4.0, top))
+    pick = (X4_START + X4["cg"], 5.03, levels[2] - 1.0)
+    ghost: list[Drawable] = []
+    for z in levels:
+        panel_fill = (
+            scene.geometry.polygon(
+                _rect(X4_START, z - STORY_HEIGHT, X4_START + length, z)
+            )
+            .fill(STEEL_SOFT)
+            .stroke(STEEL, 0.03)
+            .opacity(0.75)
+            .hidden()
         )
-        .fill(STEEL_SOFT)
-        .stroke(STEEL, 0.008)
-        .opacity(0.75)
-        .z_index(19)
-        .hidden()
-        for z in levels
-    ]
+        stand(
+            scene.geometry.group(
+                [panel_fill], origin=(X4_START + length / 2, z - STORY_HEIGHT / 2)
+            ),
+            x4_line,
+            z - STORY_HEIGHT / 2,
+        )
+        ghost.append(panel_fill)
     window, window_texts, _ = _define_window(
         scene, "Define › Frame Properties · X4", FRAME_WINDOW, -1.55, head=False
     )
-    scene.play([*step(5), pointer.animate.fade_in().duration(0.3)])
-    scene.play(
-        pointer.animate.move_to(*pick, Anchor.TOP_LEFT)
-        .duration(0.6)
-        .easing(Easing.SMOOTH)
-    )
+    scene.play([*step(5), pointer.drawable.animate.fade_in().duration(0.3)])
+    scene.play(pointer.animate.to(pick).duration(0.6).easing(Easing.SMOOTH))
     scene.play(
         [
-            _click(scene, *pick),
+            pointer.animate.click(radius=0.16),
             stagger(*[g.animate.fade_in().duration(0.3) for g in ghost], each=0.08),
             *[
                 w.animate.fade_in_from(Direction.UP, 0.06).duration(0.35).delay(0.3)
                 for w in window
             ],
             sequence(*[typed(x, 70).delay(0.1) for x in window_texts]).delay(0.6),
-            pointer.animate.fade_out().duration(0.3).delay(0.6),
+            pointer.drawable.animate.fade_out().duration(0.3).delay(0.6),
         ]
     )
     scene.wait(0.2)
@@ -1905,22 +1872,22 @@ def plane_frames(scene: Scene) -> None:
 
     # 7 · Las cargas tributarias entran como fuerzas en el nudo de cada barra y piso.
     arrows = [
-        scene.geometry.arrow(
-            *iso(x, y, z + 0.75),
-            *iso(x, y, z),
-            head_length=0.05,
-            head_width=0.05,
-            body_width=0.01,
-        )
-        .fill(BRICK_DEEP)
-        .no_stroke()
-        .z_index(OVERLAY + 5)
-        .hidden()
+        scene.geometry.arrow_3d(
+            (x, y, z + 0.75),
+            (x, y, z + 0.06),
+            shaft_radius=0.025,
+            head_radius=0.075,
+            head_length=0.2,
+            material=Material3D.matte(BRICK_DEEP),
+        ).hidden()
         for z in levels
         for _, x, y in BARS
     ]
     dead, live = X4_POINT_LOADS
-    load_x, load_y = iso(X4_START + X4["cg"], 5.03, levels[2] + 0.75)
+    # La cámara está quieta: la etiqueta se fija en la pantalla, junto a la flecha.
+    load_x, load_y = MSTA_VIEW.project(
+        scene, (X4_START + X4["cg"], 5.03, levels[2] + 0.75)
+    )
     load_tag = pill(
         scene,
         f"X4 · CM {dead:.2f} · CV {live:.2f} tonf",
@@ -1938,7 +1905,7 @@ def plane_frames(scene: Scene) -> None:
             *[w.animate.fade_out().duration(0.3) for w in (*window, *window_texts)],
             *[g.animate.fade_out().duration(0.4) for g in ghost],
             stagger(
-                *[a.animate.grow_arrow().duration(0.3) for a in arrows], total=1.4
+                *[a.animate.create().duration(0.3) for a in arrows], total=1.4
             ).delay(0.2),
             load_tag.animate.fade_in_from(Direction.LEFT, 0.05)
             .duration(0.3)
@@ -1950,52 +1917,42 @@ def plane_frames(scene: Scene) -> None:
     nodes = [(x, y) for _, x, y in BARS]
     spokes: list[Drawable] = []
     waves: list[Composition] = []
+    centers: list[Drawable] = []
     for z in levels:
-        c = iso(*DIAPHRAGM_CENTER, z)
         lines = [
             scene.geometry.dashed_line(
-                *c, *iso(*node, z), dash_length=0.035, gap_length=0.03
+                *DIAPHRAGM_CENTER, *node, dash_length=0.14, gap_length=0.12
             )
-            .stroke(INK_SOFT, 0.007)
-            .z_index(23)
+            .stroke(INK_SOFT, 0.025)
             .hidden()
             for node in nodes
         ]
+        lay_flat(scene.geometry.group(lines, origin=(0, 0)), z + 0.03)
         dot = (
-            scene.geometry.circle(0.04)
-            .fill(INK)
-            .stroke(CARD, 0.01)
-            .move_to(*c)
-            .z_index(OVERLAY + 7)
+            scene.geometry.sphere(0.16, material=Material3D.matte(INK))
+            .move_to_3d(*DIAPHRAGM_CENTER, z)
             .hidden()
         )
         spokes += lines
+        centers.append(dot)
         waves.append(
             parallel(
-                dot.animate.grow_from_center().duration(0.25),
+                dot.animate.fade_in().duration(0.25),
                 stagger(
                     *[ln.animate.create().duration(0.45) for ln in lines], each=0.005
                 ),
             )
         )
-    d1 = (
-        t(
-            scene,
-            "D1",
-            iso(*DIAPHRAGM_CENTER, top)[0] - 0.08,
-            iso(*DIAPHRAGM_CENTER, top)[1] - 0.05,
-            font=MONO,
-            size=0.11,
-            weight=700,
-            color=INK,
-            anchor=Anchor.TOP_RIGHT,
-        )
-        .z_index(OVERLAY + 8)
-        .hidden()
+    d1 = pinned(
+        t(scene, "D1", 0, 0, font=MONO, size=0.11, weight=700, color=INK),
+        (*DIAPHRAGM_CENTER, top),
+        offset=(-0.22, 0.16),
+        anchor=Anchor.CENTER,
     )
     scene.play(
         [
             *step(7),
+            load_tag.animate.fade_out().duration(0.3),
             stagger(*waves, each=0.3),
             d1.animate.fade_in().duration(0.3).delay(1.0),
         ]
@@ -2008,7 +1965,14 @@ def plane_frames(scene: Scene) -> None:
         "Tesis · §5.3.2, pp. 67–73 (Tablas 25–27, Figuras 35–39); San Bartolomé (2006), §6 y §7 "
         "· modelo MSTA de ETABS; sección de X4 esquemática",
     )
-    scene.stop("pp-diafragma")
+    # Mientras se explica, la cámara rodea el modelo despacio: cada pórtico es plano.
+    scene.stop(
+        "pp-diafragma",
+        loop=sequence(
+            orbit_to(scene, MSTA_VIEW.turned(14, 30), 4.0, SINE),
+            orbit_to(scene, MSTA_VIEW, 4.0, SINE),
+        ),
+    )
 
 
 def _percent(value: float) -> str:
@@ -2454,21 +2418,22 @@ SECTION = Section(
             transition=Transition.cross_fade(0.45),
             notes=(
                 "1.5 min. El MCT se arma en ETABS 22 siguiendo sus menús: Definir, Dibujar y "
-                "Asignar (§5.3.1). (1) Grillas en los ejes del plano y cuatro pisos: 2.46 m y "
-                "3 × 2.52 m. (2) Materiales: albañilería ALB65 tipo Masonry (Em = 500 f'm, "
+                "Asignar (§5.3.1). (1) Grillas en los ejes del plano, vistas en planta; la cámara "
+                "se inclina a la vista 3D y suben los cuatro pisos: 2.46 m y 3 × 2.52 m. (2) Materiales: albañilería ALB65 tipo Masonry (Em = 500 f'm, "
                 "ν = 0.25, γ = 1800 kgf/m³) y concreto C175 (Ec = 15 000√f'c, ν = 0.15). "
                 "(3) Secciones: columnas y vigas como frames; muros M13 y P13 como shell-thin "
                 "(membrana y placa); losa maciza LM12 como membrane (E.030, art. 30.8). (4) Se "
                 "dibuja de nodo a nodo; con Similar Stories cada elemento aparece en los cuatro "
                 "pisos, y los bordes de los shells caen sobre los frames. (5) Ocultando las losas "
-                "se ve la malla de 0.50 m (Wall Auto Mesh): sus nodos coinciden con los de "
-                "columnas y vigas; los brazos rígidos se asignaron a mano (End Length Offsets, "
-                "factor 0.5). (6) Diafragma rígido D1 en cada losa. (7) Etiquetas Pier: un nombre "
+                "se ve la malla de 0.50 m (Wall Auto Mesh); la cámara entra al nudo del eje 2 con "
+                "el A, en el piso 2: los nodos de la malla coinciden con los de columnas y vigas, "
+                "y los brazos rígidos se asignaron a mano (End Length Offsets, factor 0.5). (6) Diafragma rígido D1 en cada losa. (7) Etiquetas Pier: un nombre "
                 "por muro, igual en todos los pisos; con ellas ETABS integra los esfuerzos de la "
                 "malla en fuerzas por muro. (8) Load Sets: CM 0.10 y CV 0.20 tonf/m² (azotea "
-                "CV 0.10); masa = CM + 25 % CV: 121.3 tonf por piso típico y 87.8 en la azotea. "
-                "Al analizar, el modo 3 (T = 0.171 s) es la traslación pura en Y; la deformada "
-                "está exagerada. Dibujo esquemático: el orden de los clics es ilustrativo."
+                "CV 0.10); masa = CM + 25 % CV: 121.3 tonf por piso típico y 87.8 en la azotea; "
+                "los muros se aclaran y quedan las masas concentradas en cada diafragma. Al "
+                "analizar, el modo 3 (T = 0.171 s) es la traslación pura en Y; la deformada "
+                "está exagerada. Modelo esquemático: el orden de los clics es ilustrativo."
             ),
         ),
         SectionStep(
@@ -2485,14 +2450,16 @@ SECTION = Section(
                 "extremo; A1 = 1.038 m², A2 = L t = 0.403 m², I3 = 1.509 m⁴ (Tabla 26). (3) Método "
                 "del sobre: líneas a 45° reparten cada paño; X4 recibe 3.38 + 3.64 = 7.02 m², "
                 "CM = 2.72 y CV = 1.40 tonf por piso; en el modelo se escalan para sumar el peso "
-                "total de la losa (2.91 y 1.50 tonf). (4) En ETABS, una barra por muro en su "
-                "centroide, empotrada en la base. (5) Brazos rígidos (material rígido) del centroide "
-                "al borde del muro y dinteles T (interiores) o L (perimetrales): cada eje forma un "
-                "pórtico plano, como el del eje A. (6) Secciones General con las propiedades "
+                "total de la losa (2.91 y 1.50 tonf). (4) La cámara inclina la planta hasta la "
+                "vista 3D y en ETABS sube una barra por muro en su centroide, empotrada en la "
+                "base. (5) Brazos rígidos (material rígido) del centroide al borde del muro y "
+                "dinteles T (interiores) o L (perimetrales): cada eje forma un pórtico plano; la "
+                "cámara se pone de frente al del eje A, como se lo dibuja en elevación. (6) Secciones General con las propiedades "
                 "calculadas; rigidez casi nula fuera del plano (× 0.0001) y peso × A2/A1 para no "
                 "contar las alas. (7) Las cargas tributarias entran como fuerzas en cada barra y "
-                "piso. (8) El diafragma rígido D1 une los pórticos. Contraste con el MCT: aquí la "
-                "idealización y las cargas las decide el ingeniero fuera del programa."
+                "piso. (8) El diafragma rígido D1 une los pórticos; mientras se explica, la cámara "
+                "rodea el modelo. Contraste con el MCT: aquí la idealización y las cargas las "
+                "decide el ingeniero fuera del programa."
             ),
         ),
         SectionStep(

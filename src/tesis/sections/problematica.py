@@ -2,11 +2,13 @@
 
 import math
 from dataclasses import dataclass
+from itertools import pairwise
 
 from gaanim import (
     Anchor,
     Color,
     Direction,
+    Distribution,
     Drawable,
     Easing,
     EasingCurve,
@@ -26,15 +28,14 @@ from tesis.data.materiales_inei import (
     SOURCE_LABEL,
     TOTAL_VIVIENDAS,
 )
-from tesis.data.sudamerica import COUNTRIES, Ring
-from tesis.data.sudamerica import SOURCE_LABEL as OUTLINES_SOURCE
+from tesis.data.sudamerica import COUNTRIES
 from tesis.data.thesis import CRACKING_FLOOR1
 from tesis.kit import (
-    dash,
     label,
     numeral,
     t,
 )
+from tesis.model3d import P3, Shot, orbit_to, pinned
 from tesis.subduccion import draw_subduction
 from tesis.theme import (
     BRICK,
@@ -54,7 +55,7 @@ from tesis.theme import (
     STEEL,
     STEEL_SOFT,
 )
-from tesis.vivienda import House, Iso, draw_house
+from tesis.vivienda import LX, LY, build_house, ground_arrow, mid
 
 KICKER = "01 · Problemática"
 MATERIAL_LABELS = {
@@ -93,13 +94,9 @@ def materials(scene: Scene) -> None:
         color=INK,
     ).move_to(-4.55, -0.35, Anchor.CENTER)
     level = computed(lambda value: value / 100 - 0.1, inputs=[counter.parameter])
-    fill = (
-        scene.geometry.fill_level(
-            outline, BRICK_SOFT, direction="up", keep_outline=False
-        )
-        .z_index(-1)
-        .set_fill_level(level)
-    )
+    scene.geometry.fill_level(
+        outline, BRICK_SOFT, direction="up", keep_outline=False
+    ).z_index(-1).set_fill_level(level)
     caption = t(
         scene,
         "de las viviendas del Perú tienen paredes\nde ladrillo o bloque de concreto",
@@ -200,24 +197,11 @@ def materials(scene: Scene) -> None:
 
 
 # Mapa de placas en Mercator, a todo el ancho útil y del título a la fuente. El alto
-# del marco va de 1° N a 19° S y fija la escala; MAP_LON es la longitud que cae en x = 0, de modo que la
-# fosa quede cerca del centro: Nazca a la izquierda, la Sudamericana a la derecha.
+# del marco va de 1° N a 19° S y fija la escala; MAP_LON cae en el centro, de modo que
+# la fosa quede cerca del centro: Nazca a la izquierda, la Sudamericana a la derecha.
 MAP_LEFT, MAP_RIGHT, MAP_TOP, MAP_BOTTOM = -7.3, 7.3, 2.73, -3.5
 MAP_NORTH, MAP_SOUTH = 1.0, -19.0
 MAP_LON = -80.8
-
-
-def _merc(lat: float) -> float:
-    """Ordenada de Mercator en grados, en la misma escala que la longitud."""
-    return math.degrees(math.log(math.tan(math.pi / 4 + math.radians(lat) / 2)))
-
-
-MAP_K = (MAP_TOP - MAP_BOTTOM) / (_merc(MAP_NORTH) - _merc(MAP_SOUTH))
-
-
-def _geo(lon: float, lat: float) -> tuple[float, float]:
-    """Longitud y latitud a coordenadas de escena."""
-    return (lon - MAP_LON) * MAP_K, MAP_TOP - (_merc(MAP_NORTH) - _merc(lat)) * MAP_K
 
 
 # Traza aproximada de la fosa Perú-Chile (borde entre placas), de norte a sur.
@@ -255,127 +239,70 @@ def _intensity(mw: float) -> float:
 
 def _trench_teeth(
     scene: Scene, points: list[tuple[float, float]], step: float
-) -> list[Drawable]:
-    """Triángulos de subducción sobre la placa que cabalga, a intervalos regulares."""
-    teeth: list[Drawable] = []
-    carry = step / 2
-    for (x0, y0), (x1, y1) in zip(points, points[1:]):
-        seg = math.hypot(x1 - x0, y1 - y0)
-        ux, uy = (x1 - x0) / seg, (y1 - y0) / seg
-        nx, ny = (-uy, ux) if -uy > 0 else (uy, -ux)  # normal hacia el este
-        d = carry
-        while d < seg:
-            bx, by = x0 + ux * d, y0 + uy * d
-            half, tall = 0.055, 0.1
-            teeth.append(
-                scene.geometry.polygon(
-                    [
-                        (bx - ux * half, by - uy * half),
-                        (bx + ux * half, by + uy * half),
-                        (bx + nx * tall, by + ny * tall),
-                    ]
-                )
-                .fill(INK)
-                .no_stroke()
-            )
-            d += step
-        carry = d - seg
-    return teeth
+) -> tuple[Drawable, int]:
+    """Triángulos de subducción sobre la placa que cabalga, cada ``step`` por la fosa.
 
+    La fosa va de norte a sur y cada diente apunta a la izquierda de su avance: al
+    este. Lleva su reflejo invisible porque ``duplicate`` centra la caja de cada
+    copia en su punto; así la base cae sobre la fosa. Los extremos quedan a medio
+    paso de los bordes del mapa. Devuelve las copias, todavía ocultas, y cuántas son.
+    """
 
-def _outline(
-    scene: Scene, rings: list[Ring], fill: Color, stroke: Color, width: float
-) -> list[Drawable]:
-    return [
-        scene.geometry.polygon([_geo(lon, lat) for lon, lat in ring])
-        .fill(fill)
-        .stroke(stroke, width)
-        for ring in rings
-    ]
+    def inward(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+        t = step / 2 / math.dist(a, b)
+        return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
 
-
-def _graticule(scene: Scene) -> tuple[list[Drawable], list[Drawable]]:
-    """Paralelos y meridianos cada 5°, con rótulos en el borde izquierdo e inferior."""
-    lines: list[Drawable] = []
-    marks: list[Drawable] = []
-    for lat in (0, -5, -10, -15):
-        _, y = _geo(MAP_LON, lat)
-        lines.append(
-            scene.geometry.line(MAP_LEFT, y, MAP_RIGHT, y).stroke(MUTED, 0.008)
-        )
-        marks.append(
-            t(
-                scene,
-                f"{-lat}° S" if lat else "0°",
-                MAP_LEFT + 0.08,
-                y + 0.03,
-                font=MONO,
-                size=0.11,
-                color=MUTED,
-                anchor=Anchor.BOTTOM_LEFT,
-            )
-        )
-    for lon in range(-105, -50, 5):
-        x, _ = _geo(lon, 0)
-        if not MAP_LEFT < x < MAP_RIGHT:
-            continue
-        lines.append(
-            scene.geometry.line(x, MAP_BOTTOM, x, MAP_TOP).stroke(MUTED, 0.008)
-        )
-        if lon % 10 == 0 and lon < -80:
-            marks.append(
-                t(
-                    scene,
-                    f"{-lon}° O",
-                    x + 0.05,
-                    MAP_BOTTOM + 0.05,
-                    font=MONO,
-                    size=0.11,
-                    color=MUTED,
-                    anchor=Anchor.BOTTOM_LEFT,
-                )
-            )
-    return [line.opacity(0.3).z_index(-2) for line in lines], marks
+    path = [inward(points[0], points[1]), *points[1:-1], inward(points[-1], points[-2])]
+    g = scene.geometry
+    half, tall = 0.055, 0.1
+    tooth = g.group(
+        [
+            g.polygon([(-half, 0), (half, 0), (0, tall)]).fill(INK).no_stroke(),
+            g.polygon([(-half, 0), (half, 0), (0, -tall)]).no_fill().no_stroke(),
+        ]
+    )
+    length = sum(math.dist(a, b) for a, b in pairwise(path))
+    count = round(length / step) + 1
+    copies = g.duplicate(tooth, Distribution.along(path, count, orient=True))
+    return copies.count(0), count
 
 
 def plates(scene: Scene) -> None:
     header(scene, KICKER, "El Perú se encuentra en una zona con alta actividad sísmica")
+    atlas = scene.viz.map(
+        lat=(MAP_SOUTH, MAP_NORTH),
+        center_lon=MAP_LON,
+        within=scene.layout.safe.crop(
+            top=MAP_TOP, bottom=MAP_BOTTOM, left=MAP_LEFT, right=MAP_RIGHT
+        ),
+    )
 
     # El Perú resalta sobre sus vecinos: ellos toman el tono de la placa (tierra y mar
-    # son la misma placa Sudamericana) y se recortan al marco.
-    frame = (
-        scene.geometry.rect(MAP_RIGHT - MAP_LEFT, MAP_TOP - MAP_BOTTOM)
-        .fill(CARD)
-        .no_stroke()
-        .opacity(0)
-        .move_to(0, (MAP_TOP + MAP_BOTTOM) / 2)
-    )
-    peru = scene.geometry.group(
-        _outline(scene, COUNTRIES["PER"], CARD, INK_SOFT, 0.014)
-    )
-    neighbors = (
-        scene.geometry.group(
-            [
-                shape
-                for code, rings in COUNTRIES.items()
-                if code != "PER"
-                for shape in _outline(scene, rings, PAPER_DEEP, RULE, 0.012)
-            ]
-        )
-        .z_index(-1)
-        .clip(frame)
-    )
+    # son la misma placa Sudamericana). El mapa recorta lo que dibuja a su marco.
+    peru = atlas.polygon(COUNTRIES["PER"]).fill(CARD).stroke(INK_SOFT, 0.014)
+    neighbors = scene.geometry.group(
+        [
+            atlas.polygon(rings).fill(PAPER_DEEP).stroke(RULE, 0.012)
+            for code, rings in COUNTRIES.items()
+            if code != "PER"
+        ]
+    ).z_index(-1)
     peru_name = label(
         scene,
         "Perú",
-        *_geo(-74.4, -4.9),
+        *atlas.point(-74.4, -4.9),
         size=0.2,
         color=INK_SOFT,
         anchor=Anchor.CENTER,
     )
     places = [
         label(
-            scene, name, *_geo(lon, lat), size=0.12, color=MUTED, anchor=Anchor.CENTER
+            scene,
+            name,
+            *atlas.point(lon, lat),
+            size=0.12,
+            color=MUTED,
+            anchor=Anchor.CENTER,
         )
         for name, lon, lat in (
             ("Ecuador", -78.4, -1.4),
@@ -388,7 +315,7 @@ def plates(scene: Scene) -> None:
         t(
             scene,
             "Galápagos",
-            *_geo(-91.9, -0.8),
+            *atlas.point(-91.9, -0.8),
             size=0.12,
             color=MUTED,
             anchor=Anchor.RIGHT,
@@ -402,20 +329,22 @@ def plates(scene: Scene) -> None:
     )
 
     # Dos placas: el Perú entero está sobre la Sudamericana; la fosa marca el contacto.
-    trench = [_geo(lon, lat) for lon, lat in TRENCH]
+    west, east = atlas.lon
     nazca = (
-        scene.geometry.polygon([(MAP_LEFT, MAP_TOP), *trench, (MAP_LEFT, MAP_BOTTOM)])
+        atlas.polygon([(west, MAP_NORTH), *TRENCH, (west, MAP_SOUTH)])
         .fill(STEEL_SOFT)
         .no_stroke()
         .z_index(-3)
     )
     southam = (
-        scene.geometry.polygon([*trench, (MAP_RIGHT, MAP_BOTTOM), (MAP_RIGHT, MAP_TOP)])
+        atlas.polygon([*TRENCH, (east, MAP_SOUTH), (east, MAP_NORTH)])
         .fill(PAPER_DEEP)
         .no_stroke()
         .z_index(-3)
     )
-    grid, grid_marks = _graticule(scene)
+    # Paralelos y meridianos cada 5°, rotulados cada 5° de latitud y 10° de longitud.
+    grid = atlas.graticule(5, every=(10, 5), hemispheres="NSEO")
+    grid.lines.stroke(MUTED, 0.008).opacity(0.3).z_index(-2)
     # Rótulos de placa en dos líneas y altos: quedan fuera de las vistas del recorrido.
     nazca_label = t(
         scene,
@@ -439,9 +368,10 @@ def plates(scene: Scene) -> None:
         color=INK_SOFT,
         anchor=Anchor.RIGHT,
     )
-    line = scene.geometry.polyline(trench).no_fill().stroke(INK, 0.025)
-    teeth = _trench_teeth(scene, trench, 0.28)
-    tx, ty = _geo(-82.4, -3.2)
+    line = atlas.polyline(TRENCH).no_fill().stroke(INK, 0.025)
+    trench = [atlas.point(lon, lat) for lon, lat in TRENCH]
+    teeth, tooth_count = _trench_teeth(scene, trench, 0.28)
+    tx, ty = atlas.point(-82.4, -3.2)
     trench_label = t(
         scene,
         "Fosa Perú-Chile",
@@ -456,7 +386,7 @@ def plates(scene: Scene) -> None:
         stagger(
             parallel(
                 nazca.animate.fade_in().duration(0.5),
-                *[g.animate.fade_in().duration(0.5) for g in grid + grid_marks],
+                grid.animate.fade_in().duration(0.5),
                 nazca_label.animate.fade_in_from(Direction.RIGHT, 0.1).duration(0.5),
             ),
             parallel(
@@ -471,10 +401,7 @@ def plates(scene: Scene) -> None:
     scene.play(
         [
             line.animate.create().duration(0.9),
-            stagger(
-                *[p.animate.grow_from_center().duration(0.2) for p in teeth],
-                each=0.9 / len(teeth),
-            ),
+            teeth.animate.count(tooth_count).duration(0.9),
             trench_label.animate.fade_in().duration(0.5),
         ]
     )
@@ -489,7 +416,7 @@ def plates(scene: Scene) -> None:
     cycle, departures = 1.0, (0.0, 0.9, 1.8)
     flow = []
     for lane, lat in enumerate((-9.5, -15.0)):
-        x1, y1 = _geo(-83.2, lat)
+        x1, y1 = atlas.point(-83.2, lat)
         for k, departure in enumerate(departures):
             arrow = (
                 scene.geometry.arrow(
@@ -517,7 +444,7 @@ def plates(scene: Scene) -> None:
                     arrow.animate.fade_out().duration(0.35 * cycle).delay(0.65 * cycle)
                 )
             flow.append(parallel(*motion).delay(departure + 0.2 * lane))
-    ax, ay = _geo(-83.2, -15.0)
+    ax, ay = atlas.point(-83.2, -15.0)
     rate = t(
         scene,
         "≈ 7–8 cm/año",
@@ -542,7 +469,7 @@ def plates(scene: Scene) -> None:
     # Lo de adentro se diseña en unidades de la pantalla (origen en su centro) y se
     # lleva a la escena dividiendo por el aumento.
     lens = 3.5  # aumento de la pantalla del corte
-    cx, cy = _geo(-78.4, -12.0)
+    cx, cy = atlas.point(-78.4, -12.0)
     screen_w, screen_h = 6.4, 3.6
 
     def inside(sx: float, sy: float) -> tuple[float, float]:
@@ -622,7 +549,7 @@ def plates(scene: Scene) -> None:
     # Grandes sismos del último siglo: todos frente a la costa, sobre el contacto.
     marks = []
     for name, year, mw, lon, lat in QUAKES:
-        x, y = _geo(lon, lat)
+        x, y = atlas.point(lon, lat)
         dot = (
             scene.geometry.circle(0.07).fill(FAIL).no_stroke().move_to(x, y).z_index(5)
         )
@@ -686,7 +613,7 @@ def plates(scene: Scene) -> None:
     tour = []
     shake_time = 0.8
     for i, (mark, (*_, mw, lon, lat)) in enumerate(zip(marks, QUAKES, strict=True)):
-        x, y = _geo(lon, lat)
+        x, y = atlas.point(lon, lat)
         view = (
             min(x + 1.1, MAP_RIGHT - half_w),
             min(max(y, MAP_BOTTOM + half_h), MAP_TOP - half_h),
@@ -752,6 +679,12 @@ LIST_X, LIST_TOP, LIST_GAP = 0.9, 2.1, 0.92
 DRIFT = 0.3  # m en la losa; exagerado para que se vea
 # Diagrama del sismo sobre el terreno, frente a la fachada (m, en planta).
 QUAKE_TAIL, QUAKE_REACH, QUAKE_ANGLE = (1.6, -2.27), 3.0, math.radians(35)
+# Tomas de la vivienda: se arma vista desde la esquina de la fachada y la cámara gira
+# mientras sube el muro; en el sismo se eleva para leer X e Y sobre el terreno.
+HOUSE_CENTER = (LX / 2, LY / 2, 1.3)
+HOUSE_BUILD = Shot(44, 24, 0.92, HOUSE_CENTER, (-3.2, -0.1))
+HOUSE_TURN = Shot(30, 22, 0.92, HOUSE_CENTER, (-3.2, -0.1))
+HOUSE_QUAKE = Shot(38, 34, 0.74, (LX / 2, LY / 2 - 0.9, 1.0), (-3.3, 0.15))
 
 
 def _entry(
@@ -766,53 +699,11 @@ def _entry(
     return scene.geometry.group(parts)
 
 
-def _ground_vector(
-    scene: Scene,
-    iso: Iso,
-    start: tuple[float, float],
-    end: tuple[float, float],
-    color: Color,
-) -> Drawable:
-    """Vector dibujado sobre el terreno, en coordenadas de planta."""
-    (x0, y0), (x1, y1) = iso(*start, 0), iso(*end, 0)
-    return (
-        scene.geometry.arrow(
-            x0, y0, x1, y1, head_length=0.2, head_width=0.2, body_width=0.05
-        )
-        .fill(color)
-        .no_stroke()
-    )
-
-
-def _nudge(point: tuple[float, float], dx: float, dy: float) -> tuple[float, float]:
-    return point[0] + dx, point[1] + dy
-
-
-def _sway(house: House, dx: float, dy: float):
-    """Vaivén amortiguado: cada hilada se desplaza en proporción a su altura."""
-    swings = []
-    previous = 0.0
-    for amplitude in (1.0, -0.75, 0.5, -0.3, 0.12, 0.0):
-        step = amplitude - previous
-        swings.append(
-            parallel(
-                *[
-                    layer.animate.shift_by(step * dx * share, step * dy * share)
-                    .duration(0.36)
-                    .easing(Easing.ease_in_out(EasingCurve.SINE))
-                    for layer, share in house.layers
-                ]
-            )
-        )
-        previous = amplitude
-    return sequence(*swings)
-
-
 def seismic(scene: Scene) -> None:
     header(scene, KICKER, "Frente al sismo, la vivienda confinada trabaja como unidad")
 
-    iso = Iso((-6.6, -0.33), 0.63)
-    house = draw_house(scene, iso)
+    house = build_house(scene)
+    scene.camera.to(HOUSE_BUILD.state(scene))
     heading = label(scene, "Proceso constructivo", LIST_X, 2.62, color=MUTED, size=0.14)
     steps = [
         _entry(scene, title, body, LIST_TOP - i * LIST_GAP, str(i + 1))
@@ -834,7 +725,7 @@ def seismic(scene: Scene) -> None:
             house.ground.animate.fade_in().duration(0.4),
             stagger(
                 *[
-                    p.animate.fade_in_from(Direction.DOWN, 0.04).duration(0.3)
+                    p.animate.fade_in().duration(0.3)
                     for p in house.footing + house.plinth
                 ],
                 each=0.04,
@@ -848,37 +739,32 @@ def seismic(scene: Scene) -> None:
         [
             *enter(1),
             stagger(
-                *[g.animate.fade_in().duration(0.12) for g in house.steel], each=0.035
+                *[bar.animate.create().duration(0.5) for bar in house.steel], each=0.02
             ),
         ]
     )
     scene.wait(0.3)
 
-    # 3 · Hilada por hilada; la cara superior acompaña a la última asentada.
-    courses = []
-    for k, bricks in enumerate(house.masonry):
-        parts = [
-            bricks.animate.fade_in_from(Direction.DOWN, 0.03).duration(0.14),
-            house.tops[k].animate.fade_in().duration(0.08),
-        ]
-        if k:
-            parts.append(house.tops[k - 1].animate.fade_out().duration(0.08))
-        courses.append(parallel(*parts))
-    scene.play([*enter(2), stagger(*courses, each=0.09)])
+    # 3 · Hilada por hilada, ladrillo tras ladrillo; la cámara rodea la esquina para
+    # que se vea el dentado que entra en el hueco de las columnas.
+    courses = [
+        parallel(
+            bricks.animate.create().duration(0.3),
+            joints.animate.fade_in().duration(0.15),
+        )
+        for bricks, joints in zip(house.bricks, house.mortar, strict=True)
+    ]
+    scene.play(
+        [*enter(2), stagger(*courses, each=0.09), orbit_to(scene, HOUSE_TURN, 2.4)]
+    )
     scene.wait(0.3)
 
-    # 4 · El concreto de las columnas sube y cubre el acero.
+    # 4 · El concreto de las columnas sube y encierra el acero y el dentado.
     scene.play(
         [
             *enter(3),
             stagger(
-                *[
-                    parallel(
-                        pour.animate.fade_in().duration(0.12),
-                        bars.animate.fade_out().duration(0.12),
-                    )
-                    for pour, bars in zip(house.concrete, house.steel)
-                ],
+                *[pour.animate.create().duration(0.12) for pour in house.concrete],
                 each=0.05,
             ),
         ]
@@ -892,11 +778,16 @@ def seismic(scene: Scene) -> None:
             stagger(
                 *[b.animate.fade_in().duration(0.3) for b in house.beams], each=0.05
             ),
-            house.steel[-1].animate.fade_out().duration(0.3),
         ]
     )
-    scene.play(house.slab.animate.fill_level(1).duration(0.9))
-    scene.play([s.animate.opacity(1).duration(0.4) for s in steps[:-1]])
+    scene.play(house.pour_slab(0.9))
+    # El acero quedó dentro del concreto: se retira para que no asome en el sismo.
+    scene.play(
+        [
+            *[s.animate.opacity(1).duration(0.4) for s in steps[:-1]],
+            *[bar.animate.fade_out().duration(0.2) for bar in house.steel],
+        ]
+    )
     scene.stop("proceso-constructivo")
 
     # En el sismo: la dirección real es cualquiera; se idealiza con sus componentes
@@ -906,44 +797,32 @@ def seismic(scene: Scene) -> None:
         _entry(scene, title, body, LIST_TOP - i * LIST_GAP)
         for i, (title, body) in enumerate(IN_QUAKE)
     ]
-    # Triángulo de vectores: el sismo es la hipotenusa; X e Y, los catetos.
+    # Triángulo de vectores sobre el terreno: el sismo es la hipotenusa; X e Y, los catetos.
     x0, y0 = QUAKE_TAIL
     corner = (x0 + QUAKE_REACH * math.cos(QUAKE_ANGLE), y0)
     tip = (corner[0], y0 + QUAKE_REACH * math.sin(QUAKE_ANGLE))
-    quake = _ground_vector(scene, iso, QUAKE_TAIL, tip, INK_SOFT)
-    x_comp = _ground_vector(scene, iso, QUAKE_TAIL, corner, BRICK)
-    y_comp = _ground_vector(scene, iso, corner, tip, STEEL)
+    quake = ground_arrow(scene, QUAKE_TAIL, tip, INK_SOFT)
+    x_comp = ground_arrow(scene, QUAKE_TAIL, corner, BRICK)
+    y_comp = ground_arrow(scene, corner, tip, STEEL)
 
-    def middle(p: tuple[float, float], q: tuple[float, float]) -> tuple[float, float]:
-        return iso((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, 0)
+    def tag(
+        text: str,
+        at: P3,
+        offset: tuple[float, float],
+        color: Color,
+        size: float,
+        anchor: Anchor,
+    ) -> Drawable:
+        label = t(scene, text, 0, 0, size=size, weight=700, color=color)
+        return pinned(label, at, offset, anchor)
 
-    quake_label = t(
-        scene,
-        "Sismo",
-        *_nudge(middle(QUAKE_TAIL, tip), 0, 0.14),
-        size=0.2,
-        weight=700,
-        color=INK_SOFT,
-        anchor=Anchor.BOTTOM,
+    quake_label = tag(
+        "Sismo", mid(QUAKE_TAIL, tip), (0, 0.14), INK_SOFT, 0.2, Anchor.BOTTOM
     )
-    x_label = t(
-        scene,
-        "X",
-        *_nudge(middle(QUAKE_TAIL, corner), -0.1, -0.1),
-        size=0.24,
-        weight=700,
-        color=BRICK,
-        anchor=Anchor.TOP_RIGHT,
+    x_label = tag(
+        "X", mid(QUAKE_TAIL, corner), (-0.1, -0.1), BRICK, 0.24, Anchor.TOP_RIGHT
     )
-    y_label = t(
-        scene,
-        "Y",
-        *_nudge(middle(corner, tip), 0.12, -0.1),
-        size=0.24,
-        weight=700,
-        color=STEEL,
-        anchor=Anchor.TOP_LEFT,
-    )
+    y_label = tag("Y", mid(corner, tip), (0.12, -0.1), STEEL, 0.24, Anchor.TOP_LEFT)
     exaggerated = t(
         scene,
         "Deformación exagerada",
@@ -957,6 +836,7 @@ def seismic(scene: Scene) -> None:
         [
             heading.animate.fade_out().duration(0.3),
             *[s.animate.fade_out().duration(0.3) for s in steps],
+            orbit_to(scene, HOUSE_QUAKE, 1.4),
         ]
     )
     scene.play(
@@ -988,7 +868,7 @@ def seismic(scene: Scene) -> None:
     )
     scene.play(
         [
-            _sway(house, *iso.along(DRIFT, 0)),
+            house.sway(DRIFT, 0),
             notes[2]
             .animate.fade_in_from(Direction.LEFT, 0.06)
             .duration(0.35)
@@ -1004,7 +884,7 @@ def seismic(scene: Scene) -> None:
             notes[3].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
         ]
     )
-    scene.play(_sway(house, *iso.along(0, DRIFT)))
+    scene.play(house.sway(0, DRIFT))
     scene.play(
         [
             x_comp.animate.opacity(1).duration(0.3),
@@ -1918,8 +1798,9 @@ SECTION = Section(
             notes=(
                 "60 s. La albañilería confinada llegó tras el terremoto de Lima de 1940. (1) Seguir "
                 "la obra en orden: cimiento y sobrecimiento; el acero de las columnas se ancla "
-                "antes del muro; el muro se asienta con los extremos dentados; luego se vacían las "
-                "columnas contra el dentado y, al final, la viga solera junto con la losa "
+                "antes del muro; el muro se asienta hilada por hilada con los extremos dentados (la "
+                "cámara rodea la esquina para mostrarlos); luego se vacían las columnas contra el "
+                "dentado y, al final, la viga solera junto con la losa "
                 "(Gonzales, 1992; San Bartolomé, 2018). Puerta y ventana llevan columnas a los "
                 "lados y dintel. (2) El sismo llega en cualquier dirección; para el análisis se "
                 "descompone en sus componentes X e Y (triángulo sobre el terreno). (3) En cada "

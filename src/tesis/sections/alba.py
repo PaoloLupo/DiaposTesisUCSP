@@ -1,9 +1,15 @@
 """Bloque 6 · Implementación: arquitectura de Alba, API de ETABS, interfaz y reporte."""
 
+import math
+from typing import NamedTuple
+
 from gaanim import (
     Anchor,
+    Box,
+    Color,
     Direction,
     Drawable,
+    Easing,
     Playable,
     Scene,
     Section,
@@ -67,18 +73,17 @@ def architecture(scene: Scene) -> None:
             tag=tech,
             core=i >= 2,
             highlight=i == 4,
-            height=f"{h * 120:.0f}px",
+            height=h,
         )
         for i, (name, tech) in enumerate(MODULES)
     ]
     scene.layout.column(
         *cards,
-        gap=f"{gap * 120:.1f}px",
-        within="safe",
+        gap=gap,
+        within=scene.layout.safe.crop(top=top, left=x0, right=x0 + w),
         width="fill",
         height="fill",
         justify="start",
-        padding=(f"{(4.5 - top) * 120 - 60:.1f}px", "558px", "0px", "594px"),
     )
     # Los módulos los coloca el layout; el resto del diagrama (llaves, flechas,
     # externos) se ancla a sus posiciones medidas.
@@ -355,7 +360,7 @@ def interface(scene: Scene) -> None:
         cy,
         width + 0.12,
         height + 0.12,
-        fill="#FFFFFF",
+        fill=Color.from_hex("#FFFFFF"),
         border=RULE,
     )
     shot = scene.media.image(
@@ -517,7 +522,7 @@ def report(scene: Scene) -> None:
         2.4,
         7.4,
         3.9,
-        fill="#FFFFFF",
+        fill=Color.from_hex("#FFFFFF"),
         border=RULE,
         anchor=Anchor.TOP_LEFT,
     )
@@ -542,7 +547,7 @@ def report(scene: Scene) -> None:
         2.4,
         6.75,
         3.9,
-        fill="#23262E",
+        fill=Color.from_hex("#23262E"),
         border=None,
         anchor=Anchor.TOP_LEFT,
     )
@@ -614,85 +619,285 @@ def report(scene: Scene) -> None:
     scene.stop("reporte-cadena")
 
 
-# Recortes de assets/reporte (tools/render_report.py): una página por sección.
+class ReportPart(NamedTuple):
+    pages: tuple[int, int]  # primera y última página del PDF, desde 1
+    name: str  # título de la sección en el reporte
+    content: str  # Tabla 48
+    cites: str  # normas citadas en sus páginas o, en la última, sus datos
+    read: int  # página que se lee en la diapositiva
+    region: tuple[float, float, float, float]  # x0, y0, x1, y1 en puntos del PDF
+
+
+# Reporte del caso (anexo de la tesis, 21 páginas A4): portada e índice y seis partes.
+# Las páginas salen de tools/render_report.py: miniaturas para la tira y, a 200 dpi,
+# la portada y las páginas que se leen.
+REPORT_PAGES = 21
+PAGE_PT = (595.28, 841.89)
+COVER_REGION = (0, 95, 595, 575)
 REPORT_PARTS = [
-    ("datos", "Datos de diseño"),
-    ("requisitos", "Requisitos mínimos"),
-    ("carga-vertical", "Carga vertical"),
-    ("sismico", "Análisis sísmico"),
-    ("sismo-moderado", "Sismo moderado"),
-    ("modelo", "Información del modelo"),
+    ReportPart(
+        (3, 5),
+        "Datos de diseño",
+        "Geometría, niveles, materiales y parámetros sísmicos",
+        "E.020 · E.030 · E.070",
+        3,
+        (48, 58, 548, 308),
+    ),
+    ReportPart(
+        (6, 7),
+        "Requisitos estructurales mínimos",
+        "Espesor efectivo y densidad mínima de muros en cada dirección",
+        "E.070 Art. 19.1 (a) · Art. 19.2 (b)",
+        6,
+        (44, 90, 556, 352),
+    ),
+    ReportPart(
+        (8, 10),
+        "Análisis por carga vertical",
+        "Esfuerzo axial por cargas de gravedad, muro por muro",
+        "E.070 Art. 19.1 (b)",
+        8,
+        (48, 88, 548, 338),
+    ),
+    ReportPart(
+        (11, 14),
+        "Análisis sísmico",
+        "Peso sísmico, modos, fuerzas equivalentes y derivas",
+        "E.030 Art. 18, 31, 33–35, 40, 50 y 51",
+        14,
+        (48, 50, 548, 300),
+    ),
+    ReportPart(
+        (15, 20),
+        "Análisis elástico para sismo moderado",
+        "Control de fisuración y resistencia al corte global, muro por muro",
+        "E.070 Art. 22 (b), 26.2–26.4",
+        15,
+        (48, 88, 548, 338),
+    ),
+    ReportPart(
+        (21, 21),
+        "Información del modelo y del reporte",
+        "Versión de la API, modelo, fecha de importación y archivo",
+        "API 22.6.0 · ModeloBartolomes.EDB · Alba 0.1.0",
+        21,
+        (48, 55, 548, 215),
+    ),
 ]
+DIM = 0.3  # opacidad de lo que no es la parte en lectura
 
 
 def report_parts(scene: Scene) -> None:
     header(scene, KICKER, "El reporte del caso reúne seis partes en 21 páginas")
-    L = scene.layout
-    cover = L.box(
-        scene.media.image(
-            "reporte/portada.png",
-            width=3.95,
-            height=5.59,
-            fit="contain",
-            quality="high",
-        ),
-        background="#FFFFFF",
-        border=RULE,
-        border_width="2px",
-    ).item(shrink=0)
-    cells = [
-        L.column(
-            L.row(
-                L.box(
-                    f"{i + 1}", font=DISPLAY, font_size="34px", weight=700, color=BRICK
-                ),
-                L.box(name, font_size="24px", weight=900, color=INK),
-                gap="12px",
-                align="center",
-            ),
-            L.box(
+    # Arriba, el documento entero: sus 21 páginas en una tira, agrupadas por parte.
+    groups = [(1, 2), *[part.pages for part in REPORT_PARTS]]
+    inner, outer, top = 0.05, 0.26, 2.42
+    inner_gaps = sum(last - first for first, last in groups)
+    tw = (
+        RIGHT_EDGE - LEFT_EDGE - inner * inner_gaps - outer * (len(groups) - 1)
+    ) / REPORT_PAGES
+    th = tw * PAGE_PT[1] / PAGE_PT[0]
+    slots: dict[int, tuple[float, float]] = {}
+    thumbs: dict[int, Drawable] = {}
+    x = LEFT_EDGE
+    for g, (first, last) in enumerate(groups):
+        x += outer - inner if g else 0
+        for n in range(first, last + 1):
+            slots[n] = (x + tw / 2, top - th / 2)
+            thumbs[n] = scene.geometry.group(
                 scene.media.image(
-                    f"reporte/{image}.png",
-                    width=3.18,
-                    height=2.385,
-                    fit="contain",
+                    f"reporte/miniaturas/p{n:02}.png",
+                    width=tw,
+                    height=th,
                     quality="high",
                 ),
-                background="#FFFFFF",
-                border=RULE,
-                border_width="2px",
-            ),
-            gap="8px",
+                scene.geometry.rect(tw, th).no_fill().stroke(RULE, 0.012),
+            ).move_to(*slots[n])
+            x += tw + inner
+    marks: list[Drawable] = []
+    yb = top - th - 0.1
+    for i, part in enumerate(REPORT_PARTS):
+        first, last = part.pages
+        x0, x1 = slots[first][0] - tw / 2, slots[last][0] + tw / 2
+        marks.append(
+            scene.geometry.group(
+                scene.geometry.polyline(
+                    [(x0, yb + 0.06), (x0, yb), (x1, yb), (x1, yb + 0.06)]
+                )
+                .no_fill()
+                .stroke(MUTED, 0.016),
+                t(
+                    scene,
+                    f"{i + 1}",
+                    (x0 + x1) / 2,
+                    yb - 0.07,
+                    font=DISPLAY,
+                    size=0.24,
+                    weight=700,
+                    color=BRICK,
+                    anchor=Anchor.TOP,
+                ),
+            )
         )
-        for i, (image, name) in enumerate(REPORT_PARTS)
-    ]
-    grid = L.column(
-        L.row(*cells[:3], gap="36px"),
-        L.row(*cells[3:], gap="36px"),
-        gap="30px",
+
+    # Abajo a la izquierda, el índice: cada parte se despliega cuando se lee.
+    L = scene.layout
+    bottom = 0.95
+    entries = []
+    for i, part in enumerate(REPORT_PARTS):
+        first, last = part.pages
+        entries.append(
+            L.column(
+                L.row(
+                    L.box(
+                        f"{i + 1}",
+                        font=DISPLAY,
+                        font_size="30px",
+                        weight=700,
+                        color=BRICK,
+                        width="34px",
+                    ).item(shrink=0),
+                    L.box(part.name, font_size="25px", weight=900, color=INK).item(
+                        grow=1
+                    ),
+                    L.box(
+                        f"p. {first}" if first == last else f"pp. {first}–{last}",
+                        font=MONO,
+                        font_size="18px",
+                        color=MUTED,
+                    ).item(shrink=0),
+                    gap="14px",
+                    align="center",
+                    width="fill",
+                ),
+                hairline(scene, color="#E9E4DA"),
+                gap="12px",
+                width="fill",
+            )
+        )
+    reader_left = -1.1
+    # El índice empieza bajo la tira, a y = bottom.
+    L.column(
+        *entries,
+        gap="12px",
+        within=L.safe.crop(top=bottom, left=LEFT_EDGE, right=reader_left - 0.4),
+        width="fill",
+        height="fill",
+        justify="start",
     )
-    page_column(
-        scene,
-        body=[L.row(cover, grid, gap="48px", align="start", width="fill")],
-        top="190px",
-    )
-    scene.play(cover.animate.fade_in_from(Direction.UP, 0.08).duration(0.5))
-    scene.play(
+
+    def detail(part: ReportPart) -> Box:
+        return L.column(
+            L.box(part.content, font_size="22px", color=INK_SOFT),
+            L.box(part.cites, font=MONO, font_size="17px", color=MUTED),
+            gap="6px",
+            width="fill",
+            padding=("0px", "0px", "4px", "48px"),
+        )
+
+    # A la derecha, el lector: la página sale de su lugar en la tira y se acerca
+    # hasta la región que se lee. Viaja en arco por la franja de la tira y crece al
+    # final del viaje, para no cruzar el índice.
+    rw, rh = RIGHT_EDGE - reader_left, bottom + 3.38
+    rc = (reader_left + rw / 2, bottom - rh / 2)
+    sheet = panel(scene, *rc, rw, rh, fill=Color.from_hex("#FFFFFF"), border=RULE)
+
+    def lift(n: int, region: tuple[float, float, float, float]):
+        w, h = rw - 0.24, rh - 0.24
+        page = (
+            scene.media.image(
+                f"reporte/paginas/p{n:02}.png",
+                width=w,
+                height=h,
+                fit="contain",
+                quality="high",
+            )
+            .scale_to(th / h)
+            .move_to(*slots[n])
+        )
+        x0, y0, x1, y1 = region
+        pw, ph = PAGE_PT
+        crop = (x0 / pw, y0 / ph, (x1 - x0) / pw, (y1 - y0) / ph)
+        reach = (rc[0] - slots[n][0]) / (rc[0] - LEFT_EDGE)
+        return page, [
+            page.animate.fade_in().duration(0.35),
+            page.animate.move_to(*rc)
+            .path_arc(-math.pi / 3 * reach)
+            .duration(0.9)
+            .easing(Easing.SMOOTH),
+            page.animate.scale_to(1)
+            .crop(*crop, normalized=True)
+            .duration(0.75)
+            .delay(0.25)
+            .easing(Easing.SMOOTH),
+        ]
+
+    reveals: list[Playable] = [
         stagger(
             *[
-                enter(
-                    cell, direction=Direction.UP, distance=0.08, duration=0.3, each=0.1
-                )
-                for cell in cells
+                thumbs[n].animate.fade_in_from(Direction.DOWN, 0.06).duration(0.3)
+                for n in range(1, 3)
             ],
-            each=0.12,
+            each=0.04,
         )
-    )
+    ]
+    for i, part in enumerate(REPORT_PARTS):
+        first, last = part.pages
+        reveals.append(
+            parallel(
+                stagger(
+                    *[
+                        thumbs[n]
+                        .animate.fade_in_from(Direction.DOWN, 0.06)
+                        .duration(0.3)
+                        for n in range(first, last + 1)
+                    ],
+                    each=0.04,
+                ),
+                marks[i].animate.fade_in().duration(0.35),
+                entries[i].animate.fade_in_from(Direction.LEFT, 0.06).duration(0.35),
+            )
+        )
+    scene.play(stagger(*reveals, each=0.16))
+    current, flight = lift(1, COVER_REGION)
+    scene.play([sheet.animate.fade_in().duration(0.3), *flight])
     source(
         scene,
-        "Tesis · Anexo: reporte automatizado del modelo ejemplo · secciones de la Tabla 48, p. 124",
+        "Tesis · Anexo: reporte automatizado del modelo ejemplo · estructura de la Tabla 48, p. 124",
     )
     scene.stop("reporte-partes")
+
+    shown: Box | None = None
+    for i, part in enumerate(REPORT_PARTS):
+        first, last = part.pages
+        # El detalle de la parte anterior se pliega mientras el nuevo se despliega.
+        if shown is not None:
+            entries[i - 1].remove(shown, duration=0.45, advance=False, exit="fold")
+        shown = detail(part)
+        entries[i].add(shown, at=1, duration=0.45, advance=False, enter="unfold")
+        page, flight = lift(part.read, part.region)
+        scene.play(
+            [
+                *[
+                    thumb.animate.opacity(1 if first <= n <= last else DIM).duration(
+                        0.4
+                    )
+                    for n, thumb in thumbs.items()
+                ],
+                *[
+                    m.animate.opacity(1 if j == i else DIM).duration(0.4)
+                    for j, m in enumerate(marks)
+                ],
+                *[
+                    e.animate.opacity(1 if j == i else 0.45).duration(0.4)
+                    for j, e in enumerate(entries)
+                ],
+                current.animate.fade_out().duration(0.3),
+                *flight,
+            ]
+        )
+        current = page
+        scene.stop(f"reporte-parte-{i + 1}")
 
 
 SECTION = Section(
@@ -747,10 +952,14 @@ SECTION = Section(
             build=report_parts,
             transition=Transition.cross_fade(0.45),
             notes=(
-                "30 s. El reporte real del caso (anexo, 21 páginas) con sus seis secciones de la "
-                "Tabla 48 (p. 124): datos de diseño, requisitos mínimos (espesor y densidad), carga "
-                "vertical (esfuerzo axial), análisis sísmico (peso, modos, fuerzas y derivas), sismo "
-                "moderado (fisuración y corte global) e información del modelo y la versión de Alba."
+                "30 s. El reporte real del caso (anexo, 21 páginas): arriba sus páginas, agrupadas "
+                "en las seis secciones de la Tabla 48 (p. 124); cada pausa abre una en el índice y "
+                "acerca una página. 1 Datos de diseño (pp. 3–5). 2 Requisitos mínimos: espesor "
+                "t = 0.12 m y densidad mínima 0.032 (pp. 6–7). 3 Carga vertical: esfuerzo axial "
+                "muro por muro (pp. 8–10). 4 Análisis sísmico: peso, modos, fuerzas y derivas; la "
+                "página muestra la deriva en X (pp. 11–14). 5 Sismo moderado: fisuración y corte "
+                "global, la parte más larga (pp. 15–20). 6 Información del modelo: versión de la "
+                "API, archivo y fecha de importación, la trazabilidad de la iteración (p. 21)."
             ),
         ),
     ],

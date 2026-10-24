@@ -8,6 +8,8 @@ Unidades de diseño: el fotograma mide 1080 px de alto = 9 unidades de escena, e
 decir 120 px por unidad.
 """
 
+from typing import Any
+
 from gaanim import (
     Anchor,
     Box,
@@ -291,7 +293,7 @@ def stage(
     ``width`` la etapa tiene ancho fijo; sin él, crece con su fila.
     """
     L = scene.layout
-    size = {"width": width} if width else {}
+    size: dict[str, Any] = {"width": width} if width else {}
     column = L.column(
         hairline(scene),
         L.row(
@@ -526,7 +528,7 @@ def chip(
     width: str | None = None,
 ) -> Box:
     """Etiqueta compacta de esquinas rectas, en tipografía técnica."""
-    props: dict[str, str] = {"border": border, "border_width": "2px"} if border else {}
+    props: dict[str, Any] = {"border": border, "border_width": "2px"} if border else {}
     if width:
         props["width"] = width
     return scene.layout.box(
@@ -605,11 +607,6 @@ def compare_table(
 
 
 PX = 120.0  # px de diseño por unidad de escena
-SAFE_TOP = 60.0  # el área segura empieza a 60 px del borde del fotograma
-
-
-def _px(units: float) -> str:
-    return f"{units * PX:.1f}px"
 
 
 @component
@@ -651,11 +648,11 @@ def source_block(scene: Scene, *, reference: str) -> Box:
     """Fuente de la diapositiva, sobre el riel de avance (a y = -3.72)."""
     return scene.layout.column(
         scene.text(reference, style=CAPTION, wrap=False),
-        within="safe",
+        within=scene.layout.safe.crop(top=-3.72 + 3 / PX),
         width="fill",
         height="fill",
         justify="start",
-        padding=(f"{(4.5 + 3.72) * PX - SAFE_TOP - 3:.1f}px", SIDE, "0px", SIDE),
+        padding=("0px", SIDE),
     )
 
 
@@ -674,11 +671,11 @@ def takeaway_block(scene: Scene, *, text: str, y: float, color: Color = INK) -> 
         hairline(scene, thickness="2px"),
         scene.text(text, font=DISPLAY, size=0.3, weight=700, color=color),
         gap="18px",
-        within="safe",
+        within=L.safe.crop(top=rule_y + 1 / PX),
         width="fill",
         height="fill",
         justify="start",
-        padding=(f"{(4.5 - rule_y) * PX - SAFE_TOP - 1:.1f}px", SIDE, "0px", SIDE),
+        padding=("0px", SIDE),
     )
 
 
@@ -715,13 +712,13 @@ def pill_box(
     return scene.layout.box(
         text,
         font=font,
-        font_size=_px(size),
+        font_size=size,
         weight=weight,
         color=color,
         background=background,
         border=border if border is not None else background,
         border_width="2px",
-        padding=(_px(pad[1]), _px(pad[0])),
+        padding=(pad[1], pad[0]),
     )
 
 
@@ -759,8 +756,8 @@ def panel_box(
     scene: Scene, *, w: float, h: float, fill: Color, border: Color | None
 ) -> Box:
     return scene.layout.box(
-        width=_px(w),
-        height=_px(h),
+        width=w,
+        height=h,
         background=fill,
         border=border,
         border_width="2px" if border is not None else "0px",
@@ -791,7 +788,7 @@ def module_card(
     tag: str,
     core: bool = True,
     highlight: bool = False,
-    height: str = "72px",
+    height: float | str = "72px",
 ) -> Box:
     """Módulo de la arquitectura: número, nombre y tecnología en tipografía técnica."""
     L = scene.layout

@@ -1,20 +1,27 @@
 [project]
 name = "diapostesis"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 dependencies = [
-    "gaanim",
+    "gaanim>=0.17.1",
 ]
 
 [tool.pyright]
-include = ["src", "main.py"]
+include = ["src", "tools", "main.py"]
 extraPaths = ["src"]
 venvPath = "."
 venv = ".venv"
-typeCheckingMode = "strict"
-pythonVersion = "3.14"
+typeCheckingMode = "standard"
+pythonVersion = "3.15"
 reportUnusedCallResult = false
 reportImplicitStringConcatenation = false
 
+[dependency-groups]
+dev = [
+    "pyright==1.1.407",
+    "ruff==0.16.9",
+]
+
+# Provisorio: 0.17.1 todavía no está en PyPI; al publicarse, quitar esta sección y `uv lock`.
 [tool.uv.sources]
-gaanim = { path = "C:/Users/ASUS/dev/rust/gaanim/target/wheels/gaanim-0.15.0-py3-none-any.whl" }
+gaanim = { path = "C:/Tools/gaanim/gaanim-0.17.1-py3-none-any.whl" }

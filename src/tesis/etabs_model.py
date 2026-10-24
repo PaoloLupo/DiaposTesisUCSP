@@ -1,37 +1,49 @@
 """Modelo completo tridimensional (MCT) del caso de estudio, como se ve en ETABS.
 
 Muros y losas son áreas (shell) sin espesor sobre los ejes; columnas y vigas, líneas
-(frame) de nodo a nodo. La isométrica es la de ``tesis.vivienda``: se ven las caras
-que miran a −y, a +x y a +z, y un punto queda más cerca del observador cuanto mayor
-es ``x − y + z``. Los pisos se pintan de abajo hacia arriba; dentro de cada piso,
-muros y columnas de atrás hacia adelante y, al final, la losa con sus vigas encima.
+(frame) de nodo a nodo. Cada área es un grupo 2D llevado al mundo con ``in_3d()``: su
+contorno y su malla se dibujan en el plano del muro, con los colores planos del sistema
+visual, y la cámara en perspectiva los inclina y los oculta píxel a píxel detrás de lo
+que tienen delante, sin orden del pintor. Los frames son líneas 3D entre anclas
+invisibles en los nodos: al mover un ancla, sus frames la siguen.
 
-Cada forma guarda sus vértices en metros: ``sway`` lleva cada vértice a la deformada
-según la altura de su nivel.
+Las coordenadas van en metros (``tesis.model3d``). ``sway`` lleva el modelo a la
+deformada en Y: cada nivel se desplaza ``amplitud · modo(z)``. Nodos, losas y lo que
+acompaña al modelo se deforman con ``deform`` y siguen a un solo parámetro; los muros
+son dibujos 2D, que ``deform`` solo traslada, así que los muros en X giran fuera de su
+plano y los muros en Y se distorsionan en el suyo, de nivel a nivel.
 """
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import pairwise
 from typing import Literal
 
-from gaanim import Anchor, Anim, Color, Drawable, Easing, EasingCurve, Scene
+from gaanim import (
+    Anchor,
+    Anim,
+    Color,
+    Drawable,
+    Easing,
+    EasingCurve,
+    Material3D,
+    Parameter,
+    Scene,
+)
 
 from tesis.building import AXIS_X, AXIS_Y, DEPTH, STAIR, WIDTH, wall_segments
 from tesis.data.planta import STORIES
 from tesis.data.thesis import MESH_STEP
 from tesis.kit import t
+from tesis.model3d import P2, P3, anchor, carry, lay_flat, pinned
 from tesis.theme import CONCRETE, INK_SOFT, MONO, MUTED
-from tesis.vivienda import Iso
-
-type P2 = tuple[float, float]
-type P3 = tuple[float, float, float]
 
 SNAP = 0.07  # m: un extremo a menos de medio espesor de un eje cae sobre el eje
 GRID_EXT = 0.9  # m: las grillas sobresalen de la planta hasta sus burbujas
 
-# Sombreado plano, como en la vivienda: la cara que mira a −y es más clara que la de +x.
+# Colores planos de las áreas: la cara de los muros en X es más clara que la de los
+# muros en Y, como la luz de la isométrica de la vivienda.
 WALL_X = Color.from_hex("#EED7CA")
 WALL_Y = Color.from_hex("#E3C3B2")
 WALL_CONCRETE = Color.from_hex("#DCDAD5")
@@ -40,8 +52,11 @@ SLAB = Color.from_hex("#E6E3DC")
 FRAME = Color.from_hex("#6E727A")
 MESH = Color.from_hex("#B8532F")
 SINE = Easing.ease_in_out(EasingCurve.SINE)
-# El modelo ocupa z_index de 10 a unos 400; lo que va encima parte de aquí.
-OVERLAY = 1000
+
+EDGE_WIDTH = 0.03  # m: borde de las áreas
+MESH_WIDTH = 0.018  # m: líneas de la malla
+FRAME_THICKNESS = 0.075  # m: diámetro de columnas y vigas
+FRAME_MATERIAL = Material3D.matte(FRAME)
 
 
 @dataclass(frozen=True)
@@ -62,13 +77,52 @@ class WallLine:
     def middle(self) -> P2:
         return (self.a[0] + self.b[0]) / 2, (self.a[1] + self.b[1]) / 2
 
+    @property
+    def length(self) -> float:
+        return math.hypot(self.b[0] - self.a[0], self.b[1] - self.a[1])
+
 
 @dataclass
-class Shape:
-    """Polígono o polilínea con sus vértices en metros, para deformarlo después."""
+class Wall:
+    """Un muro en un piso: grupo en su plano con el contorno y la malla.
 
-    drawable: Drawable
-    points: list[P3]
+    Las coordenadas 2D del grupo son (posición a lo largo del muro, z): x para los
+    muros en X, y para los muros en Y. El grupo gira alrededor del centro del muro.
+    """
+
+    line: WallLine
+    z0: float
+    z1: float
+    group: Drawable
+    outline: Drawable
+    mesh: list[Drawable]
+    mesh_points: list[list[P2]]
+
+    @property
+    def span(self) -> tuple[float, float]:
+        (ax, ay), (bx, by) = self.line.a, self.line.b
+        return (ax, bx) if self.line.direction == "X" else (ay, by)
+
+    @property
+    def corners(self) -> list[P2]:
+        u0, u1 = self.span
+        return [(u0, self.z0), (u1, self.z0), (u1, self.z1), (u0, self.z1)]
+
+    @property
+    def center(self) -> P3:
+        x, y = self.line.middle
+        return x, y, (self.z0 + self.z1) / 2
+
+
+@dataclass
+class Slab:
+    """Losa de un nivel: relleno, borde y vacío de escalera en el plano del nivel."""
+
+    z: float
+    group: Drawable
+    fill: Drawable
+    edge: Drawable
+    void: Drawable
 
 
 @dataclass
@@ -76,66 +130,80 @@ class Story:
     number: int
     z0: float
     z1: float
-    walls: dict[str, Shape]
-    mesh: dict[str, list[Shape]]
-    columns: dict[P2, Shape]
-    beams: dict[tuple[P2, P2], Shape]  # de nodo a nodo
-    slab: Shape
-    edge: Shape  # borde de la losa: es el nivel que sube al definir los pisos
-    void: Shape  # borde del vacío de escalera
-    overlay: int  # z_index libre para lo que se dibuje sobre este nivel
+    walls: dict[str, Wall]
+    columns: dict[P2, Drawable]
+    beams: dict[tuple[P2, P2], Drawable]  # de nodo a nodo
+    slab: Slab
 
 
 @dataclass
 class EtabsModel:
-    iso: Iso
     lines: list[WallLine]
+    nodes: list[P2]
     stories: list[Story]
-    grid: list[Drawable]
+    anchors: dict[tuple[P2, int], Drawable]  # (nodo, nivel): 0 es la base
+    grid: Drawable  # grupo de las grillas, tendido en la base
+    grid_lines: list[Drawable]
     bubbles: list[Drawable]
-    # Objetos que viajan con el modelo sin deformarse, con la altura que siguen.
-    riders: list[tuple[Drawable, float]] = field(default_factory=list)
-    amplitude: float = 0.0
+    drift: Parameter  # m en la azotea: cuánto de la deformada se aplica
 
     @property
     def height(self) -> float:
         return self.stories[-1].z1
 
-    def shapes(self) -> list[Shape]:
-        out: list[Shape] = []
-        for story in self.stories:
-            out += list(story.walls.values())
-            out += [m for parts in story.mesh.values() for m in parts]
-            out += list(story.columns.values())
-            out += list(story.beams.values())
-            out += [story.slab, story.edge, story.void]
-        return out
+    @property
+    def levels(self) -> list[float]:
+        return [0.0, *(s.z1 for s in self.stories)]
+
+    def walls(self) -> list[Wall]:
+        return [w for s in self.stories for w in s.walls.values()]
 
     def ride(self, drawable: Drawable, z: float) -> Drawable:
-        """Registra un objeto que acompaña a la deformada a la altura ``z``."""
-        self.riders.append((drawable, z))
-        return drawable
+        """Lleva ``drawable`` con la deformada a la altura ``z``, sin deformarlo."""
+        return carry(drawable, (0.0, self.mode(z), 0.0), self.drift)
 
     def mode(self, z: float) -> float:
         """Forma esquemática del modo de traslación: un cuarto de seno en altura."""
         return math.sin(math.pi * z / (2 * self.height))
 
     def sway(self, amplitude: float, duration: float) -> list[Anim]:
-        """Lleva el modelo a la deformada en Y con ``amplitude`` metros en la azotea."""
-        anims = [
-            s.drawable.animate.points(
-                [self.iso(x, y + amplitude * self.mode(z), z) for x, y, z in s.points]
-            )
-            .duration(duration)
-            .easing(SINE)
-            for s in self.shapes()
-        ]
-        for drawable, z in self.riders:
-            dx, dy = self.iso.along(0, (amplitude - self.amplitude) * self.mode(z))
-            anims.append(
-                drawable.animate.shift_by(dx, dy).duration(duration).easing(SINE)
-            )
-        self.amplitude = amplitude
+        """Lleva el modelo a la deformada en Y con ``amplitude`` metros en la azotea.
+
+        Lo que acompaña al modelo (``ride``) sigue a ``drift``; los muros se mueven
+        aparte, con la misma duración y curva.
+        """
+
+        def ease(anim: Anim) -> Anim:
+            return anim.duration(duration).easing(SINE)
+
+        def shift(z: float) -> float:
+            return amplitude * self.mode(z)
+
+        anims = [ease(self.drift.animate.set(amplitude))]
+        for wall in self.walls():
+            d0, d1 = shift(wall.z0), shift(wall.z1)
+            if wall.line.direction == "X":
+                # Fuera de su plano: el muro se corre y se inclina entre los dos niveles.
+                x, y, zc = wall.center
+                lean = (d1 - d0) / (wall.z1 - wall.z0)
+                up = (0.0, lean, math.sqrt(1 - lean * lean))
+                anims.append(ease(wall.group.animate.move_to_3d(x, y + shift(zc), zc)))
+                anims.append(ease(wall.group.animate.orient_3d((1, 0, 0), up)))
+            else:
+                # En su plano: cada punto avanza lo que avanza su altura.
+                def sheared(
+                    u: float, h: float, w: Wall = wall, d0: float = d0, d1: float = d1
+                ) -> P2:
+                    s = (h - w.z0) / (w.z1 - w.z0)
+                    return u + d0 + (d1 - d0) * s, h
+
+                anims.append(
+                    ease(
+                        wall.outline.animate.points([sheared(*p) for p in wall.corners])
+                    )
+                )
+                for part, pts in zip(wall.mesh, wall.mesh_points, strict=True):
+                    anims.append(ease(part.animate.points([sheared(*p) for p in pts])))
         return anims
 
 
@@ -158,88 +226,24 @@ def wall_lines() -> list[WallLine]:
     return lines
 
 
-def _depth(a: P2, b: P2, u: float) -> float:
-    """``x − y`` del punto del elemento que se proyecta en ``u = x + y``; mayor = más cerca."""
-    ua, ub = a[0] + a[1], b[0] + b[1]
-    da, db = a[0] - a[1], b[0] - b[1]
-    if abs(ub - ua) < 1e-9:
-        return da
-    return da + (u - ua) / (ub - ua) * (db - da)
-
-
-def back_to_front(items: Sequence[tuple[P2, P2]]) -> list[int]:
-    """Orden del pintor para muros (segmentos) y columnas (puntos) de un mismo piso.
-
-    Dos elementos solo se ordenan si se solapan en pantalla (en ``x + y``); entonces
-    va primero el más lejano. Una columna en el extremo de un muro va encima de él.
-    """
-    n = len(items)
-    spans = [sorted((a[0] + a[1], b[0] + b[1])) for a, b in items]
-    later: list[set[int]] = [set() for _ in range(n)]
-    pending = [0] * n
-    for i in range(n):
-        for j in range(i + 1, n):
-            lo = max(spans[i][0], spans[j][0])
-            hi = min(spans[i][1], spans[j][1])
-            if hi < lo - 1e-9:
-                continue
-            u = (lo + hi) / 2
-            di, dj = _depth(*items[i], u), _depth(*items[j], u)
-            if abs(di - dj) < 1e-6:
-                point_i = items[i][0] == items[i][1]
-                point_j = items[j][0] == items[j][1]
-                if point_i == point_j:
-                    continue
-                first, second = (j, i) if point_i else (i, j)
-            else:
-                first, second = (i, j) if di < dj else (j, i)
-            if second not in later[first]:
-                later[first].add(second)
-                pending[second] += 1
-
-    def mean_depth(k: int) -> float:
-        (ax, ay), (bx, by) = items[k]
-        return (ax - ay + bx - by) / 2
-
-    order: list[int] = []
-    ready = [k for k in range(n) if pending[k] == 0]
-    while ready:
-        ready.sort(key=mean_depth)
-        k = ready.pop(0)
-        order.append(k)
-        for m in later[k]:
-            pending[m] -= 1
-            if pending[m] == 0:
-                ready.append(m)
-    # Sin ciclos entre segmentos que no se cruzan; por si acaso, el resto por profundidad.
-    order += sorted((k for k in range(n) if k not in order), key=mean_depth)
-    return order
-
-
-def _mesh_paths(line: WallLine, z0: float, z1: float) -> list[list[P3]]:
-    """Malla del muro como dos serpentinas: las filas y las columnas interiores.
+def mesh_paths(u0: float, u1: float, z0: float, z1: float) -> list[list[P2]]:
+    """Malla de un muro como dos serpentinas: las filas y las columnas interiores.
 
     Los tramos que unen una línea con la siguiente corren por los bordes del muro, que
     ya son vigas y columnas, así que dos polilíneas dibujan toda la malla.
     """
-    (ax, ay), (bx, by) = line.a, line.b
-    length = math.hypot(bx - ax, by - ay)
-    nu = max(1, math.ceil(length / MESH_STEP - 1e-6))
+    nu = max(1, math.ceil(abs(u1 - u0) / MESH_STEP - 1e-6))
     nz = max(1, math.ceil((z1 - z0) / MESH_STEP - 1e-6))
-
-    def p(s: float, z: float) -> P3:
-        return ax + (bx - ax) * s, ay + (by - ay) * s, z
-
-    rows: list[P3] = []
+    rows: list[P2] = []
     for j in range(1, nz):
         z = z0 + (z1 - z0) * j / nz
-        ends = (0.0, 1.0) if j % 2 else (1.0, 0.0)
-        rows += [p(ends[0], z), p(ends[1], z)]
-    cols: list[P3] = []
+        ends = (u0, u1) if j % 2 else (u1, u0)
+        rows += [(ends[0], z), (ends[1], z)]
+    cols: list[P2] = []
     for i in range(1, nu):
-        s = i / nu
+        u = u0 + (u1 - u0) * i / nu
         ends = (z0, z1) if i % 2 else (z1, z0)
-        cols += [p(s, ends[0]), p(s, ends[1])]
+        cols += [(u, ends[0]), (u, ends[1])]
     return [path for path in (rows, cols) if len(path) >= 2]
 
 
@@ -254,41 +258,100 @@ def _split(a: P2, b: P2, nodes: Sequence[P2]) -> list[tuple[P2, P2]]:
     return list(pairwise(stops))
 
 
-def _slab_points(z: float) -> list[P3]:
+def slab_outline() -> list[P2]:
     """Losa con el vacío de escalera: el vacío se recorre al revés, unido por una ranura."""
     x0, y0, x1, y1 = STAIR
     return [
-        (0, 0, z),
-        (x0, 0, z),
-        (x0, y0, z),
-        (x0, y1, z),
-        (x1, y1, z),
-        (x1, y0, z),
-        (x0, y0, z),
-        (x0, 0, z),
-        (WIDTH, 0, z),
-        (WIDTH, DEPTH, z),
-        (0, DEPTH, z),
+        (0, 0),
+        (x0, 0),
+        (x0, y0),
+        (x0, y1),
+        (x1, y1),
+        (x1, y0),
+        (x0, y0),
+        (x0, 0),
+        (WIDTH, 0),
+        (WIDTH, DEPTH),
+        (0, DEPTH),
     ]
 
 
-def build_model(scene: Scene, iso: Iso, *, z_base: int = 10) -> EtabsModel:
+def rect(x0: float, y0: float, x1: float, y1: float) -> list[P2]:
+    return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+
+def stand(drawable: Drawable, line: WallLine, z: float) -> Drawable:
+    """Levanta sobre el eje de ``line`` un objeto 2D dibujado en (u, z), en metros.
+
+    u es x para un muro en X e y para un muro en Y; el grupo debe tener su origen en
+    el centro del muro, (u_c, z), que queda sobre el punto medio del eje a la altura z
+    y es el pivote de su giro.
+    """
+    along = (1, 0, 0) if line.direction == "X" else (0, 1, 0)
+    return drawable.in_3d().orient_3d(along, (0, 0, 1)).move_to_3d(*line.middle, z)
+
+
+def _wall(scene: Scene, line: WallLine, z0: float, z1: float) -> Wall:
+    (ax, ay), (bx, by) = line.a, line.b
+    u0, u1 = (ax, bx) if line.direction == "X" else (ay, by)
+    fill = (
+        WALL_CONCRETE
+        if line.concrete
+        else (WALL_X if line.direction == "X" else WALL_Y)
+    )
+    edge = CONCRETE if line.concrete else WALL_EDGE
+    outline = (
+        scene.geometry.polygon(rect(u0, z0, u1, z1))
+        .fill(fill)
+        .stroke(edge, EDGE_WIDTH)
+        .hidden()
+    )
+    paths = mesh_paths(u0, u1, z0, z1)
+    mesh = [
+        scene.geometry.polyline(path)
+        .no_fill()
+        .stroke(CONCRETE if line.concrete else MESH, MESH_WIDTH)
+        .opacity(0.55)
+        .hidden()
+        for path in paths
+    ]
+    zc = (z0 + z1) / 2
+    group = scene.geometry.group([outline, *mesh], origin=((u0 + u1) / 2, zc))
+    stand(group, line, zc)
+    return Wall(line, z0, z1, group, outline, mesh, paths)
+
+
+def _slab(scene: Scene, z: float) -> Slab:
+    x0, y0, x1, y1 = STAIR
+    fill = scene.geometry.polygon(slab_outline()).fill(SLAB).no_stroke().hidden()
+    edge = (
+        scene.geometry.polygon(rect(0, 0, WIDTH, DEPTH))
+        .no_fill()
+        .stroke(MUTED, EDGE_WIDTH)
+        .hidden()
+    )
+    void = (
+        scene.geometry.polygon(rect(x0, y0, x1, y1))
+        .no_fill()
+        .stroke(MUTED, EDGE_WIDTH * 0.8)
+        .hidden()
+    )
+    group = scene.geometry.group([fill, edge, void], origin=(0, 0))
+    lay_flat(group, z)
+    return Slab(z, group, fill, edge, void)
+
+
+def frame_line(scene: Scene, start: Drawable, end: Drawable) -> Drawable:
+    """Frame entre dos anclas: crece de ``start`` a ``end`` y las sigue si se mueven."""
+    return scene.geometry.line_3d(
+        start, end, FRAME_THICKNESS, segments=10, material=FRAME_MATERIAL
+    ).hidden()
+
+
+def build_model(scene: Scene) -> EtabsModel:
     """Crea todo el modelo oculto; cada paso de la diapositiva decide cuándo aparece."""
     lines = wall_lines()
     nodes = sorted({p for line in lines for p in (line.a, line.b)})
-    items: list[tuple[P2, P2]] = [(line.a, line.b) for line in lines]
-    items += [(p, p) for p in nodes]
-    order = back_to_front(items)
-
-    def polygon(points: list[P3]) -> Drawable:
-        return scene.geometry.polygon([iso(*p) for p in points]).hidden()
-
-    def polyline(points: list[P3]) -> Drawable:
-        return scene.geometry.polyline([iso(*p) for p in points]).no_fill().hidden()
-
-    def outline(points: list[P3]) -> Drawable:
-        """Contorno cerrado: un polígono sin relleno admite ``points`` como el muro."""
-        return polygon(points).no_fill()
 
     # Vigas: las del perímetro corren de esquina a esquina; adentro, sobre cada muro.
     perimeter: list[tuple[P2, P2]] = [
@@ -304,102 +367,59 @@ def build_model(scene: Scene, iso: Iso, *, z_base: int = 10) -> EtabsModel:
 
     beam_lines = perimeter + [(ln.a, ln.b) for ln in lines if not on_perimeter(ln)]
     spans = sorted({span for a, b in beam_lines for span in _split(a, b, nodes)})
+    span_nodes = sorted({p for span in spans for p in span})
 
-    z = z_base
-    stories: list[Story] = []
     levels = [level for _, level in STORIES]
+    anchors: dict[tuple[P2, int], Drawable] = {
+        (node, k): anchor(scene, (*node, z))
+        for k, z in enumerate(levels)
+        for node in sorted({*nodes, *span_nodes})
+    }
+    stories: list[Story] = []
     for number, (z0, z1) in enumerate(pairwise(levels), start=1):
-        walls: dict[str, Shape] = {}
-        mesh: dict[str, list[Shape]] = {}
-        columns: dict[P2, Shape] = {}
-        for k in order:
-            if k < len(lines):
-                line = lines[k]
-                pts: list[P3] = [
-                    (*line.a, z0),
-                    (*line.b, z0),
-                    (*line.b, z1),
-                    (*line.a, z1),
-                ]
-                fill = (
-                    WALL_CONCRETE
-                    if line.concrete
-                    else (WALL_X if line.direction == "X" else WALL_Y)
-                )
-                edge = CONCRETE if line.concrete else WALL_EDGE
-                walls[line.name] = Shape(
-                    polygon(pts).fill(fill).stroke(edge, 0.008).z_index(z), pts
-                )
-                mesh[line.name] = [
-                    Shape(
-                        polyline(path)
-                        .stroke(CONCRETE if line.concrete else MESH, 0.0045)
-                        .opacity(0.55)
-                        .z_index(z + 1),
-                        path,
-                    )
-                    for path in _mesh_paths(line, z0, z1)
-                ]
-                z += 2
-            else:
-                node = nodes[k - len(lines)]
-                pts = [(*node, z0), (*node, z1)]
-                columns[node] = Shape(
-                    polyline(pts).stroke(FRAME, 0.016).z_index(z), pts
-                )
-                z += 1
-        slab_pts = _slab_points(z1)
-        slab = Shape(polygon(slab_pts).fill(SLAB).no_stroke().z_index(z), slab_pts)
-        edge_pts: list[P3] = [
-            (0, 0, z1),
-            (WIDTH, 0, z1),
-            (WIDTH, DEPTH, z1),
-            (0, DEPTH, z1),
-        ]
-        edge = Shape(outline(edge_pts).stroke(MUTED, 0.01).z_index(z + 1), edge_pts)
-        x0, y0, x1, y1 = STAIR
-        void_pts: list[P3] = [(x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
-        void = Shape(
-            outline(void_pts).stroke(MUTED, 0.008).z_index(z + 1),
-            void_pts,
-        )
-        beams: dict[tuple[P2, P2], Shape] = {}
-        for a, b in spans:
-            pts = [(*a, z1), (*b, z1)]
-            beams[a, b] = Shape(polyline(pts).stroke(FRAME, 0.016).z_index(z + 2), pts)
-        stories.append(
-            Story(number, z0, z1, walls, mesh, columns, beams, slab, edge, void, z + 3)
-        )
-        z += 4
+        walls = {line.name: _wall(scene, line, z0, z1) for line in lines}
+        columns = {
+            node: frame_line(scene, anchors[node, number - 1], anchors[node, number])
+            for node in nodes
+        }
+        beams = {
+            (a, b): frame_line(scene, anchors[a, number], anchors[b, number])
+            for a, b in spans
+        }
+        stories.append(Story(number, z0, z1, walls, columns, beams, _slab(scene, z1)))
 
-    assert z < OVERLAY, z
-    grid: list[Drawable] = []
+    grid_lines: list[Drawable] = []
     bubbles: list[Drawable] = []
     for name, gx in AXIS_X.items():
-        a, b = iso(gx, -GRID_EXT + 0.12, 0), iso(gx, DEPTH + 0.5, 0)
-        grid.append(_dashed(scene, a, b))
-        bubbles.append(_bubble(scene, name, *iso(gx, -GRID_EXT, 0)))
+        grid_lines.append(_dashed(scene, (gx, -GRID_EXT + 0.12), (gx, DEPTH + 0.5)))
+        bubbles.append(_bubble(scene, name, (gx, -GRID_EXT, 0)))
     for name, gy in AXIS_Y.items():
-        a, b = iso(-GRID_EXT + 0.12, gy, 0), iso(WIDTH + 0.5, gy, 0)
-        grid.append(_dashed(scene, a, b))
-        bubbles.append(_bubble(scene, name, *iso(-GRID_EXT, gy, 0)))
-    return EtabsModel(iso, lines, stories, grid, bubbles)
+        grid_lines.append(_dashed(scene, (-GRID_EXT + 0.12, gy), (WIDTH + 0.5, gy)))
+        bubbles.append(_bubble(scene, name, (-GRID_EXT, gy, 0)))
+    grid = lay_flat(scene.geometry.group(grid_lines, origin=(0, 0)), -0.01)
+    drift = scene.viz.parameter(0.0)
+    model = EtabsModel(lines, nodes, stories, anchors, grid, grid_lines, bubbles, drift)
+    # Los nodos de los pisos y las losas siguen a la deformada; los frames, a sus nodos.
+    for (_, k), point in anchors.items():
+        if k:
+            model.ride(point, levels[k])
+    for story in stories:
+        model.ride(story.slab.group, story.z1)
+    return model
 
 
 def _dashed(scene: Scene, a: P2, b: P2) -> Drawable:
     return (
-        scene.geometry.dashed_line(*a, *b, dash_length=0.06, gap_length=0.045)
-        .stroke(MUTED, 0.007)
-        .z_index(2)
+        scene.geometry.dashed_line(*a, *b, dash_length=0.24, gap_length=0.18)
+        .stroke(MUTED, 0.028)
         .hidden()
     )
 
 
-def _bubble(scene: Scene, name: str, x: float, y: float) -> Drawable:
-    ring = (
-        scene.geometry.circle(0.105).fill("#F9F7F2").stroke(MUTED, 0.01).move_to(x, y)
-    )
+def _bubble(scene: Scene, name: str, at: P3) -> Drawable:
+    """Burbuja de grilla: siempre de frente a la cámara, al pie de su eje."""
+    ring = scene.geometry.circle(0.105).fill("#F9F7F2").stroke(MUTED, 0.01)
     text = t(
-        scene, name, x, y, font=MONO, size=0.1, color=INK_SOFT, anchor=Anchor.CENTER
+        scene, name, 0, 0, font=MONO, size=0.1, color=INK_SOFT, anchor=Anchor.CENTER
     )
-    return scene.geometry.group([ring, text]).z_index(3).hidden()
+    return pinned(scene.geometry.group([ring, text]), at, anchor=Anchor.CENTER)
