@@ -871,7 +871,7 @@ def traceability(scene: Scene) -> None:
         items=[
             "Datos del proyecto",
             "Z, U, S y factores de irregularidad",
-            "f'm, f'c · N y A_p",
+            "$f'_m$, $f'_c$ · N y $A_p$",
             "Nombres de combinaciones a usar",
         ],
     )
@@ -925,8 +925,8 @@ def traceability(scene: Scene) -> None:
             chip(scene, text="Piso 1"),
             chip(scene, text="X-X"),
             chip(scene, text="Resistencia global"),
-            chip(scene, text=f"V_E = {demand:.3f}"),
-            chip(scene, text=f"ΣV_m = {capacity:.3f} tonf"),
+            chip(scene, text=f"$V_E$ = {demand:.3f}"),
+            chip(scene, text=f"$sum V_m$ = {capacity:.3f} tonf"),
             L.box(
                 "✓ Cumple" if ok else "✕ No cumple",
                 font_size="26px",

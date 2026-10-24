@@ -137,12 +137,15 @@ def column_list(
     size: str = "30px",
     gap: str = "34px",
 ) -> Box:
-    """Encabezado de columna sobre un filete de su color y una lista con guiones."""
+    """Encabezado de columna sobre un filete de su color y una lista con guiones.
+
+    Los ítems admiten ``$…$``: una caja sin ``markup=True`` deja el dólar literal.
+    """
     L = scene.layout
     rows = [
         L.row(
             L.box(width="20px", height="3px", background=color).item(shrink=0),
-            L.box(item, font_size=size, color=INK),
+            L.box(item, font_size=size, color=INK, markup=True),
             gap="20px",
             align="center",
         )
@@ -527,7 +530,7 @@ def chip(
     font: str = MONO,
     width: str | None = None,
 ) -> Box:
-    """Etiqueta compacta de esquinas rectas, en tipografía técnica."""
+    """Etiqueta compacta de esquinas rectas, en tipografía técnica; admite ``$…$``."""
     props: dict[str, Any] = {"border": border, "border_width": "2px"} if border else {}
     if width:
         props["width"] = width
@@ -538,6 +541,7 @@ def chip(
         color=color,
         background=background,
         padding=("10px", "18px"),
+        markup=True,
         **props,
     )
 
