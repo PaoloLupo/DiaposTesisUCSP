@@ -167,12 +167,11 @@ Con esto pasamos al cuarto bloque, el proceso manual, donde mostramos cómo se v
 
 ## manual · 1 · 2 · Proceso manual · caso de estudio
 
-El caso de estudio es el ejemplo de aplicación de la norma E.070 del ingeniero Ángel San Bartolomé, del 2006, que originalmente se resolvió con la E.030 del 2003 y con SAP2000. Es una vivienda de 4 pisos en Lima, sobre suelo de cascajo, con una planta de 16.6 por 8 metros, losa maciza de 12 centímetros, muros de 13 centímetros, albañilería con un f'm de 65 y concreto con un f'c de 175 kilogramos por centímetro cuadrado. En la planta se ven los nombres de cada muro, que son las etiquetas Pier que usamos en ETABS; el apóstrofe indica el muro simétrico.
+El caso de estudio es el ejemplo de aplicación de la norma E.070 del ingeniero Ángel San Bartolomé, del 2006, que originalmente se resolvió con la E.030 del 2003 y con SAP2000. Es una vivienda de 4 pisos en Lima, sobre suelo rígido, de cascajo, con una planta de 16.6 por 8 metros, losa maciza de 12 centímetros, muros de 13 centímetros, albañilería con un f'm de 65 y concreto con un f'c de 175 kilogramos por centímetro cuadrado. En la planta se ven los nombres de cada muro, que son las etiquetas Pier que usamos en ETABS; el apóstrofe indica el muro simétrico.
 
-[stop caso-datos]
 Un detalle importante son los muros X2, que son de concreto armado y están en el eje A para acercar el centro de rigidez al centro de masas y así controlar la torsión.
 
-[stop caso-x2]
+[stop caso-estudio]
 
 ## manual · 1 · 3 · Proceso manual · modelos comparados
 
@@ -203,25 +202,34 @@ Luego se asigna un diafragma rígido en cada losa, de modo que cada piso se muev
 Y se asignan las etiquetas Pier, un nombre por muro, el mismo en los cuatro pisos. Con estas etiquetas ETABS integra los esfuerzos de la malla y nos da las fuerzas de cada muro, que son las que se usan en las verificaciones.
 
 [stop mct-pier]
-Por último se asignan las cargas: una carga muerta de 0.10 y una carga viva de 0.20 toneladas por metro cuadrado, y 0.10 en la azotea. La masa se toma como la carga muerta más el 25 % de la viva, lo que da 121.3 toneladas por piso típico y 87.8 en la azotea. Al analizar, el modo 3, con un periodo de 0.171 segundos, es la traslación en Y, con el 80 % de la masa. La deformada está exagerada.
+Por último se asignan las cargas: una carga muerta de 0.10 y una carga viva de 0.20 toneladas por metro cuadrado, y 0.10 en la azotea. La masa se toma como la carga muerta más el 25 % de la viva, lo que da 121.3 toneladas por piso típico y 87.8 en la azotea.
 
-[stop mct-analisis]
+[stop mct-cargas]
 
 ## manual · 1 · 5 · Proceso manual · pórticos planos
 
-El segundo modelo es el simplificado, el MSTA, que sigue el método de pórticos planos de San Bartolomé. Aquí, antes de abrir ETABS, cada muro se tiene que preparar a mano. Primero se obtiene su sección transformada en CAD con la rutina SECTRANS: las columnas de concreto se convierten a albañilería multiplicando su espesor por n, la relación de módulos, que es 6.1, y los muros transversales entran como alas. Por ejemplo, en el muro X4 el centroide queda a 1.212 metros de la cara y no al centro, porque el ala del muro Y4 está en un extremo, y de ahí salen su área, su área de corte y su inercia.
+El segundo modelo es el simplificado, el MSTA, que sigue el método de pórticos planos de San Bartolomé. Aquí, antes de abrir ETABS, cada muro se tiene que preparar a mano. Primero se obtiene su sección transformada en CAD con la rutina SECTRANS: las columnas de concreto se convierten a albañilería multiplicando su espesor por n, la relación de módulos, que es 6.1, y los muros transversales entran como alas.
+
+[stop pp-transformada]
+Por ejemplo, en el muro X4 el centroide queda a 1.212 metros de la cara y no al centro, porque el ala del muro Y4 está en un extremo, y de ahí salen su área, su área de corte y su inercia.
 
 [stop pp-seccion]
 Luego se calculan las cargas con el método del sobre, trazando líneas a 45 grados en cada paño. Al muro X4 le corresponden 7.02 metros cuadrados, lo que da 2.72 toneladas de carga muerta y 1.40 de carga viva por piso.
 
 [stop pp-tributarias]
-Ya en ETABS se dibuja una barra por muro en su centroide, empotrada en la base, y se une con brazos rígidos hasta el borde del muro y con los dinteles. Así, cada eje forma un pórtico plano, como este del eje A.
+Ya en ETABS se dibuja una barra por muro en su centroide, empotrada en la base.
+
+[stop pp-barras]
+Luego cada barra se une con brazos rígidos hasta el borde del muro y con los dinteles. Así, cada eje forma un pórtico plano, como este del eje A.
 
 [stop pp-porticos]
 A cada barra se le asigna una sección general con las propiedades calculadas, con una rigidez casi nula fuera de su plano, y su peso se corrige para no contar dos veces el peso de las alas.
 
 [stop pp-secciones]
-Después se asignan las cargas tributarias como fuerzas en cada barra y en cada piso, que en el caso de X4 se escalan a 2.91 y 1.50 toneladas para sumar el peso total de la losa, y finalmente el diafragma rígido une todos los pórticos. A diferencia del modelo completo, aquí la idealización y las cargas las decide el ingeniero fuera del programa.
+Después se asignan las cargas tributarias como fuerzas en cada barra y en cada piso, que en el caso de X4 se escalan a 2.91 y 1.50 toneladas para sumar el peso total de la losa.
+
+[stop pp-cargas]
+Finalmente, el diafragma rígido une todos los pórticos. A diferencia del modelo completo, aquí la idealización y las cargas las decide el ingeniero fuera del programa.
 
 [stop pp-diafragma]
 

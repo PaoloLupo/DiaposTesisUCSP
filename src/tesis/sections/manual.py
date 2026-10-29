@@ -75,7 +75,6 @@ from tesis.data.thesis import (
     MESH_N16_VARIATION,
     MESH_SIZES,
     MESH_STEP,
-    MODE_Y,
     MODEL_CHECKS,
     WEIGHT_BY_FLOOR,
 )
@@ -156,7 +155,7 @@ def case_study(scene: Scene) -> None:
     )
     rows = [
         ("Referencia", "Á. San Bartolomé · ejemplo E.070 · PUCP"),
-        ("Ubicación", "Lima · suelo de cascajo (S1)"),
+        ("Ubicación", "Lima · suelo rígido S1 (cascajo)"),
         ("Uso", "Vivienda · U = 1.0"),
         ("Altura", f"{CASE['pisos']} pisos · {CASE['altura']:.2f} m de piso a techo"),
         (
@@ -184,10 +183,6 @@ def case_study(scene: Scene) -> None:
         height="fill",
         padding=("150px", "24px", "110px", "1290px"),
     )
-    scene.play(enter(sheet, each=0.04, duration=0.3))
-    scene.stop("caso-datos")
-
-    x2 = plan.instances("X2")
     note = t(
         scene,
         "X2: muros de concreto armado en el eje A\npara acercar el centro de rigidez al de masas",
@@ -200,8 +195,8 @@ def case_study(scene: Scene) -> None:
     )
     scene.play(
         [
-            *[w.animate.indicate().duration(0.8) for w in x2],
-            note.animate.fade_in().duration(0.5),
+            enter(sheet, each=0.04, duration=0.3),
+            note.animate.fade_in().duration(0.5).delay(0.3),
         ]
     )
     source(
@@ -209,7 +204,7 @@ def case_study(scene: Scene) -> None:
         "San Bartolomé (2006). Ejemplo de aplicación de la Norma E.070 en el diseño de un "
         "edificio de albañilería confinada. PUCP · Tesis, Tablas 20–21 y Fig. 34 · ′ = simétrico",
     )
-    scene.stop("caso-x2")
+    scene.stop("caso-estudio")
 
 
 SOFT = {"MCT": BRICK_SOFT, "MSTA": STEEL_SOFT, "MSTO": CONCRETE_SOFT}
@@ -349,7 +344,6 @@ ROOF_ARROWS = (
     (15.1, 2),
     (15.1, 6),
 )
-SWAY = 1.1  # m en la azotea: deformada exagerada
 OVERLAY = 1000  # z_index de lo 2D que va sobre los rótulos del modelo
 # Tomas de la cámara. El foco se ve en ``at``, a la izquierda del panel de pasos.
 CENTER = (WIDTH / 2, DEPTH / 2)
@@ -357,7 +351,7 @@ MODEL_AT = (-3.0, -0.45)
 MCT_PLAN = Shot(0, 84, 0.4, (*CENTER, 0.0), (-3.3, -0.15))
 MCT_VIEW = Shot(38, 26, 0.34, (*CENTER, 4.6), MODEL_AT)
 MCT_HIGH = Shot(28, 40, 0.33, (*CENTER, 4.6), MODEL_AT)
-MCT_SWAY = Shot(56, 20, 0.33, (*CENTER, 4.8), MODEL_AT)
+MCT_MASS = Shot(56, 20, 0.33, (*CENTER, 4.8), MODEL_AT)
 JUNCTION = (3.0, 0.0)  # nudo del eje 2 con el eje A: X1, Y3 y su columna
 # El nudo a pantalla completa, como al acercarse en ETABS: piso 2, entre X1 e Y3.
 MCT_JUNCTION = Shot(32, 16, 0.95, (*JUNCTION, 3.72), (1.4, -0.35))
@@ -1086,8 +1080,8 @@ def full_model(scene: Scene) -> None:
                 s.z1,
             )
         )
-    # Para el análisis modal el edificio se lee como masas concentradas en cada
-    # diafragma: los muros se vuelven casi transparentes y quedan frames y masas.
+    # La masa sísmica se lee concentrada en cada diafragma: los muros se vuelven
+    # casi transparentes y quedan frames y masas.
     see_through = [
         part.animate.opacity(0.15).duration(0.6)
         for wall in model.walls()
@@ -1100,7 +1094,7 @@ def full_model(scene: Scene) -> None:
             *[c.animate.fade_out().duration(0.3) for c in centers],
             d1.animate.fade_out().duration(0.3),
             *[p.animate.fade_out().duration(0.3) for p in triad],
-            orbit_to(scene, MCT_SWAY, 1.4),
+            orbit_to(scene, MCT_MASS, 1.4),
             stagger(*[a.animate.create().duration(0.4) for a in arrows], each=0.05),
             stagger(
                 *[x.animate.fade_in().duration(0.3) for x in loads], each=0.15
@@ -1122,47 +1116,13 @@ def full_model(scene: Scene) -> None:
             ),
         ]
     )
-    # Con el modelo completo, el análisis modal: el modo 3 es la traslación en Y.
-    modal = [
-        label(scene, "Análisis modal", -7.3, -2.55, color=MUTED, size=0.13),
-        t(
-            scene,
-            f"Modo {MODE_Y['modo']} · T = {MODE_Y['T']:.3f} s",
-            -7.3,
-            -2.83,
-            font=MONO,
-            size=0.13,
-            color=INK,
-        ),
-        t(
-            scene,
-            f"traslación en Y · {MODE_Y['UY'] * 100:.0f} % de la masa",
-            -7.3,
-            -3.08,
-            size=0.15,
-            color=INK_SOFT,
-        ),
-        t(scene, "deformada exagerada", -7.3, -3.32, font=MONO, size=0.1, color=MUTED),
-    ]
-    scene.play(
-        [
-            *steps.restore(),
-            stagger(*[m.animate.fade_in().duration(0.3) for m in modal], each=0.08),
-        ]
-    )
+    scene.play(steps.restore())
     source(
         scene,
-        "Tesis · §5.3.1, pp. 58–67 (Figuras 23–34, Tabla 24); Figura 21, p. 47; Figura 40, p. 74; "
-        "Tabla 28, p. 77 · modelo esquemático del MCT",
+        "Tesis · §5.3.1, pp. 58–67 (Figuras 23–34, Tabla 24); Figura 21, p. 47; Figura 40, p. 74 "
+        "· modelo esquemático del MCT",
     )
-    scene.stop(
-        "mct-analisis",
-        loop=sequence(
-            parallel(*model.sway(SWAY, 0.6)),
-            parallel(*model.sway(-SWAY, 1.2)),
-            parallel(*model.sway(0.0, 0.6)),
-        ),
-    )
+    scene.stop("mct-cargas")
 
 
 def _junction_detail(scene: Scene, model: EtabsModel, story: Story) -> list[Drawable]:
@@ -1610,6 +1570,8 @@ def plane_frames(scene: Scene) -> None:
             ),
         ]
     )
+    scene.wait(0.2)
+    scene.stop("pp-transformada")
 
     # 2 · La unión de las piezas da la sección transformada, su centroide y propiedades.
     outline = [
@@ -1832,6 +1794,7 @@ def plane_frames(scene: Scene) -> None:
             ).delay(0.4),
         ]
     )
+    scene.stop("pp-barras")
 
     # 5 · En cada nivel: brazos rígidos desde el centroide y dinteles entre sus extremos.
     bar_points = {(round(x, 3), round(y, 3)) for _, x, y in BARS}
@@ -2000,6 +1963,7 @@ def plane_frames(scene: Scene) -> None:
             .delay(1.4),
         ]
     )
+    scene.stop("pp-cargas")
 
     # 8 · Diafragma rígido: cada nivel liga los nudos de todos los pórticos a D1.
     nodes = [(x, y) for _, x, y in BARS]
@@ -2494,7 +2458,7 @@ SECTION = Section(
             transition=Transition.cross_fade(0.45),
             notes=(
                 "45 s. Caso: 'Ejemplo de aplicación de la Norma E.070' de San Bartolomé (2006), "
-                "resuelto originalmente con la E.030-2003 y SAP2000. Lima, cascajo, vivienda de 4 "
+                "resuelto originalmente con la E.030-2003 y SAP2000. Lima, suelo rígido (cascajo), vivienda de 4 "
                 "pisos, losa maciza de 12 cm, muros de 13 cm, f'm = 65 kgf/cm², f'c = 175 kgf/cm². "
                 "La planta muestra las etiquetas Pier del modelo de ETABS; ′ indica el muro simétrico "
                 "(_2). X2 son muros de concreto en el eje A para controlar la torsión."
@@ -2531,9 +2495,8 @@ SECTION = Section(
                 "por muro, igual en todos los pisos; con ellas ETABS integra los esfuerzos de la "
                 "malla en fuerzas por muro. (8) Load Sets: CM 0.10 y CV 0.20 tonf/m² (azotea "
                 "CV 0.10); masa = CM + 25 % CV: 121.3 tonf por piso típico y 87.8 en la azotea; "
-                "los muros se aclaran y quedan las masas concentradas en cada diafragma. Al "
-                "analizar, el modo 3 (T = 0.171 s) es la traslación pura en Y; la deformada "
-                "está exagerada. Modelo esquemático: el orden de los clics es ilustrativo."
+                "los muros se aclaran y quedan las masas concentradas en cada diafragma. "
+                "Modelo esquemático: el orden de los clics es ilustrativo."
             ),
         ),
         SectionStep(
