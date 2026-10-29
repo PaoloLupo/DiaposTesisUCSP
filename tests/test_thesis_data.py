@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from tesis.data.planta import FLOOR_AREA, density, wall_area_sum
-from tesis.data.porticos import BARS, X4, X4_START
+from tesis.data.porticos import BARS, E_RIGID, NU_RIGID, X4, X4_START
 from tesis.data.thesis import (
     AXIAL_LIMITS,
     AXIAL_STRESS_FLOOR1,
@@ -230,6 +230,16 @@ class ManualProcessTablesTest(unittest.TestCase):
         # La barra de X4 está a cg de la cara exterior de la columna de Y4.
         x4 = next((x, y) for name, x, y in BARS if name == "X4")
         self.assertAlmostEqual(x4[0], X4_START + X4["cg"], delta=0.001)
+
+    def test_plane_frame_materials(self) -> None:
+        block = table(self.chapter, "tb:ge")
+        rows = {
+            name.split(" (")[0]: (float(e.replace(",", "")), float(nu))
+            for name, e, nu in re.findall(
+                r"\[([^\]]+)\],\s*\[([\d,]+)\],\s*\[([\d.]+)\]", block
+            )
+        }
+        self.assertEqual(rows["Rígido"], (E_RIGID, NU_RIGID))
 
     def test_translation_mode_in_y(self) -> None:
         block = table(self.chapter, "tb:an_mod")

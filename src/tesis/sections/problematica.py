@@ -192,7 +192,11 @@ def materials(scene: Scene) -> None:
             each=0.09,
         )
     )
-    source(scene, f"{SOURCE_LABEL} · Características de la vivienda.")
+    source(
+        scene,
+        f"Elaboración propia en base a {SOURCE_LABEL} · Censos Nacionales, "
+        "Características de la vivienda",
+    )
     scene.stop("materiales-listo")
 
 
@@ -637,7 +641,7 @@ def plates(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · §1.1 Problemática, p. 1 (Tavera, 2014)",
+        "Tesis · §1.1 Problemática, p. 1 en base a Tavera (2014)",
     )
     scene.stop("pais-sismico")
 
@@ -897,8 +901,8 @@ def seismic(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · §1.1 Problemática, p. 1; §3.1 Albañilería confinada, p. 21 (Gonzales, 1992; "
-        "Tavera, 2014; San Bartolomé, 2018). Vivienda esquemática.",
+        "Tesis · §1.1 Problemática, p. 1; §3.1 Albañilería confinada, p. 21 en base a "
+        "Gonzales (1992), Tavera (2014) y San Bartolomé (2018) · vivienda esquemática",
     )
     scene.stop("vivienda-en-conjunto")
 

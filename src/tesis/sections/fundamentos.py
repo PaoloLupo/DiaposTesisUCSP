@@ -433,8 +433,8 @@ def density_check(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · Tabla 22, p. 57 (E.070, art. 19.2b) · Z = 0.45, U = 1, S = 1, N = 4 · "
-        "planta de San Bartolomé (2006)",
+        "Tesis · Tabla 22, p. 57 en base a la E.070, art. 19.2b, y a la planta de "
+        "San Bartolomé (2006) · Z = 0.45, U = 1, S = 1, N = 4",
     )
     scene.stop("densidad-conclusion")
 
@@ -739,7 +739,8 @@ def strength_checks(scene: Scene) -> None:
         scene.stop(f"verificacion-{i + 1}")
     source(
         scene,
-        "Tesis · Figuras 44 y 45, pp. 107 y 109 (E.070, arts. 19.1b, 26.2 y 26.3) · "
+        "Tesis · Figuras 44 y 45, pp. 107 y 109 en base a la E.070, arts. 19.1b, 26.2 y "
+        "26.3 · "
         "valores: Tablas 31, 35 y 37, pp. 82, 86 y 88",
     )
     scene.stop("verificaciones-fuente")
@@ -941,7 +942,8 @@ def drift(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · Figura 46, p. 110; E.030, Tabla N.° 11 · esquema con desplazamientos "
+        "Tesis · Figura 46, p. 110 en base a la E.030, Tabla N.° 11 · esquema con "
+        "desplazamientos "
         "exagerados; valor del caso: Tabla 52, p. 131",
     )
     scene.stop("deriva-lectura")

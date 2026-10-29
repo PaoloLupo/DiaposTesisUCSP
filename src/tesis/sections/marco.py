@@ -813,7 +813,7 @@ def density_module(scene: Scene) -> None:
     scene.play(token.animate.fade_out().duration(0.2))
     reference = source(
         scene,
-        "Tesis · Figura 43, p. 105 (E.070, art. 19.2) · valores: Tabla 22, p. 57",
+        "Tesis · Figura 43, p. 105 en base a la E.070, art. 19.2 · valores: Tabla 22, p. 57",
     )
     scene.stop("modulo-recorrido")
 

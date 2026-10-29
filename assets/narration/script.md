@@ -220,7 +220,10 @@ Luego se calculan las cargas con el método del sobre, trazando líneas a 45 gra
 Ya en ETABS se dibuja una barra por muro en su centroide, empotrada en la base.
 
 [stop pp-barras]
-Luego cada barra se une con brazos rígidos hasta el borde del muro y con los dinteles. Así, cada eje forma un pórtico plano, como este del eje A.
+Luego cada barra se une con brazos rígidos hasta el borde del muro y con los dinteles. Los brazos usan un material rígido ficticio, con un módulo de elasticidad de 200 millones de toneladas por metro cuadrado, para que no se deformen en el nudo.
+
+[stop pp-brazos]
+Así, cada eje forma un pórtico plano, como este del eje A.
 
 [stop pp-porticos]
 A cada barra se le asigna una sección general con las propiedades calculadas, con una rigidez casi nula fuera de su plano, y su peso se corrige para no contar dos veces el peso de las alas.

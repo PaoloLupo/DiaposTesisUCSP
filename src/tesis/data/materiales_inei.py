@@ -10,7 +10,7 @@ SOURCE_URL = (
     "adjuntos/censos-2025/descarga_datos/tabulados/00/vivienda/"
     "Caracter%C3%ADsticas_de_la_vivienda.xlsx"
 )
-SOURCE_LABEL = "INEI · Censos Nacionales 2025"
+SOURCE_LABEL = "INEI (2025)"
 
 MATERIALES_ORDENADOS = sorted(
     [

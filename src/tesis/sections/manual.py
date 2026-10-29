@@ -57,7 +57,9 @@ from tesis.data.planta import STORIES
 from tesis.data.porticos import (
     BARS,
     BEAMS,
+    E_RIGID,
     MODULAR_RATIO,
+    NU_RIGID,
     SLAB_DEAD,
     SLAB_LIVE,
     STORY_COUNT,
@@ -155,7 +157,7 @@ def case_study(scene: Scene) -> None:
     )
     rows = [
         ("Referencia", "Á. San Bartolomé · ejemplo E.070 · PUCP"),
-        ("Ubicación", "Lima · suelo rígido S1 (cascajo)"),
+        ("Ubicación", "Lima · suelo rígido (cascajo)"),
         ("Uso", "Vivienda · U = 1.0"),
         ("Altura", f"{CASE['pisos']} pisos · {CASE['altura']:.2f} m de piso a techo"),
         (
@@ -201,8 +203,8 @@ def case_study(scene: Scene) -> None:
     )
     source(
         scene,
-        "San Bartolomé (2006). Ejemplo de aplicación de la Norma E.070 en el diseño de un "
-        "edificio de albañilería confinada. PUCP · Tesis, Tablas 20–21 y Fig. 34 · ′ = simétrico",
+        "Tesis · Tablas 20 y 21, pp. 52–53, y Figura 34, p. 66 en base a San Bartolomé "
+        "(2006) · ′ = simétrico",
     )
     scene.stop("caso-estudio")
 
@@ -1271,6 +1273,10 @@ FRAME_WINDOW = (
     "Fuera del plano: As3, I22 y J × 0.0001",
     f"Masa y peso × {WEIGHT_FACTOR_X4:.3f}  (= As2 / A1)",
 )
+RIGID_WINDOW = (
+    "Material  Rígido (ficticio)",
+    f"E = {E_RIGID:,} tonf/m²    ν = {NU_RIGID}".replace(",", " "),
+)
 # Tomas: la planta cenital ocupa el lugar de la planta dibujada; luego la vista 3D y
 # el pórtico del eje A de frente, en elevación.
 MSTA_PLAN = Shot(0, 89, PLAN_WIDTH / WIDTH, (*CENTER, 0.0), PLAN_CENTER)
@@ -1818,6 +1824,10 @@ def plane_frames(scene: Scene) -> None:
             if abs(a[1]) < 1e-6 and abs(b[1]) < 1e-6:
                 frame_a.append(line)
         by_level.append((arms, lintels))
+    # Mientras se dibujan los brazos, el material rígido con que se definen.
+    rigid_window, rigid_texts, _ = _define_window(
+        scene, "Define › Materials · brazos rígidos", RIGID_WINDOW, -1.55, head=False
+    )
     scene.play(
         [
             *step(4),
@@ -1837,8 +1847,15 @@ def plane_frames(scene: Scene) -> None:
                 ],
                 each=0.35,
             ),
+            *[
+                w.animate.fade_in_from(Direction.UP, 0.06).duration(0.35).delay(0.3)
+                for w in rigid_window
+            ],
+            sequence(*[typed(x, 70).delay(0.1) for x in rigid_texts]).delay(0.6),
         ]
     )
+    scene.wait(0.2)
+    scene.stop("pp-brazos")
     # Un pórtico plano: las barras, brazos y dinteles de un mismo eje (eje A). La
     # cámara se pone de frente, en elevación, como se lo dibuja en el papel.
     in_frame = {id(x) for x in frame_a}
@@ -1862,6 +1879,10 @@ def plane_frames(scene: Scene) -> None:
     ).hidden()
     scene.play(
         [
+            *[
+                w.animate.fade_out().duration(0.3)
+                for w in (*rigid_window, *rigid_texts)
+            ],
             *[x.animate.opacity(0.12).duration(0.5) for x in others],
             *[w.animate.opacity(0.2).duration(0.5) for w in plan.walls],
             orbit_to(scene, MSTA_FRAME_A, 1.6),
@@ -2014,8 +2035,8 @@ def plane_frames(scene: Scene) -> None:
     )
     source(
         scene,
-        "Tesis · §5.3.2, pp. 67–73 (Tablas 25–27, Figuras 35–39); San Bartolomé (2006), §6 y §7 "
-        "· modelo MSTA de ETABS; sección de X4 esquemática",
+        "Tesis · §5.3.2, pp. 67–73 (Tablas 25–27, Figuras 35–39) en base a San Bartolomé "
+        "(2006), §6 y §7 · modelo MSTA de ETABS; sección de X4 esquemática",
     )
     # Mientras se explica, la cámara rodea el modelo despacio: cada pórtico es plano.
     scene.stop(
@@ -2515,7 +2536,8 @@ SECTION = Section(
                 "CM = 2.72 y CV = 1.40 tonf por piso; en el modelo se escalan para sumar el peso "
                 "total de la losa (2.91 y 1.50 tonf). (4) La cámara inclina la planta hasta la "
                 "vista 3D y en ETABS sube una barra por muro en su centroide, empotrada en la "
-                "base. (5) Brazos rígidos (material rígido) del centroide al borde del muro y "
+                "base. (5) Brazos rígidos del centroide al borde del muro, con un material "
+                "rígido ficticio (E = 200 000 000 tonf/m², ν = 0.15; Tabla 25, p. 68), y "
                 "dinteles T (interiores) o L (perimetrales): cada eje forma un pórtico plano; la "
                 "cámara se pone de frente al del eje A, como se lo dibuja en elevación. (6) Secciones General con las propiedades "
                 "calculadas; rigidez casi nula fuera del plano (× 0.0001) y peso × A2/A1 para no "

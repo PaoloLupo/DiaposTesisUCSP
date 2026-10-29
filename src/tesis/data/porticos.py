@@ -103,6 +103,11 @@ BEAMS: tuple[tuple[BeamKind, tuple[float, float], tuple[float, float]], ...] = (
 # Relación modular de la rutina SECTRANS: Ec/Em = 15 000 √f'c / (500 f'm).
 MODULAR_RATIO = 15_000 * math.sqrt(175) / (500 * 65)
 
+# Material de los brazos rígidos del MSTA (tb:ge, Tabla 25): ficticio, con un módulo
+# idealizado (tonf/m²) para que no se deformen en el nudo.
+E_RIGID = 200_000_000
+NU_RIGID = 0.15
+
 # Muro de ejemplo: X4, con el ala de Y4 en un extremo. Fila de tb:geome (Tabla 26);
 # el centroide se mide desde la cara exterior de la columna izquierda.
 X4 = {"L": 3.10, "cg": 1.212, "A1": 1.038, "A2": 0.403, "I3": 1.509}
