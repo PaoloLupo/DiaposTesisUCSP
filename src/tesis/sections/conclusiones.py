@@ -253,7 +253,7 @@ def findings(scene: Scene) -> None:
                 thesis_image("cap7/ui_alba.png"), width=2.8, height=2.0, fit="contain"
             ),
             "Alba",
-            "apoyo de código\nlibre",
+            "software libre\nde apoyo",
             BRICK,
         ),
     ]
@@ -289,7 +289,7 @@ RECOMMENDATIONS = [
     ("Modelamiento", STEEL, "Fuerzas en uniones T y L"),
     ("Modelamiento", STEEL, "Análisis no lineal con macromodelos"),
     ("Alba", BRICK, "Diseño de confinamientos en Alba"),
-    ("Alba", BRICK, "Código libre al día con el RNE"),
+    ("Alba", BRICK, "Software libre al día con el RNE"),
     ("Nuevos usos", GOLD, "CNN para irregularidades en planta"),
     ("Nuevos usos", GOLD, "Alba como recurso docente"),
 ]
@@ -418,8 +418,8 @@ SECTION = Section(
                 "losa y cuentan el aporte de los muros ortogonales. (2) La E.030 vigente es más "
                 "rigurosa que la de 2003: combinación direccional 100 % + 30 % y factores sísmicos "
                 "mayores. (3) Las columnas de 0.25 m de la propuesta E.070 reducen las derivas hasta "
-                "22.61 % y neutralizan esa exigencia. (4) Alba es una herramienta de apoyo de código "
-                "libre. Cerrar con el criterio del usuario como factor determinante."
+                "22.61 % y neutralizan esa exigencia. (4) Alba es una herramienta de apoyo y es "
+                "software libre. Cerrar con el criterio del usuario como factor determinante."
             ),
         ),
         SectionStep(
@@ -429,7 +429,7 @@ SECTION = Section(
             notes=(
                 "45 s. Recomendaciones (p. 137): modelos completos con elementos área, fuerzas en "
                 "intersecciones T y L (un confinamiento solo puede tener una etiqueta Pier), diseño "
-                "de confinamientos en Alba, mantenimiento del código libre con el RNE, análisis no "
+                "de confinamientos en Alba, mantenimiento del software libre con el RNE, análisis no "
                 "lineal con macromodelos, CNN para irregularidades en planta y uso educativo."
             ),
         ),

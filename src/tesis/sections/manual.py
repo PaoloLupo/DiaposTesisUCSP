@@ -1,5 +1,5 @@
-"""Bloque 4 · Proceso manual: caso de estudio, modelo completo en ETABS, pórticos planos,
-criterios y ciclo iterativo."""
+"""Bloque 4 · Proceso manual: caso de estudio, modelos comparados, modelo completo en
+ETABS, pórticos planos, criterios y ciclo iterativo."""
 
 import math
 from collections.abc import Callable, Sequence
@@ -40,7 +40,9 @@ from tesis.building import (
     grow_walls,
 )
 from tesis.components import (
+    chip,
     compact_step,
+    compare_table,
     comparison_card,
     enter,
     header,
@@ -105,6 +107,7 @@ from tesis.theme import (
     FAIL,
     INK,
     INK_SOFT,
+    MODEL_COLORS,
     MONO,
     MUTED,
     PAPER_DEEP,
@@ -207,6 +210,91 @@ def case_study(scene: Scene) -> None:
         "edificio de albañilería confinada. PUCP · Tesis, Tablas 20–21 y Fig. 34 · ′ = simétrico",
     )
     scene.stop("caso-x2")
+
+
+SOFT = {"MCT": BRICK_SOFT, "MSTA": STEEL_SOFT, "MSTO": CONCRETE_SOFT}
+
+MATRIX = [
+    ("Norma sismorresistente", ("E.030 vigente", "E.030 vigente", "E.030 (2003)")),
+    ("Factor de zona", ("Z = 0.45", "Z = 0.45", "Z = 0.40")),
+    ("Sismo ortogonal 100 % + 30 %", ("sí", "sí", "no")),
+    ("Peralte de columnas", ("≥ 0.25 m", "≥ 0.25 m", "0.20 m")),
+    ("Idealización de muros", ("áreas (shell)", "barras", "barras")),
+    ("Programa de análisis", ("ETABS", "ETABS", "SAP2000")),
+    ("Procesamiento", ("Alba · API", "hojas de cálculo", "San Bartolomé (2006)")),
+]
+
+
+def models(scene: Scene) -> None:
+    header(scene, KICKER, "Tres modelos del mismo edificio: qué cambia entre ellos")
+    names = {
+        "MCT": "completo tridimensional",
+        "MSTA": "simplificado actualizado",
+        "MSTO": "simplificado original",
+    }
+    models_ = list(names)
+    table = compare_table(
+        scene,
+        columns=[(m, names[m], MODEL_COLORS[m], SOFT[m]) for m in models_],
+        rows=[
+            (
+                aspect,
+                [
+                    (
+                        values[j],
+                        values[j] != values[0],
+                        MODEL_COLORS[m] if values[j] != values[0] else INK_SOFT,
+                    )
+                    for j, m in enumerate(models_)
+                ],
+            )
+            for aspect, values in MATRIX
+        ],
+    )
+    L = scene.layout
+    logic = L.column(
+        *[
+            L.row(
+                chip(
+                    scene,
+                    text=pair,
+                    color=color,
+                    background=CARD,
+                    border=color,
+                    font=DISPLAY,
+                    width="250px",
+                ),
+                L.box(text, font_size="26px", color=INK),
+                gap="24px",
+                align="center",
+            )
+            for pair, text, color in [
+                (
+                    "MCT ↔ MSTA",
+                    "misma norma: la diferencia viene de la idealización y del procesamiento",
+                    BRICK,
+                ),
+                (
+                    "MSTA ↔ MSTO",
+                    "misma idealización: la diferencia viene de la norma (E.030 y E.070)",
+                    STEEL,
+                ),
+            ]
+        ],
+        gap="16px",
+        width="fill",
+    )
+    page(scene, body=[table, logic], gap="36px", top="185px", justify="start")
+    scene.play(enter(table, each=0.03, duration=0.25))
+    scene.stop("modelos-matriz")
+
+    scene.play(enter(logic, each=0.1))
+    source(
+        scene,
+        "Tesis · §8.1 Diferencias encontradas entre los modelos analizados, p. 126 · la propuesta E.070 (2019) "
+        "se adoptó como caso de análisis",
+    )
+    scene.stop("modelos-logica")
 
 
 # La vista 3D de ETABS como la arma el ingeniero: Definir, Dibujar y Asignar.
@@ -1171,7 +1259,7 @@ FRAME_STEPS: Phases = (
             ),
             (
                 "Centroide y propiedades",
-                "cg, A1, A2 e I de cada muro con la rutina SECTRANS",
+                "cg, A1, A2 e I de cada muro con la sección transformada",
             ),
             (
                 "Áreas tributarias",
@@ -2410,6 +2498,18 @@ SECTION = Section(
                 "pisos, losa maciza de 12 cm, muros de 13 cm, f'm = 65 kgf/cm², f'c = 175 kgf/cm². "
                 "La planta muestra las etiquetas Pier del modelo de ETABS; ′ indica el muro simétrico "
                 "(_2). X2 son muros de concreto en el eje A para controlar la torsión."
+            ),
+        ),
+        SectionStep(
+            name="Proceso manual · modelos comparados",
+            build=models,
+            transition=Transition.cross_fade(0.45),
+            notes=(
+                "45 s. MCT: modelo completo en ETABS procesado con Alba. MSTA: pórticos planos "
+                "actualizados, ETABS + hojas de cálculo. MSTO: referencia de San Bartolomé (2006) en "
+                "SAP2000 con E.030-2003. La lógica de lectura: MCT vs MSTA aísla la idealización y el "
+                "procesamiento (misma norma); MSTA vs MSTO aísla la norma (misma idealización). La "
+                "comparación es descriptiva: no mide una tasa de error de Alba."
             ),
         ),
         SectionStep(

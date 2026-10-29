@@ -1,4 +1,5 @@
-"""Bloque 6 · Implementación: arquitectura de Alba, API de ETABS, interfaz y reporte."""
+"""Bloque 6 · Implementación: el programa Alba, su arquitectura, API de ETABS, interfaz
+y reporte."""
 
 import math
 from typing import NamedTuple
@@ -24,6 +25,7 @@ from tesis.app import thesis_image
 from tesis.components import (
     chip,
     enter,
+    fact,
     hairline,
     header,
     module_card,
@@ -49,6 +51,77 @@ from tesis.theme import (
 )
 
 KICKER = "06 · Implementación: Alba"
+
+# Ficha del programa (Tesis §7.1); versión y licencia salen del repositorio de Alba.
+PROGRAM_FACTS = [
+    ("Tipo", "Programa de escritorio"),
+    ("Licencia", "Software libre"),
+    ("Lenguaje", "Python"),
+    ("Se conecta con", "ETABS por su API"),
+]
+
+
+def program(scene: Scene) -> None:
+    header(scene, KICKER, "Alba es el programa de escritorio que implementa el marco")
+    L = scene.layout
+    # El ícono es el mismo del ejecutable; sus partes (tile, arc, pin, dot, arrow)
+    # se arman una a una, como al abrir la aplicación.
+    logo = scene.media.svg("alba-logo.svg").item(
+        width="400px", height="400px", fit="contain"
+    )
+    wordmark = L.box("Alba", font=DISPLAY, font_size="150px", weight=700, color=INK)
+    lead = L.box(
+        "Verifica edificaciones de albañilería confinada\n"
+        "a partir de su modelo analizado en ETABS",
+        font_size="34px",
+        color=INK_SOFT,
+    )
+    facts = L.column(
+        *[
+            L.row(
+                *[fact(scene, name=n, value=v) for n, v in PROGRAM_FACTS[i : i + 2]],
+                gap="48px",
+                width="fill",
+            )
+            for i in (0, 2)
+        ],
+        gap="34px",
+        width="fill",
+    )
+    info = L.column(wordmark, lead, facts, gap="36px", width="fill").item(grow=1)
+    page_column(
+        scene,
+        body=[L.row(logo, info, gap="96px", align="center", width="fill")],
+        justify="center",
+    )
+    scene.play(
+        stagger(
+            logo.part("tile").animate.fade_in_from(Direction.UP, 0.08).duration(0.45),
+            parallel(
+                logo.part("pin").animate.create().duration(0.9),
+                logo.part("arc").animate.create().duration(0.7),
+            ),
+            logo.part("dot").animate.grow_from_center().duration(0.35),
+            logo.part("arrow").animate.create().duration(0.4),
+            each=0.3,
+        )
+    )
+    scene.play(
+        stagger(
+            wordmark.animate.fade_in_from(Direction.LEFT, 0.08).duration(0.5),
+            lead.animate.fade_in().duration(0.5),
+            each=0.2,
+        )
+    )
+    scene.stop("alba-programa")
+
+    scene.play(enter(facts, each=0.08))
+    source(
+        scene,
+        "Tesis · §7.1 Alcance de la implementación, p. 113 · Alba 0.1.0, licencia BSD-3-Clause",
+    )
+    scene.stop("alba-ficha")
+
 
 MODULES = [
     ("Interfaz de usuario", "ImGui Bundle"),
@@ -904,6 +977,17 @@ SECTION = Section(
     "alba",
     [
         SectionStep(
+            name="Alba · el programa",
+            build=program,
+            transition=Transition.cross_fade(0.45),
+            notes=(
+                "30 s. Presentar Alba como software antes de su arquitectura: programa de "
+                "escritorio de desarrollo propio (§7.1, p. 113) que lee un modelo analizado en "
+                "ETABS por su API, ejecuta las verificaciones de la E.070 y la E.030 y genera el "
+                "reporte. Escrito en Python; software libre (licencia BSD-3-Clause, versión 0.1.0)."
+            ),
+        ),
+        SectionStep(
             name="Alba · arquitectura",
             build=architecture,
             transition=Transition.cross_fade(0.45),
@@ -912,7 +996,7 @@ SECTION = Section(
                 ".alb), conexión con ETABS por COM (comtypes), procesamiento (pandas: filtrar, "
                 "clasificar por Pier y dirección), verificaciones normativas y visualización/reportes "
                 "(Typst, openpyxl). El recorrido del punto sigue un dato desde ETABS hasta el PDF. "
-                "Alba es de código libre."
+                "Alba es software libre."
             ),
         ),
         SectionStep(

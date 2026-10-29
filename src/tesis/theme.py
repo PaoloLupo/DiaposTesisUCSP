@@ -10,7 +10,7 @@ Los colores tienen significado estable en toda la exposición:
 
 from pathlib import Path
 
-from gaanim import Color, Style, TextStyle, Theme
+from gaanim import AxesStyle, Color, Style, TextStyle, Theme
 
 FONTS_DIR = Path(__file__).resolve().parents[2] / "assets" / "fonts"
 
@@ -76,8 +76,12 @@ def build_theme() -> Theme:
         },
         fonts={"text": SANS, "code": MONO},
         text={"label": LABEL, "caption": NOTE},
-        # Rótulos de la retícula de los mapas, como las demás notas técnicas.
-        styles={"map/labels": Style(text=TextStyle(font=MONO, size=0.11, color=MUTED))},
+        styles={
+            # Rótulos de la retícula de los mapas, como las demás notas técnicas.
+            "map/labels": Style(text=TextStyle(font=MONO, size=0.11, color=MUTED)),
+            # Cifras de los ejes de las gráficas, a la escala de sus rótulos.
+            "axes": AxesStyle(numbers=TextStyle(font=SANS, size=0.17, color=INK_SOFT)),
+        },
         font_dir=FONTS_DIR,
         text_markup=False,
     )
